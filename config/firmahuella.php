@@ -11,9 +11,15 @@ return [
         ? $venvPython
         : (PHP_OS_FAMILY === 'Windows' ? 'py' : 'python3')),
     'timeout' => (int) env('FIRMAHUELLA_TIMEOUT', 120),
+    'upload_proxy' => [
+        'url' => env('BIBLIOTECA_GRAFICA_UPLOAD_URL', 'http://190.116.178.163/apps/api/file-control/charge_file.php'),
+        // Mantiene compatibilidad con el token que ya usa DjController para fotos y DNI.
+        'token' => env('BIBLIOTECA_GRAFICA_UPLOAD_TOKEN', '457862h45hj7u5126h58d2s51s2s'),
+    ],
     'destinos' => [
         'dj' => '\\\\192.168.10.5\\Extranet_2024\\apps\\sisolmar\\storage\\app\\dj\\2026',
-        'firmas' => '\\\\192.168.10.2\\Biblioteca_Grafica\\FIRMAS\\PERSONAL',
-        'huellas' => '\\\\192.168.10.2\\Biblioteca_Grafica\\HUELLAS_DIGITALES\\PERSONAL',
+        // charge_file.php concatena estas rutas con Biblioteca_Grafica en el servidor 10.5.
+        'firmas' => 'FIRMAS\\PERSONAL',
+        'huellas' => 'HUELLAS_DIGITALES\\PERSONAL',
     ],
 ];

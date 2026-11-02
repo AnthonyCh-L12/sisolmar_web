@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Models\FileControl;
@@ -110,39 +111,42 @@ class FirmaHuellaDjController extends Controller
         $destinos = config('firmahuella.destinos');
         $archivos = [
             'dj' => ['archivo' => $validated['pdf'], 'ruta' => $destinos['dj'] . DIRECTORY_SEPARATOR . $nombreBase . '.pdf'],
-            'firma' => ['archivo' => $validated['firma'], 'ruta' => $destinos['firmas'] . DIRECTORY_SEPARATOR . $nombreBase . '.jpg'],
-            'huella' => ['archivo' => $validated['huella'], 'ruta' => $destinos['huellas'] . DIRECTORY_SEPARATOR . $nombreBase . '.jpg'],
+            'firma' => ['archivo' => $validated['firma'], 'ruta' => $destinos['firmas']],
+            'huella' => ['archivo' => $validated['huella'], 'ruta' => $destinos['huellas']],
         ];
 
-        // Respaldamos archivos previos para poder revertir una escritura parcial.
+        // La DJ se guarda en el servidor web; las biometrías pasan por charge_file.php,
+        // igual que las fotos y DNI, para que el servidor 10.5 escriba en Biblioteca_Grafica.
         $respaldos = [];
         $escritos = [];
+        $biometricosEnviados = [];
 
         try {
             foreach ($archivos as $tipo => $item) {
+                if ($tipo !== 'dj') {
+                    $this->enviarBiometricoAlServidor(
+                        $item['archivo'],
+                        $nombreBase . '.jpg',
+                        $item['ruta'],
+                        $tipo
+                    );
+                    $biometricosEnviados[] = $tipo;
+                    continue;
+                }
+
                 $directorio = dirname($item['ruta']);
                 File::ensureDirectoryExists($directorio, 0770, true);
 
-                if (is_file($item['ruta'])) {
-                    $respaldo = file_get_contents($item['ruta']);
-                    if ($respaldo === false) {
-                        throw new \RuntimeException("No se pudo respaldar el archivo existente de {$tipo}.");
-                    }
-                    $respaldos[$tipo] = $respaldo;
-                } else {
-                    $respaldos[$tipo] = null;
+                $respaldo = is_file($item['ruta']) ? file_get_contents($item['ruta']) : null;
+                if (is_file($item['ruta']) && $respaldo === false) {
+                    throw new \RuntimeException('No se pudo respaldar la DJ existente.');
                 }
+                $respaldos['dj'] = $respaldo;
 
                 $contenido = file_get_contents($item['archivo']->getRealPath());
-                if ($contenido === false) {
-                    throw new \RuntimeException("No se pudo leer el archivo de {$tipo}.");
-                }
-
-                // Registrar antes de escribir para revertir también una escritura parcial.
-                $escritos[] = $tipo;
-                $bytesEscritos = file_put_contents($item['ruta'], $contenido, LOCK_EX);
-                if ($bytesEscritos !== strlen($contenido)) {
-                    throw new \RuntimeException("No se pudo guardar el archivo de {$tipo} en su carpeta final.");
+                $escritos[] = 'dj';
+                if ($contenido === false || file_put_contents($item['ruta'], $contenido, LOCK_EX) !== strlen($contenido)) {
+                    throw new \RuntimeException('No se pudo guardar la DJ en su carpeta del servidor.');
                 }
             }
 
@@ -178,12 +182,44 @@ class FirmaHuellaDjController extends Controller
             Log::error('Error guardando DJ y biométricos extraídos', [
                 'codi_pers' => $codigo,
                 'error' => $e->getMessage(),
+                'biometricos_enviados' => $biometricosEnviados,
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'No se pudo guardar la DJ, la firma y la huella en las carpetas del servidor. Verifica el acceso a las rutas compartidas.',
+                'message' => 'No se pudo guardar la DJ, la firma y la huella mediante el servidor de archivos. Revisa el registro del servidor.',
             ], 500);
+        }
+    }
+
+    private function enviarBiometricoAlServidor($archivo, string $nombreArchivo, string $ruta, string $tipo): void
+    {
+        $contenido = file_get_contents($archivo->getRealPath());
+        if ($contenido === false) {
+            throw new \RuntimeException("No se pudo leer el archivo de {$tipo} para enviarlo al servidor de archivos.");
+        }
+
+        $proxy = config('firmahuella.upload_proxy');
+        $response = Http::timeout(30)
+            ->withToken((string) ($proxy['token'] ?? ''))
+            ->attach('archivo', $contenido, $nombreArchivo)
+            ->post((string) ($proxy['url'] ?? ''), [
+                'nameFile' => $nombreArchivo,
+                'ruta' => $ruta,
+            ]);
+
+        $respuesta = $response->json();
+        if ($response->failed() || ! is_array($respuesta) || ($respuesta['success'] ?? false) !== true) {
+            Log::error("charge_file.php rechazó el archivo de {$tipo}.", [
+                'status' => $response->status(),
+                // No guardar el cuerpo completo: charge_file.php incluye Authorization
+                // en su respuesta cuando el token es inválido.
+                'error_proxy' => $respuesta['error'] ?? $respuesta['mensaje'] ?? 'Respuesta inválida del servidor de archivos.',
+                'nombre_archivo' => $nombreArchivo,
+                'ruta_destino' => $ruta,
+            ]);
+
+            throw new \RuntimeException("El servidor de archivos no pudo guardar {$tipo} (HTTP {$response->status()}).");
         }
     }
 }
