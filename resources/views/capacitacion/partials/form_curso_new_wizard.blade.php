@@ -1,4 +1,4 @@
-{{-- Modal Nuevo: Registrar curso con wizard (Paso 1 Datos / Paso 2 Planificación / Paso 3 Evaluación).
+{{-- Modal Nuevo: Registrar curso con wizard (Paso 1 Datos / Paso 2 Planificación).
       Usa x-data="formCursoNew()" de gestion_cursos_new_modal.js. IDs con prefijo nreg para no colisionar. --}}
 <div id="modalRegistroCursoNew" class="contents">
     <div x-data="formCursoNew()" id="formCursoNewRoot" x-init="init()"
@@ -27,7 +27,7 @@
                     <div class="flex justify-between items-start gap-4">
                         <div>
                             <h3 class="text-xl font-bold text-default-900">Registrar curso</h3>
-                            <p class="text-sm text-default-500 mt-1">Completa la información en 3 pasos. Los campos con <span class="text-red-500 font-bold">*</span> son obligatorios.</p>
+                            <p class="text-sm text-default-500 mt-1">Completa la información en 2 pasos. Los campos con <span class="text-red-500 font-bold">*</span> son obligatorios.</p>
                         </div>
                         <button type="button" @click="cerrar()"
                             class="w-8 h-8 inline-flex items-center justify-center rounded-lg text-default-400 hover:text-default-700 hover:bg-default-100 transition-colors">
@@ -35,7 +35,7 @@
                         </button>
                     </div>
                     <div class="flex items-center gap-2 mt-4">
-                        <template x-for="n in [1,2,3]" :key="n">
+                        <template x-for="n in [1,2]" :key="n">
                             <div class="flex items-center gap-2 flex-1 last:flex-none">
                                 <button type="button" @click="irPaso(n)"
                                     class="flex items-center gap-2 shrink-0"
@@ -44,9 +44,9 @@
                                         :class="paso === n ? 'bg-primary text-white border-primary' : (n < paso ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-default-400 border-default-200')"
                                         x-text="n < paso ? '✓' : n"></span>
                                     <span class="text-xs font-bold hidden sm:inline"
-                                        x-text="n === 1 ? 'Datos' : (n === 2 ? 'Planificación' : 'Evaluación')"></span>
+                                        x-text="n === 1 ? 'Datos' : 'Planificación'"></span>
                                 </button>
-                                <div x-show="n < 3" class="h-0.5 flex-1 rounded-full" :class="n < paso ? 'bg-emerald-400' : 'bg-default-100'"></div>
+                                <div x-show="n < 2" class="h-0.5 flex-1 rounded-full" :class="n < paso ? 'bg-emerald-400' : 'bg-default-100'"></div>
                             </div>
                         </template>
                     </div>
@@ -108,14 +108,13 @@
                             <label for="nregFrecuencia" class="text-sm font-medium text-gray-800 inline-block mb-1">Frecuencia <span class="text-red-500">*</span></label>
                             <select id="nregFrecuencia" x-model="frecuencia"
                                 class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary/50 outline-none">
-                                <option value="">Seleccione la frecuencia…</option>
-                                <option value="MENSUAL">Mensual</option>
-                                <option value="BIMESTRAL">Bimestral</option>
-                                <option value="TRIMESTRAL">Trimestral</option>
-                                <option value="CUATRIMESTRAL">Cuatrimestral</option>
-                                <option value="SEMESTRAL">Semestral</option>
-                                <option value="ANUAL">Anual</option>
-                                <option value="PERSONALIZADO">Fecha personalizada</option>
+                                <option value="0">Seleccione la frecuencia…</option>
+                                <option value="1">Mensual</option>
+                                <option value="2">Bimestral</option>
+                                <option value="3">Trimestral</option>
+                                <option value="4">Cuatrimestral</option>
+                                <option value="6">Semestral</option>
+                                <option value="12">Anual</option>
                             </select>
                             <p x-show="!frecuencia" class="text-[11px] text-amber-600 font-medium mt-1">Elige una frecuencia para continuar al siguiente paso.</p>
                         </div>
@@ -153,21 +152,6 @@
                                         <span class="text-sm text-gray-700"><span class="text-xs bg-gray-200 px-1.5 py-0.5 rounded mr-1" x-text="c.codigo"></span><span x-text="c.descripcion"></span></span>
                                     </label>
                                 </template>
-                            </div>
-                        </div>
-                        {{-- Sucursales PAC --}}
-                        <div x-show="esPAC" x-transition class="bg-indigo-50/50 border border-indigo-100 rounded-lg p-4">
-                            <p class="text-sm font-bold text-indigo-800 mb-1">Sucursales asignadas <span class="text-red-500">*</span></p>
-                            <input type="text" x-model="busquedaSucursal" placeholder="Buscar sucursal…" class="w-full border border-indigo-200 rounded-md px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-indigo-200">
-                            <div class="border border-indigo-100 rounded-md p-2 overflow-y-auto bg-white custom-scrollbar" style="max-height: 150px;">
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
-                                    <template x-for="s in sucursalesFiltradas" :key="s">
-                                        <label class="flex items-center gap-2 p-2 rounded-md hover:bg-slate-50 cursor-pointer">
-                                            <input type="checkbox" :value="s" x-model="sucursalesAsignadas" class="w-4 h-4 text-indigo-600 rounded">
-                                            <span class="text-xs font-medium text-gray-700" x-text="s"></span>
-                                        </label>
-                                    </template>
-                                </div>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -220,102 +204,6 @@
                         </div>
                     </div>
 
-                    {{-- PASO 3 --}}
-                    <div x-show="paso === 3" class="flex flex-col gap-4" x-cloak>
-                        <div class="flex items-center gap-2">
-                            <span class="w-6 h-6 rounded-lg bg-primary/10 text-primary text-xs font-bold inline-flex items-center justify-center">3</span>
-                            <h4 class="text-sm font-bold text-default-900">Evaluación y recursos</h4>
-                        </div>
-                        <div class="flex items-center justify-between p-3 bg-indigo-50/80 border border-indigo-100 rounded-xl cursor-pointer select-none"
-                            @click="aplicaEvaluacion = !aplicaEvaluacion">
-                            <div class="pointer-events-none">
-                                <p class="text-sm font-bold text-indigo-900">Evaluación obligatoria</p>
-                                <p class="text-[11px] text-indigo-600/80 font-medium">Actívalo si el curso requiere examen para aprobar</p>
-                            </div>
-                            <input id="nregAplicaEval" type="checkbox" x-model="aplicaEvaluacion" @click.stop class="form-switch scale-110 cursor-pointer">
-                        </div>
-                        <div x-show="aplicaEvaluacion" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            <div>
-                                <label for="nregLimite" class="text-xs font-semibold text-gray-700 inline-block mb-1">Tiempo (min)</label>
-                                <input id="nregLimite" type="number" min="5" x-model="limiteTiempo" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                            </div>
-                            <div>
-                                <label for="nregNota" class="text-xs font-semibold text-gray-700 inline-block mb-1">Nota mínima</label>
-                                <input id="nregNota" type="number" min="5" x-model="nota" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                            </div>
-                            <div>
-                                <label for="nregIntentos" class="text-xs font-semibold text-gray-700 inline-block mb-1">Intentos</label>
-                                <input id="nregIntentos" type="number" min="1" x-model="intentos" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                            </div>
-                            <div>
-                                <label for="nregCant" class="text-xs font-semibold text-gray-700 inline-block mb-1">N.º preguntas</label>
-                                <input id="nregCant" type="number" min="5" x-model="cantidadPreguntas" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                            </div>
-                            <div class="col-span-2 sm:col-span-2">
-                                <label for="nregBalotario" class="text-xs font-semibold text-gray-700 inline-block mb-1">Preguntas en balotario</label>
-                                <input id="nregBalotario" type="number" min="5" x-model="preguntasBalotario" :readonly="preguntasExamen.length > 0"
-                                    :class="preguntasExamen.length > 0 ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'"
-                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                            </div>
-                        </div>
-                        <div x-show="aplicaEvaluacion" class="border border-dashed border-blue-300 bg-blue-50/40 rounded-xl p-4">
-                            <p class="text-[11px] font-black uppercase tracking-widest text-primary mb-2">Banco de preguntas (Word .docx)</p>
-                            <div class="w-full bg-white border border-blue-200 rounded-lg px-4 py-2.5 flex items-center justify-between shadow-sm mb-3">
-                                <span class="text-xs font-medium" :class="!archivoWordNombre ? 'italic text-blue-400' : 'text-blue-700'"
-                                    x-text="archivoWordNombre || 'Selecciona un Word con preguntas y respuestas'"></span>
-                                <button x-show="archivoWordNombre" type="button" @click="archivoWordNombre=''; archivoWord=null; preguntasExamen=[]"
-                                    class="text-red-400 hover:text-red-600 ml-2" title="Quitar archivo"><i class="bx bx-trash text-lg"></i></button>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <button type="button" @click="$refs.nregInputWord.click()"
-                                    class="btn btn-sm bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-lg px-5 h-[42px] font-bold">
-                                    <i class="bx bx-file-find mr-2 text-lg"></i><span x-text="archivoWordNombre ? 'Cambiar archivo' : 'Seleccionar archivo'"></span>
-                                </button>
-                                <button x-show="archivoWordNombre && !preguntasExamen.length" type="button" @click="analizarExamenWord()" :disabled="cargandoWord"
-                                    class="btn btn-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg px-5 h-[42px] font-bold disabled:opacity-70">
-                                    <span x-show="!cargandoWord">Analizar Word</span>
-                                    <span x-show="cargandoWord">Analizando…</span>
-                                </button>
-                                <button x-show="preguntasExamen.length > 0" type="button" @click="verVistaPrevia()"
-                                    class="btn btn-sm bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg px-5 h-[42px] font-bold">
-                                    <i class="bx bx-show mr-2"></i>Ver <span x-text="preguntasExamen.length"></span> preguntas
-                                </button>
-                                <input type="file" x-ref="nregInputWord" class="hidden" accept=".docx"
-                                    @change="archivoWord = $event.target.files[0]; archivoWordNombre = $event.target.files[0]?.name || ''; preguntasExamen = []; $event.target.value = '';">
-                            </div>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold text-gray-700 mb-2">Recursos visuales <span class="text-gray-400 font-normal">(opcionales)</span></p>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <div class="relative w-full aspect-[16/9] bg-white border-2 border-dashed border-slate-200 rounded-lg overflow-hidden flex items-center justify-center cursor-pointer hover:border-primary/40"
-                                        @click="!imagePreviewPortada && $refs.nregPortada.click()">
-                                        <template x-if="imagePreviewPortada">
-                                            <img :src="imagePreviewPortada" class="w-full h-full object-cover">
-                                        </template>
-                                        <template x-if="!imagePreviewPortada">
-                                            <span class="text-xs font-semibold text-slate-500">Subir portada (JPG/PNG)</span>
-                                        </template>
-                                    </div>
-                                    <input type="file" id="nregPortada" x-ref="nregPortada" class="hidden" accept=".jpg,.jpeg,.png" @change="handleImageUpload($event, 'portada')">
-                                    <button x-show="imagePreviewPortada" type="button" @click="imagePreviewPortada=null; imageFilePortada=null" class="text-xs text-red-500 font-semibold mt-1">Quitar portada</button>
-                                </div>
-                                <div>
-                                    <div class="relative w-full aspect-[16/9] bg-white border-2 border-dashed border-slate-200 rounded-lg overflow-hidden flex items-center justify-center cursor-pointer hover:border-primary/40"
-                                        @click="!imagePreviewAfiche && $refs.nregAfiche.click()">
-                                        <template x-if="imagePreviewAfiche">
-                                            <img :src="imagePreviewAfiche" class="w-full h-full object-cover">
-                                        </template>
-                                        <template x-if="!imagePreviewAfiche">
-                                            <span class="text-xs font-semibold text-slate-500">Subir afiche (JPG/PNG)</span>
-                                        </template>
-                                    </div>
-                                    <input type="file" id="nregAfiche" x-ref="nregAfiche" class="hidden" accept=".jpg,.jpeg,.png" @change="handleImageUpload($event, 'afiche')">
-                                    <button x-show="imagePreviewAfiche" type="button" @click="imagePreviewAfiche=null; imageFileAfiche=null" class="text-xs text-red-500 font-semibold mt-1">Quitar afiche</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {{-- Footer --}}
@@ -325,13 +213,13 @@
                         <span x-text="paso > 1 ? '← Atrás' : 'Cancelar'"></span>
                     </button>
                     <div class="flex items-center gap-2">
-                        <span class="text-xs text-default-400 font-semibold hidden sm:inline" x-text="`Paso ${paso} de 3`"></span>
-                        <button x-show="paso < 3" type="button" @click="siguiente()"
-                            :disabled="(paso === 1 && !puedeAvanzarPaso1) || (paso === 2 && !puedeAvanzarPaso2)"
+                        <span class="text-xs text-default-400 font-semibold hidden sm:inline" x-text="`Paso ${paso} de 2`"></span>
+                        <button x-show="paso < 2" type="button" @click="siguiente()"
+                            :disabled="paso === 1 && !puedeAvanzarPaso1"
                             class="h-9 px-5 inline-flex items-center gap-1.5 bg-primary text-white text-sm font-medium rounded-lg shadow-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed">
                             Siguiente →
                         </button>
-                        <span x-show="paso === 3" :title="!formularioCompleto ? tituloCamposFaltantes : ''">
+                        <span x-show="paso === 2" :title="!formularioCompleto ? tituloCamposFaltantes : ''">
                             <button type="button" @click="registrar" :disabled="!formularioCompleto"
                                 class="h-9 px-5 inline-flex items-center gap-1.5 bg-primary text-white text-sm font-medium rounded-lg shadow-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                 :class="!formularioCompleto ? 'pointer-events-none' : ''">

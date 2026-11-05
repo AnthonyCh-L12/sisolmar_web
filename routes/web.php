@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\ActualizacionesDjController;
+use App\Http\Controllers\Api\NewCapacController;
 use App\Http\Controllers\BiometricoController;
 use App\Http\Controllers\CapacitacionController;
-use App\Http\Controllers\ExamenesController;
 use App\Http\Controllers\ConsultaController;
 use App\Http\Controllers\DjController;
+use App\Http\Controllers\ExamenesController;
 use App\Http\Controllers\FileController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\NotificacionController;
@@ -14,17 +16,13 @@ use App\Http\Controllers\ReportePersonalController;
 use App\Http\Controllers\RoutingController;
 use App\Http\Controllers\UbicacionController;
 use App\Http\Controllers\UsuarioController;
-use App\Http\Controllers\ActualizacionesDjController;
-use App\Http\Controllers\Api\NewCapacController;
 use App\Mail\AlertaCaducidadMail;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
-
 Route::get('/login', [LoginController::class, 'index'])->name('login');
 
 Route::middleware(['auth'])->group(function () {
-    
 
     // ─── RUTAS WEB (vistas y acciones directas) ───────────────────────────────
     Route::get('/dj/periodos/gestionar', [ActualizacionesDjController::class, 'index'])->name('dj.periodos.index');
@@ -69,8 +67,6 @@ Route::middleware(['auth'])->group(function () {
 
     // ─── RUTAS /api/* (antes en api.php) ─────────────────────────────────────
     Route::prefix('api')->group(function () {
-
-    
 
         // Usuarios
         Route::get('/get-usuarios', [UsuarioController::class, 'getUsuarios']);
@@ -184,8 +180,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-cursos-av', [ExamenesController::class, 'obtenerCursosAV']);
         Route::post('/obtener-datos-reporte-av', [ExamenesController::class, 'obtenerDatosReporteAV']);
 
-
-
         // ── Nuevas rutas de Capacitación (Rodrigo) ───────────────────────
         Route::post('/obtener-personal-reporte', [CapacitacionController::class, 'obtenerPersonalParaReporte']);
         Route::post('/actualizar-curso/{codigo}', [CapacitacionController::class, 'actualizarCurso']);
@@ -216,7 +210,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-curso-new/{codigoCurso}', [NewCapacController::class, 'obtenerCurso']);
         Route::get('/obtener-ultimo-codigo-curso-new', [NewCapacController::class, 'ultimoCodigoCurso']);
         Route::get('/obtener-dirigidos-new', [NewCapacController::class, 'dirigidos']);
-        Route::post('/guardar-curso-directo-new', [NewCapacController::class, 'guardarCursoDirecto']);
+
+        Route::get('/obtener-catalogos/dirigidos-new', [NewCapacController::class, 'obtenerDirigidosNew']);
+        Route::get('/obtener-catalogos/areas-new', [NewCapacController::class, 'obtenerAreasNew']);
+        Route::get('/obtener-catalogos/sistemas-new', [NewCapacController::class, 'obtenerSistemasNew']);
+        Route::get('/obtener-catalogos/planes-new', [NewCapacController::class, 'obtenerPlanesNew']);
+        Route::get('/obtener-catalogos/tipos-curso-new', [NewCapacController::class, 'obtenerTiposCursoNew']);
+
+        Route::post('/guardar-curso-new', [NewCapacController::class, 'guardarCursoNew']);
+        Route::post('/actualizar-curso-new', [NewCapacController::class, 'actualizarCursoNew']);
         Route::get('/obtener-tipos-curso', [CapacitacionController::class, 'obtenerTiposDeCurso']);
         Route::post('/capacitacion/procesar-examen-word', [CapacitacionController::class, 'procesarExamenWord']);
         Route::post('/capacitacion/guardar-examen-word', [CapacitacionController::class, 'guardarExamenWord']);

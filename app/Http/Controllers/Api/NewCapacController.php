@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CursoNew;
 use App\Models\CursoProgramacion;
 use App\Models\Personal;
 use Carbon\Carbon;
@@ -10,46 +11,47 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 class NewCapacController extends Controller
 {
     public function obtenerCursos(): JsonResponse
     {
         try {
-            $cursos = DB::table('sw_cursos as c')
-                ->leftJoin('sw_capacitacion_tipo_curso as tc', 'tc.codigo', '=', 'c.tipo_curso')
-                ->leftJoin('sw_capacitacion_areas as a', 'a.codigo', '=', 'c.area_conocimiento')
+            $cursos = DB::table('sw_cursos_new as c')
+                ->leftJoin('sw_cursos_plan as p', 'p.codigo', '=', 'c.SW_CURS_PLAN_CAPAC_COD')
+                ->leftJoin('sw_cursos_sistema as s', 's.codigo', '=', 'c.SW_CURS_SIST_GESTION_COD')
+                // Compatibilidad temporal: el JSON actual expone la abreviatura histórica (ej. SGC).
+                ->leftJoin('sw_capacitacion_areas as sa', 'sa.codigo', '=', 'c.SW_CURS_SIST_GESTION_COD')
                 ->select(
-                    'c.codigo',
-                    'c.codigo_curso',
-                    'c.nombre',
-                    'c.categoria',
-                    'c.codigo_moodle',
-                    'tc.descripcion as plan_nombre',
-                    'a.abreviatura as sistema_nombre',
+                    'c.CODIGO',
+                    'c.SW_CURS_COD',
+                    'c.SW_CURS_NOMBRE',
+                    'c.SW_CURS_TIPO_COD',
+                    'c.SW_CURS_AV_COD',
+                    'p.nombre as plan_nombre',
+                    DB::raw('COALESCE(sa.abreviatura, s.nombre) as sistema_nombre'),
                     'c.fecha_creacion',
                     'c.habilitado',
                 )
-                ->orderBy('c.codigo_curso')
+                ->orderBy('c.SW_CURS_COD')
                 ->get();
 
             $vigentes = CursoProgramacion::query()
                 ->habilitados()
                 ->vigentes()
-                ->whereIn('cod_curso', $cursos->pluck('codigo')->all())
+                ->whereIn('cod_curso', $cursos->pluck('CODIGO')->all())
                 ->pluck('cod_curso')
-                ->map(fn($v) => (int) $v)
+                ->map(fn ($v) => (int) $v)
                 ->flip();
 
             $cursos = $cursos
                 ->map(function ($row) use ($vigentes) {
                     return [
-                        'CURS_COD' => (string) $row->codigo_curso,
-                        'CURS_NOMBRE' => $row->nombre,
+                        'CURS_COD' => (string) $row->SW_CURS_COD,
+                        'CURS_NOMBRE' => $row->SW_CURS_NOMBRE,
                         'CURS_TIPO' => $this->mapearCategoriaCurso(
-                            isset($row->categoria) ? (int) $row->categoria : null,
-                            $row->codigo_moodle,
+                            isset($row->SW_CURS_TIPO_COD) ? (int) $row->SW_CURS_TIPO_COD : null,
+                            $row->SW_CURS_AV_COD,
                         ),
                         'CURS_PLAN_CAPAC_NOMBRE' => $row->plan_nombre,
                         'CURS_SIST_GESTION_NOMBRE' => $row->sistema_nombre,
@@ -60,7 +62,8 @@ class NewCapacController extends Controller
                             ? Carbon::parse($row->fecha_creacion)->format('Y-m-d')
                             : null,
                         'CURS_HABILITADO' => (bool) $row->habilitado,
-                        'CURS_TIENE_VIGENTE' => isset($vigentes[(int) $row->codigo]),
+                        'CURS_SUBIDO_AV' => (int) $row->SW_CURS_AV_COD != 0,
+                        'CURS_TIENE_VIGENTE' => isset($vigentes[(int) $row->CODIGO]),
                     ];
                 })
                 ->values();
@@ -87,36 +90,38 @@ class NewCapacController extends Controller
     public function obtenerCurso(string $codigoCurso): JsonResponse
     {
         try {
-            $row = DB::table('sw_cursos as c')
-                ->leftJoin('sw_capacitacion_tipo_curso as tc', 'tc.codigo', '=', 'c.tipo_curso')
-                ->leftJoin('sw_capacitacion_areas as a', 'a.codigo', '=', 'c.area_conocimiento')
-                ->leftJoin('sw_cursos_area as ar', 'ar.codigo', '=', 'c.area')
+            $row = DB::table('sw_cursos_new as c')
+                ->leftJoin('sw_cursos_plan as p', 'p.codigo', '=', 'c.SW_CURS_PLAN_CAPAC_COD')
+                ->leftJoin('sw_cursos_sistema as s', 's.codigo', '=', 'c.SW_CURS_SIST_GESTION_COD')
+                // Compatibilidad temporal: el JSON actual expone la abreviatura histórica (ej. SGC).
+                ->leftJoin('sw_capacitacion_areas as sa', 'sa.codigo', '=', 'c.SW_CURS_SIST_GESTION_COD')
+                ->leftJoin('sw_cursos_area as ar', 'ar.codigo', '=', 'c.SW_CURS_AREA_COD')
                 ->select(
-                    'c.codigo',
-                    'c.codigo_curso',
-                    'c.nombre',
-                    'c.descripcion',
-                    'c.categoria',
-                    'c.codigo_moodle',
-                    'c.tipo_curso',
-                    'c.area_conocimiento',
-                    'c.area',
-                    'c.cod_responsable',
-                    'c.es_periodico',
-                    'c.frecuencia',
-                    'c.dirigido_a',
-                    'c.sucursal',
+                    'c.CODIGO',
+                    'c.SW_CURS_COD',
+                    'c.SW_CURS_NOMBRE',
+                    'c.SW_CURS_DESCRIPCION',
+                    'c.SW_CURS_TIPO_COD',
+                    'c.SW_CURS_AV_COD',
+                    'c.SW_CURS_PLAN_CAPAC_COD',
+                    'c.SW_CURS_SIST_GESTION_COD',
+                    'c.SW_CURS_AREA_COD',
+                    'c.SW_CURS_RESP_COD',
+                    'c.SW_CURS_PERIODICIDAD',
+                    'c.SW_CURS_CANT_PERIOD',
+                    'c.SW_CURS_DIRIGIDO_COD',
+                    'c.SW_CURS_SUCURSAL_COD',
                     'c.habilitado',
                     'c.fecha_creacion',
-                    'tc.descripcion as plan_nombre',
-                    'a.abreviatura as sistema_nombre',
+                    'p.nombre as plan_nombre',
+                    DB::raw('COALESCE(sa.abreviatura, s.nombre) as sistema_nombre'),
                     'ar.nombre as area_responsable_nombre',
                     'ar.codigo_moodle as area_codigo_moodle',
                 )
-                ->where('c.codigo_curso', $codigoCurso)
+                ->where('c.SW_CURS_COD', $codigoCurso)
                 ->first();
 
-            if (!$row) {
+            if (! $row) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No se encontró el curso.',
@@ -125,7 +130,7 @@ class NewCapacController extends Controller
 
             $programaciones = CursoProgramacion::query()
                 ->habilitados()
-                ->delCurso($row->codigo)
+                ->delCurso($row->CODIGO)
                 ->orderBy('codigo_programacion')
                 ->get([
                     'codigo_programacion',
@@ -148,24 +153,25 @@ class NewCapacController extends Controller
                 ->values();
 
             $estados = $programaciones
-                ->map(fn($p) => strtoupper((string) ($p['estado_periodo'] ?? '')))
+                ->map(fn ($p) => strtoupper((string) ($p['estado_periodo'] ?? '')))
                 ->all();
 
             $sucursales = [];
             try {
                 $sucursales = DB::table('sw_curso_sucursales')
-                    ->where('curso_codigo', $row->codigo)
+                    ->where('curso_codigo', $row->CODIGO)
                     ->pluck('sucursal')
                     ->all();
             } catch (\Exception $e) {
                 $sucursales = [];
             }
 
+            $responsableCodigo = (int) $row->SW_CURS_RESP_COD;
             $responsableNombre = null;
-            if (!empty($row->cod_responsable)) {
+            if ($responsableCodigo > 0) {
                 try {
                     $resp = Personal::query()
-                        ->where('CODI_PERS', $row->cod_responsable)
+                        ->where('CODI_PERS', str_pad((string) $responsableCodigo, 5, '0', STR_PAD_LEFT))
                         ->first([
                             DB::raw(
                                 "LTRIM(RTRIM(APEL_1 + ' ' + ISNULL(APEL_2, '') + ' ' + NOMB_1 + ' ' + ISNULL(NOMB_2, ''))) as nombre"
@@ -177,45 +183,50 @@ class NewCapacController extends Controller
                 }
             }
 
+            $dirigidoCodigo = (int) $row->SW_CURS_DIRIGIDO_COD;
             $dirigidoNombre = null;
-            $dirigidoCodigo = $row->dirigido_a !== null ? (string) $row->dirigido_a : null;
-            if ($dirigidoCodigo === 'OTROS' || $dirigidoCodigo === '0') {
+            if ($dirigidoCodigo === 0) {
                 $dirigidoNombre = 'Otros';
-            } elseif ($dirigidoCodigo !== null && is_numeric($dirigidoCodigo)) {
+            } else {
                 try {
                     $dirigidoNombre = DB::table('sw_cursos_dirigido')
-                        ->where('codigo', (int) $dirigidoCodigo)
+                        ->where('codigo', $dirigidoCodigo)
                         ->value('nombre');
                 } catch (\Exception $e) {
                     $dirigidoNombre = null;
                 }
             }
 
-            $categoria = isset($row->categoria) ? (int) $row->categoria : null;
+            $categoria = (int) $row->SW_CURS_TIPO_COD;
+            $planCodigo = (int) $row->SW_CURS_PLAN_CAPAC_COD;
+            $sistemaCodigo = (int) $row->SW_CURS_SIST_GESTION_COD;
+            $areaCodigo = (int) $row->SW_CURS_AREA_COD;
 
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'CURS_COD' => (string) $row->codigo_curso,
-                    'CURS_PK' => (int) $row->codigo,
-                    'CURS_NOMBRE' => $row->nombre,
-                    'CURS_DESCRIPCION' => $row->descripcion,
-                    'CURS_CATEGORIA' => $categoria !== null ? (string) $categoria : null,
-                    'CURS_TIPO' => $this->mapearCategoriaCurso($categoria, $row->codigo_moodle),
-                    'CURS_PLAN_COD' => $row->tipo_curso !== null ? (string) $row->tipo_curso : null,
+                    'CURS_COD' => (string) $row->SW_CURS_COD,
+                    'CURS_PK' => (int) $row->CODIGO,
+                    'CURS_NOMBRE' => $row->SW_CURS_NOMBRE,
+                    'CURS_DESCRIPCION' => $row->SW_CURS_DESCRIPCION,
+                    'CURS_CATEGORIA' => $categoria > 0 ? (string) $categoria : null,
+                    'CURS_TIPO' => $this->mapearCategoriaCurso($categoria > 0 ? $categoria : null, $row->SW_CURS_AV_COD),
+                    'CURS_PLAN_COD' => $planCodigo > 0 ? (string) $planCodigo : null,
                     'CURS_PLAN_CAPAC_NOMBRE' => $row->plan_nombre,
-                    'CURS_SIST_GESTION_COD' => $row->area_conocimiento !== null ? (string) $row->area_conocimiento : null,
+                    'CURS_SIST_GESTION_COD' => $sistemaCodigo > 0 ? (string) $sistemaCodigo : null,
                     'CURS_SIST_GESTION_NOMBRE' => $row->sistema_nombre,
-                    'CURS_AREA_RESPONSABLE' => $row->area !== null ? (string) $row->area : null,
+                    'CURS_AREA_RESPONSABLE' => $areaCodigo > 0 ? (string) $areaCodigo : null,
                     'CURS_AREA_RESPONSABLE_NOMBRE' => $row->area_responsable_nombre,
                     'CURS_COD_MOODLE_AREA' => $row->area_codigo_moodle !== null ? (string) $row->area_codigo_moodle : null,
-                    'CURS_COD_RESPONSABLE' => $row->cod_responsable !== null ? (string) $row->cod_responsable : null,
+                    'CURS_COD_RESPONSABLE' => $responsableCodigo > 0
+                        ? str_pad((string) $responsableCodigo, 5, '0', STR_PAD_LEFT)
+                        : null,
                     'CURS_RESPONSABLE_NOMBRE' => $responsableNombre,
-                    'CURS_ES_PERIODICO' => (bool) $row->es_periodico,
-                    'CURS_FRECUENCIA' => $row->frecuencia,
-                    'CURS_DIRIGIDO_A' => $row->dirigido_a !== null ? (string) $row->dirigido_a : null,
+                    'CURS_ES_PERIODICO' => (bool) $row->SW_CURS_PERIODICIDAD,
+                    'CURS_FRECUENCIA' => $this->mapearFrecuencia((int) $row->SW_CURS_CANT_PERIOD),
+                    'CURS_DIRIGIDO_A' => (string) $dirigidoCodigo,
                     'CURS_DIRIGIDO_NOMBRE' => $dirigidoNombre,
-                    'CURS_SUCURSAL' => $row->sucursal,
+                    'CURS_SUCURSAL' => $this->formatearSucursal((int) $row->SW_CURS_SUCURSAL_COD),
                     'CURS_SUCURSALES' => $sucursales,
                     'CURS_HABILITADO' => (bool) $row->habilitado,
                     'CURS_CREADO_FECHA' => $row->fecha_creacion
@@ -257,13 +268,39 @@ class NewCapacController extends Controller
     }
 
     /**
-     * Devuelve el siguiente codigo_curso (max + 1, padded a 5).
-     * Usado por el modal nativo "Ingresar directo BD".
+     * Traduce la cantidad de periodos al texto histórico que consume el frontend.
      */
+    private function mapearFrecuencia(int $cantPeriod): ?string
+    {
+        return match ($cantPeriod) {
+            1 => 'MENSUAL',
+            2 => 'BIMESTRAL',
+            3 => 'TRIMESTRAL',
+            4 => 'CUATRIMESTRAL',
+            6 => 'SEMESTRAL',
+            12 => 'ANUAL',
+            default => null,
+        };
+    }
+
+    /**
+     * Mantiene el formato histórico de sucursal: "TODAS" o código de 2 dígitos.
+     */
+    private function formatearSucursal(int $codigo): string
+    {
+        if ($codigo === 0) {
+            return 'TODAS';
+        }
+
+        return str_pad((string) $codigo, 2, '0', STR_PAD_LEFT);
+    }
+
     public function ultimoCodigoCurso(): JsonResponse
     {
         try {
-            $last = DB::table('sw_cursos')->orderBy('codigo_curso', 'desc')->value('codigo_curso');
+            $last = CursoNew::query()
+                ->orderByRaw('TRY_CAST(SW_CURS_COD AS int) DESC')
+                ->value('SW_CURS_COD');
             $next = $last ? str_pad(((int) $last) + 1, 5, '0', STR_PAD_LEFT) : '10001';
 
             return response()->json(['success' => true, 'ultimo' => (string) $last, 'siguiente' => (string) $next]);
@@ -274,9 +311,6 @@ class NewCapacController extends Controller
         }
     }
 
-    /**
-     * Catálogo "dirigido a" para el modal nativo (misma fuente que la vista).
-     */
     public function dirigidos(): JsonResponse
     {
         try {
@@ -292,119 +326,144 @@ class NewCapacController extends Controller
         }
     }
 
-    /**
-     * Inserción directa a sw_cursos (modal nativo "Ingresar directo BD").
-     * Inserta solo columnas existentes en la tabla para tolerar
-     * variaciones de nombre (creado_por, codEmpresa, es_demanda, etc.).
-     */
-    public function guardarCursoDirecto(Request $request): JsonResponse
+    public function obtenerDirigidosNew(): JsonResponse
+    {
+        return $this->listarCatalogo(
+            'obtenerDirigidosNew',
+            fn () => DB::table('sw_cursos_dirigido')
+                ->select('codigo', 'nombre')
+                ->where('habilitado', 1)
+                ->orderBy('nombre')
+                ->get(),
+            'No se pudo cargar el catálogo de dirigidos.'
+        );
+    }
+
+    public function obtenerAreasNew(): JsonResponse
+    {
+        return $this->listarCatalogo(
+            'obtenerAreasNew',
+            fn () => DB::table('sw_cursos_area')
+                ->select('codigo', 'codigo_moodle as codMoodle', 'nombre')
+                ->where('habilitado', 1)
+                ->orderBy('nombre')
+                ->get(),
+            'No se pudo cargar el catálogo de áreas.'
+        );
+    }
+
+    public function obtenerSistemasNew(): JsonResponse
+    {
+        return $this->listarCatalogo(
+            'obtenerSistemasNew',
+            fn () => DB::table('sw_cursos_sistema')
+                ->select('codigo', 'nombre', 'descripcion')
+                ->where('habilitado', 1)
+                ->orderBy('nombre')
+                ->get(),
+            'No se pudo cargar el catálogo de sistemas de gestión.'
+        );
+    }
+
+    public function obtenerPlanesNew(): JsonResponse
+    {
+        return $this->listarCatalogo(
+            'obtenerPlanesNew',
+            fn () => DB::table('sw_cursos_plan')
+                ->select('codigo', 'nombre', 'descripcion')
+                ->where('habilitado', 1)
+                ->orderBy('nombre')
+                ->get(),
+            'No se pudo cargar el catálogo de planes.'
+        );
+    }
+
+    public function obtenerTiposCursoNew(): JsonResponse
+    {
+        return $this->listarCatalogo(
+            'obtenerTiposCursoNew',
+            fn () => DB::table('sw_cursos_tipo')
+                ->select('codigo', 'descripcion')
+                ->where('habilitado', 1)
+                ->orderBy('descripcion')
+                ->get(),
+            'No se pudo cargar el catálogo de tipos de curso.'
+        );
+    }
+
+    public function actualizarCursoNew(Request $request): JsonResponse
     {
         try {
             $request->validate([
-                'nombre' => 'required|string|max:100',
-                'codigo_curso' => 'nullable|string|max:20',
-                'creado_por' => 'nullable|string|max:50',
-                'fecha_creacion' => 'nullable|date',
-                'modificado_por' => 'nullable|string|max:50',
-                'fecha_modificacion' => 'nullable|date',
-                'habilitado' => 'nullable|boolean',
-                'es_periodico' => 'nullable|boolean',
-                'aplica_evaluacion' => 'nullable|boolean',
-                'obligatorio_alta' => 'nullable|boolean',
-                'es_demanda' => 'nullable|boolean',
-                'cod_responsable' => 'nullable|string|max:20',
-                'codigo_moodle' => 'nullable|string|max:50',
-                'descripcion' => 'nullable|string',
-                'dirigido_a' => 'nullable|string|max:20',
-                'cod_cliente' => 'nullable|string|max:50',
-                'sucursal' => 'nullable|string|max:10',
-                'tipo_curso' => 'nullable|integer',
-                'area_conocimiento' => 'nullable|integer',
-                'area' => 'nullable|integer',
-                'categoria' => 'nullable|integer|in:1,2,3,4,5',
+                'SW_CURS_COD' => 'required|string|max:40',
+                'SW_CURS_NOMBRE' => 'nullable|string|max:400',
+                'SW_CURS_DESCRIPCION' => 'nullable|string',
+                'SW_CURS_TIPO_COD' => 'nullable|integer|exists:sw_cursos_tipo,codigo',
+                'SW_CURS_RESP_COD' => 'nullable|string|min:0',
+                'SW_CURS_PERIODICIDAD' => 'nullable|boolean',
+                'SW_CURS_CANT_PERIOD' => 'nullable|integer|min:1',
+                'SW_CURS_SIST_GESTION_COD' => 'nullable|integer|min:0',
+                'SW_CURS_AREA_COD' => 'nullable|integer|min:0',
             ]);
 
-            $columnas = [];
-            try {
-                $columnas = Schema::getColumnListing('sw_cursos');
-            } catch (\Exception $e) {
-                $columnas = [];
-            }
-            $existe = fn(string $col) => empty($columnas) || in_array($col, $columnas, true);
+            $curso = CursoNew::where('SW_CURS_COD', $request->input('SW_CURS_COD'))->first();
 
-            // codigo_curso: si no viene, generar max + 1; si viene, respetar (evita colisión).
-            $codigoCurso = trim((string) $request->input('codigo_curso', ''));
-            if ($codigoCurso === '') {
-                $last = DB::table('sw_cursos')->orderBy('codigo_curso', 'desc')->value('codigo_curso');
-                $codigoCurso = $last ? str_pad(((int) $last) + 1, 5, '0', STR_PAD_LEFT) : '10001';
-            }
-            if (DB::table('sw_cursos')->where('codigo_curso', $codigoCurso)->exists()) {
-                return response()->json(['success' => false, 'message' => "El codigo_curso {$codigoCurso} ya existe."], 422);
+            if (! $curso) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "El curso {$request->input('SW_CURS_COD')} no existe.",
+                ], 404);
             }
 
-            $bool = fn($v) => ((int) $v) === 1 ? 1 : 0;
-            $fechaODefault = fn($v) => $v
-                ? Carbon::parse($v)->format('Y-m-d\TH:i:s')
-                : Carbon::now()->format('Y-m-d\TH:i:s');
-            $intOrNull = fn($v) => ($v === null || $v === '' || $v === '__NULL__') ? null : (int) $v;
-            $strOrNull = fn($v) => ($v === null || $v === '' || $v === '__NULL__') ? null : (string) $v;
+            $usuario = auth()->user()?->usuario ?? 'SISTEMA';
+            $ahora = Carbon::now()->format('Y-m-d\\TH:i:s');
 
-            $dirigido = $strOrNull($request->input('dirigido_a'));
-            if ($dirigido === 'OTROS') {
-                $dirigido = '0';
+            $data = [];
+
+            if ($request->filled('SW_CURS_NOMBRE')) {
+                $data['SW_CURS_NOMBRE'] = trim((string) $request->input('SW_CURS_NOMBRE'));
             }
 
-            $data = [
-                'codigo_curso' => $codigoCurso,
-                'nombre' => trim((string) $request->input('nombre')),
-                'fecha_creacion' => $fechaODefault($request->input('fecha_creacion')),
-                'fecha_modificacion' => $fechaODefault($request->input('fecha_modificacion')),
-                'habilitado' => $request->has('habilitado') ? $bool($request->input('habilitado')) : 1,
-                'periodicidad' => null, // siempre NULL por requerimiento
-                'es_periodico' => $request->has('es_periodico') ? $bool($request->input('es_periodico')) : 0,
-                'frecuencia' => null, // siempre NULL por requerimiento
-                'aplica_evaluacion' => $request->has('aplica_evaluacion') ? $bool($request->input('aplica_evaluacion')) : 0,
-                'obligatorio_alta' => $request->has('obligatorio_alta') ? $bool($request->input('obligatorio_alta')) : 0,
-                'cod_responsable' => $strOrNull($request->input('cod_responsable')),
-                'codigo_moodle' => $strOrNull($request->input('codigo_moodle')),
-                'descripcion' => $strOrNull($request->input('descripcion')),
-                'dirigido_a' => $dirigido,
-                'cod_cliente' => $strOrNull($request->input('cod_cliente')),
-                'sucursal' => $strOrNull($request->input('sucursal')),
-                'target_group' => 'TODOS', // siempre TODOS
-                'tipo_curso' => $intOrNull($request->input('tipo_curso')),
-                'area_conocimiento' => $intOrNull($request->input('area_conocimiento')),
-                'area' => $intOrNull($request->input('area')),
-                'categoria' => $intOrNull($request->input('categoria')),
-            ];
-
-            // Columnas opcionales (solo si existen en la tabla real).
-            $opcionales = [
-                'creado_por' => $strOrNull($request->input('creado_por')),
-                'modificado_por' => $strOrNull($request->input('modificado_por')),
-                'es_demanda' => $request->has('es_demanda') ? $bool($request->input('es_demanda')) : 0,
-                'codEmpresa' => '01', // siempre 01
-                'cod_empresa' => '01', // variante snake_case por compatibilidad
-            ];
-            foreach ($opcionales as $col => $val) {
-                if ($existe($col)) {
-                    $data[$col] = $val;
-                }
+            if ($request->has('SW_CURS_DESCRIPCION')) {
+                $desc = trim((string) $request->input('SW_CURS_DESCRIPCION'));
+                $data['SW_CURS_DESCRIPCION'] = $desc !== '' ? $desc : 'Sin descripción.';
             }
 
-            // Filtrar a columnas existentes (si se pudo leer el schema).
-            if (!empty($columnas)) {
-                $data = array_intersect_key($data, array_flip($columnas));
+            if ($request->filled('SW_CURS_TIPO_COD')) {
+                $data['SW_CURS_TIPO_COD'] = (int) $request->input('SW_CURS_TIPO_COD');
             }
 
-            $pk = DB::table('sw_cursos')->insertGetId($data, 'codigo');
+            if ($request->filled('SW_CURS_RESP_COD')) {
+                $data['SW_CURS_RESP_COD'] = (int) $request->input('SW_CURS_RESP_COD');
+            }
+
+            if ($request->filled('SW_CURS_PERIODICIDAD')) {
+                $data['SW_CURS_PERIODICIDAD'] = $request->boolean('SW_CURS_PERIODICIDAD') ? 1 : 0;
+            }
+
+            if ($request->filled('SW_CURS_CANT_PERIOD')) {
+                $data['SW_CURS_CANT_PERIOD'] = (int) $request->input('SW_CURS_CANT_PERIOD');
+            }
+
+            if ($request->filled('SW_CURS_SIST_GESTION_COD')) {
+                $data['SW_CURS_SIST_GESTION_COD'] = (int) $request->input('SW_CURS_SIST_GESTION_COD');
+            }
+
+            if ($request->filled('SW_CURS_AREA_COD')) {
+                $data['SW_CURS_AREA_COD'] = (int) $request->input('SW_CURS_AREA_COD');
+            }
+
+            $data['modificado_por'] = $usuario;
+            $data['fecha_modificacion'] = $ahora;
+
+            $curso->update($data);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Curso registrado directo en BD.',
-                'codigo' => $pk,
-                'codigo_curso' => $codigoCurso,
-            ]);
+                'message' => 'Curso actualizado correctamente.',
+                'codigo' => $curso->CODIGO,
+                'codigo_curso' => $curso->SW_CURS_COD,
+            ], 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -412,12 +471,136 @@ class NewCapacController extends Controller
                 'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
-            Log::error('Error en NewCapacController@guardarCursoDirecto', [
+            Log::error('Error en NewCapacController@actualizarCursoNew', [
                 'error' => $e->getMessage(),
                 'line' => $e->getLine(),
             ]);
 
-            return response()->json(['success' => false, 'message' => 'Error al guardar: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Error al actualizar: '.$e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Envoltorio común para los catálogos: conserva el contrato {success, total, data}.
+     */
+    private function listarCatalogo(string $metodo, callable $consulta, string $mensajeError): JsonResponse
+    {
+        try {
+            $rows = $consulta();
+
+            return response()->json([
+                'success' => true,
+                'total' => $rows->count(),
+                'data' => $rows->values(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Error en NewCapacController@{$metodo}", [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $mensajeError,
+            ], 500);
+        }
+    }
+
+    /**
+     * Registra un curso en sw_cursos_new.
+     *
+     * Por ahora solo crea la fila maestra: no genera examen, programaciones,
+     * sucursales/clientes ni curso en Moodle.
+     */
+    public function guardarCursoNew(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'SW_CURS_COD' => 'nullable|string|max:40',
+                'SW_CURS_NOMBRE' => 'required|string|max:400',
+                'SW_CURS_DESCRIPCION' => 'nullable|string',
+                'SW_CURS_TIPO_COD' => 'required|integer|exists:sw_cursos_tipo,codigo',
+                'SW_CURS_PLAN_CAPAC_COD' => 'required|integer|exists:sw_cursos_plan,codigo',
+                'SW_CURS_SIST_GESTION_COD' => 'required|integer|min:0',
+                'SW_CURS_AREA_COD' => 'required|integer|min:0',
+                'SW_CURS_RESP_COD' => 'required|integer|min:0',
+                'SW_CURS_DIRIGIDO_COD' => 'required|integer|min:0',
+                'SW_CURS_SUCURSAL_COD' => 'required|integer|min:0',
+                'SW_CURS_CANT_PERIOD' => 'required|integer|min:0',
+                'SW_CURS_AV_COD' => 'required|integer|min:0',
+                'SW_CURS_PERIODICIDAD' => 'required|boolean',
+                'SW_CURS_EVALUACION' => 'required|boolean',
+                'SW_CURS_CLIENTE_COD' => 'nullable|string|max:20',
+                'habilitado' => 'nullable|boolean',
+            ]);
+
+            // Código de negocio: si no viene, se genera el siguiente.
+            $codigoCurso = trim((string) $request->input('SW_CURS_COD', ''));
+            if ($codigoCurso === '') {
+                $ultimo = CursoNew::query()
+                    ->orderByRaw('TRY_CAST(SW_CURS_COD AS int) DESC')
+                    ->value('SW_CURS_COD');
+                $codigoCurso = $ultimo ? str_pad(((int) $ultimo) + 1, 5, '0', STR_PAD_LEFT) : '10001';
+            }
+
+            if (CursoNew::query()->where('SW_CURS_COD', $codigoCurso)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "El curso {$codigoCurso} ya existe.",
+                ], 422);
+            }
+
+            $usuario = auth()->user()?->usuario ?? 'SISTEMA';
+            $ahora = Carbon::now()->format('Y-m-d\TH:i:s');
+            $descripcion = trim((string) $request->input('SW_CURS_DESCRIPCION', ''));
+
+            $curso = CursoNew::create([
+                'SW_CURS_COD' => $codigoCurso,
+                'SW_CURS_NOMBRE' => trim((string) $request->input('SW_CURS_NOMBRE')),
+                'SW_CURS_DESCRIPCION' => $descripcion !== '' ? $descripcion : 'Sin descripción.',
+                'SW_CURS_TIPO_COD' => (int) $request->input('SW_CURS_TIPO_COD'),
+                'SW_CURS_RESP_COD' => (int) $request->input('SW_CURS_RESP_COD'),
+                'SW_CURS_PLAN_CAPAC_COD' => (int) $request->input('SW_CURS_PLAN_CAPAC_COD'),
+                'SW_CURS_SIST_GESTION_COD' => (int) $request->input('SW_CURS_SIST_GESTION_COD'),
+                'SW_CURS_AREA_COD' => (int) $request->input('SW_CURS_AREA_COD'),
+                'SW_CURS_SUCURSAL_COD' => (int) $request->input('SW_CURS_SUCURSAL_COD'),
+                'SW_CURS_CANT_PERIOD' => (int) $request->input('SW_CURS_CANT_PERIOD'),
+                'SW_CURS_AV_COD' => (int) $request->input('SW_CURS_AV_COD'),
+                'SW_CURS_DIRIGIDO_COD' => (int) $request->input('SW_CURS_DIRIGIDO_COD'),
+                'SW_CURS_PERIODICIDAD' => (int) $request->boolean('SW_CURS_PERIODICIDAD'),
+                'SW_CURS_EVALUACION' => (int) $request->boolean('SW_CURS_EVALUACION'),
+                'habilitado' => $request->has('habilitado') ? (int) $request->boolean('habilitado') : 1,
+                'creado_por' => $usuario,
+                'modificado_por' => $usuario,
+                'fecha_creacion' => $ahora,
+                'fecha_modificacion' => $ahora,
+                'SW_CURS_CLIENTE_COD' => $request->filled('SW_CURS_CLIENTE_COD')
+                    ? (string) $request->input('SW_CURS_CLIENTE_COD')
+                    : null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Curso registrado correctamente.',
+                'codigo' => $curso->CODIGO,
+                'codigo_curso' => $curso->SW_CURS_COD,
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validación.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@guardarCursoNew', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al guardar: '.$e->getMessage(),
+            ], 500);
         }
     }
 }

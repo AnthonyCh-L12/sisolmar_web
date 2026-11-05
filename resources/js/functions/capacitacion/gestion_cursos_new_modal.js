@@ -11,7 +11,7 @@ import imageCompression from "browser-image-compression";
  *  - GET obtener-areas-por-sistema/{id} / obtener-areas (áreas responsables)
  *  - GET get-areas-encargadas / get-clientes-pac / obtener-sucursales / listar-jefaturas
  *  - POST capacitacion/procesar-examen-word (Word -> preguntas)
- *  - POST save-cursos (guardado multipart)
+ *  - POST guardar-curso-new (alta en sw_cursos_new)
  * Al abrir el modal se precargan sucursales, áreas, planes, dirigido a, etc.
  */
 
@@ -441,7 +441,7 @@ window.formCursoNew = function () {
         // ── Modal / pasos ──
         showModal: false,
         paso: 1,
-        totalPasos: 3,
+        totalPasos: 2,
         cargandoCombos: false,
         combosError: "",
         puntosCarga: 3,
@@ -480,8 +480,8 @@ window.formCursoNew = function () {
         dirigido: "",
         lastSistemaId: null,
 
-        // ── Paso 3: evaluación + recursos ──
-        aplicaEvaluacion: true,
+        // ── Evaluación + recursos (fase 2) ──
+        aplicaEvaluacion: false,
         limiteTiempo: "30",
         nota: "10",
         intentos: "1",
@@ -564,22 +564,10 @@ window.formCursoNew = function () {
             if (!this.tipoCurso || !this.areaResponsable || !this.sucursal || !this.dirigido) return false;
             if (this.tipoCurso != "6" && !this.areaConocimiento) return false;
             if (this.tipoCurso == "6" && !this.clienteSeleccionado) return false;
-            if (this.esPAC && this.sucursalesAsignadas.length === 0) return false;
             return true;
         },
         get formularioCompleto() {
-            const base = this.puedeAvanzarPaso1 && this.puedeAvanzarPaso2;
-            if (!base) return false;
-            if (!this.aplicaEvaluacion) return true;
-            return (
-                parseInt(this.limiteTiempo) >= 5 &&
-                parseFloat(this.nota) >= 5 &&
-                parseInt(this.intentos) >= 1 &&
-                parseInt(this.cantidadPreguntas) >= 5 &&
-                parseInt(this.preguntasBalotario) >= 5 &&
-                !!this.archivoWord &&
-                this.preguntasExamen.length > 0
-            );
+            return this.puedeAvanzarPaso1 && this.puedeAvanzarPaso2;
         },
         get tituloCamposFaltantes() {
             const f = [];
@@ -591,12 +579,6 @@ window.formCursoNew = function () {
             if (!this.areaResponsable) f.push("Área responsable");
             if (!this.sucursal) f.push("Sucursal");
             if (!this.dirigido) f.push("Dirigido a");
-            if (this.aplicaEvaluacion) {
-                if (parseInt(this.limiteTiempo) < 5) f.push("Tiempo (mín. 5)");
-                if (parseFloat(this.nota) < 5) f.push("Nota (mín. 5)");
-                if (parseInt(this.cantidadPreguntas) < 5) f.push("Preguntas (mín. 5)");
-                if (!this.archivoWord || this.preguntasExamen.length === 0) f.push("Analizar Word");
-            }
             return f.length ? "Faltan: " + f.join(", ") : "Completa los campos requeridos";
         },
 
@@ -642,7 +624,6 @@ window.formCursoNew = function () {
             // Solo permite retroceder o avanzar si el paso actual es válido
             if (n < this.paso) this.paso = n;
             else if (n === 2 && this.puedeAvanzarPaso1) this.paso = 2;
-            else if (n === 3 && this.puedeAvanzarPaso1 && this.puedeAvanzarPaso2) this.paso = 3;
         },
 
         // ── Combos (se cargan al abrir) ──
@@ -813,15 +794,11 @@ window.formCursoNew = function () {
             );
         },
 
-        // ── Guardado (POST save-cursos) ──
+        // ── Guardado (POST guardar-curso-new) ──
         async registrar(e) {
             e?.preventDefault?.();
-            if (this.esPAC && this.sucursalesAsignadas.length === 0) {
-                Swal.fire("Atención", "Debe asignar al menos una sucursal para cursos PAC", "warning");
-                return;
-            }
             if (this.tipoCurso == "6" && !this.clienteSeleccionado) {
-                Swal.fire("Atención", "Debe seleccionar un cliente para cursos PCU", "warning");
+                Swal.fire("Atención", "Debe seleccionar un cliente para cursos PCA", "warning");
                 return;
             }
             if (!this.codResponsable) {
@@ -836,67 +813,43 @@ window.formCursoNew = function () {
                 Swal.fire("Atención", "Debe seleccionar a quién va dirigido el curso", "warning");
                 return;
             }
-            if (!this.nombre.trim() || !this.tipoCurso || !this.categoria) {
+            if (!this.nombre.trim() || !this.tipoCurso || !this.categoria || !this.sucursal) {
                 Swal.fire("Atención", "Completa los campos obligatorios (*)", "warning");
                 return;
             }
-            if (this.aplicaEvaluacion) {
-                const ok =
-                    parseInt(this.limiteTiempo) >= 5 &&
-                    parseFloat(this.nota) >= 5 &&
-                    parseInt(this.intentos) >= 1 &&
-                    parseInt(this.cantidadPreguntas) >= 5 &&
-                    parseInt(this.preguntasBalotario) >= 5;
-                if (!ok) {
-                    Swal.fire("Atención", "Revisa los datos del examen (mínimos requeridos).", "warning");
-                    return;
-                }
-                if (!this.archivoWord || this.preguntasExamen.length === 0) {
-                    Swal.fire("Atención", "Adjunta un Word (.docx) y analízalo para crear el curso con examen.", "warning");
-                    return;
-                }
-            }
+
+            const toInt = (v) => {
+                const n = parseInt(String(v ?? "").replace(/[^\d-]/g, ""), 10);
+                return Number.isFinite(n) ? n : 0;
+            };
+            const frecuenciaCodigo = {
+                MENSUAL: 1,
+                BIMESTRAL: 2,
+                TRIMESTRAL: 3,
+                CUATRIMESTRAL: 4,
+                SEMESTRAL: 6,
+                ANUAL: 12,
+            };
+            const cliente = (this.clientesDisponibles || []).find(
+                (c) => String(c.codigo) === String(this.clienteSeleccionado)
+            );
 
             const fd = new FormData();
-            fd.append("nombre", this.nombre);
-            fd.append("tipo_curso", this.tipoCurso);
-            fd.append("categoria", this.categoria);
-            fd.append("area_conocimiento", this.areaConocimiento);
-            fd.append("area", this.area);
-            fd.append("frecuencia", this.frecuencia);
-            fd.append("es_periodico", this.esPeriodico ? 1 : 0);
-            fd.append("aplica_evaluacion", this.aplicaEvaluacion ? 1 : 0);
-            fd.append("obligatorio_alta", 1);
-            fd.append("es_demanda", 0);
-            fd.append("target_group", "TODOS");
-            if (this.aplicaEvaluacion) {
-                fd.append("tiempo", this.limiteTiempo);
-                fd.append("nota", this.nota);
-                fd.append("intentos", this.intentos);
-                fd.append("cantidad_preguntas", this.cantidadPreguntas);
-                fd.append("preguntas_balotario", this.preguntasBalotario);
-                if (this.preguntasExamen.length > 0) fd.append("preguntas_word", JSON.stringify(this.preguntasExamen));
-            }
-            if (this.esPAC && this.sucursalesAsignadas.length > 0) {
-                this.sucursalesAsignadas.forEach((s) => fd.append("sucursales_asignadas[]", s));
-            }
-            if (this.tipoCurso == "6" && this.clienteSeleccionado) {
-                fd.append("sucursales_asignadas[]", this.clienteSeleccionado);
-            }
-            if (this.tipoCurso == "7" && this.areasAsignadas.length > 0) {
-                this.areasAsignadas.forEach((a) => fd.append("sucursales_asignadas[]", a));
-            }
-            const resp = (this.personalJefaturas || []).find((p) => String(p.codigo) === String(this.codResponsable));
-            fd.append("cod_responsable", this.codResponsable);
-            fd.append("area_responsable", this.areaResponsable);
-            fd.append("cod_moodle_area", this.codMoodleArea);
-            fd.append("descripcion", this.descripcion);
-            fd.append("dirigido_a", this.dirigido);
-            fd.append("sucursal", this.sucursal);
-            if (this.archivoWord) fd.append("archivo", this.archivoWord);
-            if (this.imageFilePortada) fd.append("image_portada", this.imageFilePortada);
-            if (this.imageFileAfiche) fd.append("image_afiche", this.imageFileAfiche);
-            if (resp?.nombre_completo) fd.append("nombre_responsable", resp.nombre_completo);
+            fd.append("SW_CURS_NOMBRE", this.nombre.trim());
+            fd.append("SW_CURS_DESCRIPCION", (this.descripcion || "").trim());
+            fd.append("SW_CURS_TIPO_COD", String(toInt(this.categoria)));
+            fd.append("SW_CURS_PLAN_CAPAC_COD", String(toInt(this.tipoCurso)));
+            fd.append("SW_CURS_SIST_GESTION_COD", String(toInt(this.areaConocimiento)));
+            fd.append("SW_CURS_AREA_COD", String(toInt(this.areaResponsable)));
+            fd.append("SW_CURS_RESP_COD", String(toInt(this.codResponsable)));
+            fd.append("SW_CURS_DIRIGIDO_COD", this.dirigido === "OTROS" ? "0" : String(toInt(this.dirigido)));
+            fd.append("SW_CURS_SUCURSAL_COD", this.sucursal === "TODAS" ? "0" : String(toInt(this.sucursal)));
+            fd.append("SW_CURS_CANT_PERIOD", this.esPeriodico ? (frecuenciaCodigo[this.frecuencia] || 0) : 0);
+            fd.append("SW_CURS_AV_COD", "0");
+            fd.append("SW_CURS_PERIODICIDAD", this.esPeriodico ? "1" : "0");
+            fd.append("SW_CURS_EVALUACION", "0");
+            fd.append("SW_CURS_CLIENTE_COD", cliente?.cod_legacy ? String(cliente.cod_legacy) : "");
+            fd.append("habilitado", "1");
 
             Swal.fire({
                 title: "Registrando curso...",
@@ -907,10 +860,10 @@ window.formCursoNew = function () {
                 didOpen: () => Swal.showLoading(),
             });
             try {
-                const res = await axios.post(`${VITE_URL_APP}/api/save-cursos`, fd, {
+                const res = await axios.post(`${VITE_URL_APP}/api/guardar-curso-new`, fd, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
-                if (res.status === 200 && res.data?.success) {
+                if ((res.status === 200 || res.status === 201) && res.data?.success) {
                     Swal.fire("Éxito", res.data.message || "Curso registrado correctamente", "success");
                     this.cerrar();
                     if (window.tablaCursosNew) {
@@ -926,7 +879,7 @@ window.formCursoNew = function () {
                 if (err.response?.status === 422) {
                     const errors = err.response.data.errors || {};
                     let html = '<ul class="text-left text-sm">';
-                    for (const [k, msgs] of Object.entries(errors)) html += `<li><b>${k}:</b> ${msgs[0]}</li>`;
+                    for (const [k, msgs] of Object.entries(errors)) html += `<li><b>${k}</b>: ${msgs[0]}</li>`;
                     html += "</ul>";
                     Swal.fire({ title: "Errores de validación", html, icon: "warning" });
                 } else {
@@ -957,7 +910,7 @@ window.formCursoNew = function () {
             this.codMoodleArea = "";
             this.sucursal = "";
             this.dirigido = "";
-            this.aplicaEvaluacion = true;
+            this.aplicaEvaluacion = false;
             this.limiteTiempo = "30";
             this.nota = "10";
             this.intentos = "1";
@@ -1162,6 +1115,7 @@ window.formCursoEditNew = function () {
                     frecuencia: this.frecuencia,
                     areaConocimiento: this.areaConocimiento,
                     areaResponsable: this.areaResponsable,
+                    codMoodleArea: this.codMoodleArea
                 };
             } catch (e) {
                 console.error("Error abriendo edición:", e);
@@ -1200,18 +1154,27 @@ window.formCursoEditNew = function () {
             const o = this._original || {};
             const changed = (k) => String(this[k] ?? "") !== String(o[k] ?? "");
             const fd = new FormData();
-            if (changed("nombre")) fd.append("nombre", this.nombre);
-            if (changed("descripcion")) fd.append("descripcion", this.descripcion);
-            if (changed("categoria")) fd.append("categoria", this.categoria);
-            if (changed("codResponsable")) fd.append("cod_responsable", this.codResponsable);
-            if (changed("areaConocimiento") && !this.esPCU) fd.append("area_conocimiento", this.areaConocimiento);
-            if (changed("areaResponsable")) fd.append("area_responsable", this.areaResponsable);
-            if (this.codMoodleArea) fd.append("cod_moodle_area", this.codMoodleArea);
-            fd.append("es_periodico", this.esPeriodico ? 1 : 0);
-            if (changed("frecuencia")) fd.append("frecuencia", this.frecuencia);
+
+            fd.append("SW_CURS_COD", String(this.codigo));
+
+            const toInt = (v) => {
+                const n = parseInt(String(v ?? "").replace(/[^\d-]/g, ""), 10);
+                return Number.isFinite(n) ? n : 0;
+            };
+
+            if (changed("nombre"))         fd.append("SW_CURS_NOMBRE", this.nombre);
+            if (changed("descripcion"))    fd.append("SW_CURS_DESCRIPCION", this.descripcion || "");
+            if (changed("categoria"))      fd.append("SW_CURS_TIPO_COD", String(this.categoria));
+            if (changed("codResponsable")) fd.append("SW_CURS_RESP_COD", String(this.codResponsable));
+            if (changed("areaConocimiento") && !this.esPCU) fd.append("SW_CURS_SIST_GESTION_COD", String(this.areaConocimiento));
+            if (changed("areaResponsable")) fd.append("SW_CURS_AREA_COD", String(this.areaResponsable));
+            if (changed("codMoodleArea") && this.codMoodleArea) fd.append("cod_moodle_area", this.codMoodleArea);
+            if (changed("esPeriodico")) fd.append("SW_CURS_PERIODICIDAD", this.esPeriodico ? 1 : 0);
+            if (changed("frecuencia")) fd.append("SW_CURS_CANT_PERIOD", toInt(this.frecuencia));
+            
             this.guardando = true;
             try {
-                const res = await axios.post(`${VITE_URL_APP}/api/actualizar-curso/${this.codigoPk || this.codigo}`, fd, {
+                const res = await axios.post(`${VITE_URL_APP}/api/actualizar-curso-new`, fd, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
                 if (res.data?.success) {

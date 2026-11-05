@@ -103,9 +103,6 @@
         background: #ffffff !important;
     }
     .tabulator-placeholder span { color: #94a3b8 !important; font-size: 13px !important; font-weight: 600 !important; }
-
-    /* Botón "Ingresar directo BD" oculto (modal directo a BD) */
-    #btnDirectoBDNew { display: none !important; }
 </style>
 @endsection
 

@@ -92,14 +92,13 @@
                             <label for="nediFrecuencia" class="text-sm font-medium text-gray-800 inline-block mb-1">Frecuencia <span class="text-red-500">*</span></label>
                             <select id="nediFrecuencia" x-model="frecuencia"
                                 class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                                <option value="">Seleccione la frecuencia…</option>
-                                <option value="MENSUAL">Mensual</option>
-                                <option value="BIMESTRAL">Bimestral</option>
-                                <option value="TRIMESTRAL">Trimestral</option>
-                                <option value="CUATRIMESTRAL">Cuatrimestral</option>
-                                <option value="SEMESTRAL">Semestral</option>
-                                <option value="ANUAL">Anual</option>
-                                <option value="PERSONALIZADO">Fecha personalizada</option>
+                                <option value="0">Seleccione la frecuencia…</option>
+                                <option value="1">Mensual</option>
+                                <option value="2">Bimestral</option>
+                                <option value="3">Trimestral</option>
+                                <option value="4">Cuatrimestral</option>
+                                <option value="6">Semestral</option>
+                                <option value="12">Anual</option>
                             </select>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
