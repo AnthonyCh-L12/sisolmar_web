@@ -100,6 +100,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let _cursosFullData = [];
 
+    function recargarListadoCursos() {
+        if (
+            window.tabulatorCursos &&
+            typeof window.tabulatorCursos.replaceData === "function"
+        ) {
+            window.tabulatorCursos.replaceData();
+        }
+    }
+
     function populateFilters(data) {
         _cursosFullData = data;
         const unique = (field) =>
@@ -259,6 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     width: 130,
                     hozAlign: "center",
                     headerSort: true,
+                    visible: false,
                     formatter(cell) {
                         const val = cell.getValue() ?? 0;
                         return `
@@ -865,6 +875,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                                     actualizarContadores();
                                                     if (typeof window._aplicarFiltrosMatricula === 'function') window._aplicarFiltrosMatricula();
                                                     actualizarBotonSeleccionarFiltrados();
+                                                    recargarListadoCursos();
                                                 } else {
                                                     await Swal.fire({ icon: 'error', title: 'Error', text: resp.data.message || 'Error desconocido', confirmButtonColor: '#6366f1' });
                                                 }
@@ -1034,6 +1045,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     Swal.close();
                                     if (resp.data.success) {
                                         await Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'La matriculación fue enviada a procesamiento.' + (notificar ? ` Si son más de 10 personas, se enviará el resumen a ${correo} al finalizar.` : ''), confirmButtonColor: '#6366f1' });
+                                        recargarListadoCursos();
                                     } else {
                                         await Swal.fire({ icon: 'error', title: 'Error', text: resp.data.message || 'Error desconocido', confirmButtonColor: '#6366f1' });
                                     }
