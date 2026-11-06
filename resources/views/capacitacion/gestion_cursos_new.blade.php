@@ -109,7 +109,7 @@
 @include('layouts.shared/page-title', ['subtitle' => 'Capacitación', 'title' => 'Gestión de cursos (Nuevo)'])
 
 @section('content')
-<div class="px-6 py-6">
+<div class="px-6 py-6" x-data="{ guiaPasosOpen: false }">
     {{-- Header --}}
     <div
         class="relative overflow-hidden rounded-2xl border border-default-200/60 bg-gradient-to-br from-white via-default-50/50 to-primary/5 shadow-sm mb-6">
@@ -138,7 +138,7 @@
                         Creación de cursos especificando sus características y plan de capacitación al que pertenecen.
                     </p>
 
-                    <div class="flex items-center gap-6 mt-5">
+                    <div class="flex flex-wrap items-center gap-4 sm:gap-6 mt-5">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                                 <i class="ti ti-book-2 text-lg text-primary"></i>
@@ -158,6 +158,19 @@
                                 <p class="text-[10px] text-default-500">de capacitación</p>
                             </div>
                         </div>
+                        <div class="w-px h-10 bg-default-200"></div>
+                        <button type="button" @click="guiaPasosOpen = true"
+                            class="group inline-flex items-center gap-2 pl-3 pr-3.5 py-2 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 transition-colors cursor-pointer"
+                            title="Ver los pasos para crear y publicar un curso">
+                            <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary inline-flex items-center justify-center shrink-0">
+                                <i class="ti ti-list-check text-base"></i>
+                            </span>
+                            <span class="text-left">
+                                <span class="block text-xs font-bold text-default-800 leading-tight">Pasos para crear un curso</span>
+                                <span class="block text-[10px] text-default-500">y subirlo al AV</span>
+                            </span>
+                            <i class="ti ti-chevron-right text-sm text-primary/60 group-hover:translate-x-0.5 transition-transform"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -258,6 +271,115 @@
 
     {{-- Modal: subir curso al AV --}}
     @include('capacitacion.partials.form_curso_subir_av_new_modal')
+
+    {{-- Modal: guía de pasos para crear y publicar un curso --}}
+    <div x-show="guiaPasosOpen" x-cloak class="fixed inset-0 z-[130] flex items-center justify-center p-4"
+        x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+        style="background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px);"
+        @click.self="guiaPasosOpen = false" @keydown.escape.window="guiaPasosOpen = false">
+
+        <div class="relative flex flex-col shadow-2xl rounded-2xl overflow-hidden w-full max-w-2xl border border-default-200 bg-white max-h-[92vh]"
+            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+            x-transition:enter-end="opacity-100 scale-100 translate-y-0">
+
+            <div class="flex justify-between items-start gap-4 px-6 py-5 border-b border-default-100 shrink-0 bg-gradient-to-r from-primary/5 via-white to-white">
+                <div class="flex items-start gap-3">
+                    <div class="w-11 h-11 rounded-xl bg-primary/10 text-primary inline-flex items-center justify-center shrink-0">
+                        <i class="ti ti-route text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-default-900">Pasos para crear un curso</h3>
+                        <p class="text-sm text-default-500 mt-0.5">Del registro local a la publicación en el Aula Virtual.</p>
+                    </div>
+                </div>
+                <button type="button" @click="guiaPasosOpen = false"
+                    class="flex-shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-lg text-default-400 hover:text-default-700 hover:bg-default-100 transition-colors">
+                    <i class="ti ti-x text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
+                <ol class="relative space-y-5">
+                    {{-- Paso 1 --}}
+                    <li class="relative flex gap-4">
+                        <div class="flex flex-col items-center">
+                            <span class="w-9 h-9 rounded-full bg-green-500 text-white inline-flex items-center justify-center shrink-0 shadow-sm">
+                                <i class="ti ti-check text-lg"></i>
+                            </span>
+                            <span class="w-px flex-1 bg-default-200 mt-1"></span>
+                        </div>
+                        <div class="pb-1">
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-sm font-bold text-default-900">Crear el curso en el sistema</h4>
+                                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-bold uppercase tracking-wide">Hecho</span>
+                            </div>
+                            <p class="text-xs text-default-500 mt-1 leading-6">
+                                Se registra el curso en el módulo local (<span class="font-semibold text-default-700">sw_cursos_new</span>) con sus datos base.
+                            </p>
+                        </div>
+                    </li>
+
+                    {{-- Paso 2 --}}
+                    <li class="relative flex gap-4">
+                        <div class="flex flex-col items-center">
+                            <span class="w-9 h-9 rounded-full bg-primary/10 text-primary inline-flex items-center justify-center shrink-0 font-bold text-sm">2</span>
+                            <span class="w-px flex-1 bg-default-200 mt-1"></span>
+                        </div>
+                        <div class="pb-1">
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-sm font-bold text-default-900">Completar los datos del curso</h4>
+                                <span class="px-2 py-0.5 rounded-full bg-default-100 text-default-500 text-[10px] font-bold uppercase tracking-wide">Opcional</span>
+                            </div>
+                            <p class="text-xs text-default-500 mt-1 leading-6">
+                                Edita la información del curso: nombre, descripción, tipo, responsable, periodicidad y frecuencia, sistema de gestión y área responsable.
+                            </p>
+                        </div>
+                    </li>
+
+                    {{-- Paso 3 --}}
+                    <li class="relative flex gap-4">
+                        <div class="flex flex-col items-center">
+                            <span class="w-9 h-9 rounded-full bg-primary/10 text-primary inline-flex items-center justify-center shrink-0 font-bold text-sm">3</span>
+                            <span class="w-px flex-1 bg-default-200 mt-1"></span>
+                        </div>
+                        <div class="pb-1">
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-sm font-bold text-default-900">Subir el curso al Aula Virtual (AV)</h4>
+                            </div>
+                            <p class="text-xs text-default-500 mt-1 leading-6">
+                                Carga los recursos del curso: examen, portada, afiche informativo, nota mínima y demás media necesaria.
+                            </p>
+                        </div>
+                    </li>
+
+                    {{-- Paso 4 --}}
+                    <li class="relative flex gap-4">
+                        <div class="flex flex-col items-center">
+                            <span class="w-9 h-9 rounded-full bg-primary text-white inline-flex items-center justify-center shrink-0 font-bold text-sm shadow-sm">4</span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-sm font-bold text-default-900">Aperturar el curso</h4>
+                            </div>
+                            <p class="text-xs text-default-500 mt-1 leading-6">
+                                Al aperturar el curso se genera la <span class="font-semibold text-default-700">matriculación automática</span> de los participantes.
+                            </p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <div class="px-6 py-4 border-t border-default-100 bg-default-50/60 flex justify-end shrink-0">
+                <button type="button" @click="guiaPasosOpen = false"
+                    class="h-10 px-5 inline-flex items-center justify-center gap-1.5 bg-primary text-white text-xs font-semibold rounded-lg shadow-sm hover:bg-primary-700 transition">
+                    <i class="ti ti-circle-check text-sm"></i>
+                    Entendido
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 @endsection
 
