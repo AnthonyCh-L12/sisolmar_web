@@ -90,6 +90,110 @@ class NewCapacController extends Controller
         }
     }
 
+    public function obtenerCursosMatriculas(): JsonResponse
+    {
+        try {
+            $matriculas = DB::table('sw_matriculas as sm')
+                ->join('sw_cursos_programacion as sp', 'sp.codigo_programacion', '=', 'sm.cod_programacion')
+                ->where('sp.habilitado', 1)
+                ->where('sp.estado_periodo', 'VIGENTE')
+                ->select('sm.cod_curso', DB::raw('COUNT(DISTINCT sm.cod_personal) as total'))
+                ->groupBy('sm.cod_curso');
+
+            $cursos = DB::table('sw_cursos_new as c')
+                ->leftJoin('sw_cursos_plan as p', 'p.codigo', '=', 'c.SW_CURS_PLAN_CAPAC_COD')
+                ->leftJoin('sw_cursos_sistema as s', 's.codigo', '=', 'c.SW_CURS_SIST_GESTION_COD')
+                ->leftJoin('sw_cursos_area as ar', 'ar.codigo', '=', 'c.SW_CURS_AREA_COD')
+                ->leftJoin('sw_clientes as cli', 'cli.cod_legacy', '=', 'c.SW_CURS_CLIENTE_COD')
+                ->leftJoin('si_solm.dbo.PERSONAL as pr', function ($join) {
+                    $join->on(
+                        'pr.CODI_PERS',
+                        '=',
+                        DB::raw("RIGHT('00000' + CAST(c.SW_CURS_RESP_COD AS varchar(5)), 5)")
+                    );
+                })
+                ->leftJoinSub($matriculas, 'm', 'm.cod_curso', '=', 'c.CODIGO')
+                ->where('c.habilitado', 1)
+                ->select(
+                    'c.CODIGO',
+                    'c.SW_CURS_COD',
+                    'c.SW_CURS_NOMBRE',
+                    'c.SW_CURS_DESCRIPCION',
+                    'c.SW_CURS_AV_COD',
+                    'c.SW_CURS_RESP_COD',
+                    'c.fecha_creacion',
+                    'p.nombre as plan_nombre',
+                    'p.descripcion as plan_descripcion',
+                    's.nombre as sistema_nombre',
+                    'ar.nombre as area_nombre',
+                    'cli.abreviatura as cliente_abreviatura',
+                    DB::raw("LTRIM(RTRIM(ISNULL(pr.APEL_1, '') + ' ' + ISNULL(pr.APEL_2, '') + ' ' + ISNULL(pr.NOMB_1, '') + ' ' + ISNULL(pr.NOMB_2, ''))) as responsable_nombre"),
+                    DB::raw('COALESCE(m.total, 0) as total_matriculados')
+                )
+                ->orderBy('c.SW_CURS_COD')
+                ->get();
+
+            $vigentes = CursoProgramacion::query()
+                ->habilitados()
+                ->vigentes()
+                ->whereIn('cod_curso', $cursos->pluck('CODIGO')->all())
+                ->pluck('cod_curso')
+                ->map(fn ($v) => (int) $v)
+                ->flip();
+
+            $cursos = $cursos
+                ->map(function ($row) use ($vigentes) {
+                    $responsable = trim((string) ($row->responsable_nombre ?? ''));
+                    $responsableCodigo = (int) ($row->SW_CURS_RESP_COD ?? 0);
+                    $plan = trim((string) ($row->plan_nombre ?? ''));
+
+                    return [
+                        'Id' => (int) $row->SW_CURS_AV_COD > 0
+                            ? (int) $row->SW_CURS_AV_COD
+                            : (int) $row->CODIGO,
+                        'LocalId' => (int) $row->CODIGO,
+                        'Codigo' => (string) $row->SW_CURS_COD,
+                        'Nombre' => mb_strtoupper((string) $row->SW_CURS_NOMBRE),
+                        'Tipo' => $plan !== ''
+                            ? $plan
+                            : (trim((string) ($row->plan_descripcion ?? '')) ?: 'Sin tipo'),
+                        'Area' => $row->area_nombre ?: 'Sin area',
+                        'Sistema' => $row->sistema_nombre ?: 'Sin sistema',
+                        'Cliente' => $row->cliente_abreviatura ?: 'Sin cliente',
+                        'Cod_Responsable' => $responsableCodigo > 0
+                            ? str_pad((string) $responsableCodigo, 5, '0', STR_PAD_LEFT)
+                            : null,
+                        'Responsable' => $responsable !== ''
+                            ? mb_strtoupper($responsable)
+                            : 'Sin responsable',
+                        'Descripcion' => $row->SW_CURS_DESCRIPCION ?: 'Sin descripcion',
+                        'Total_Matriculados' => (int) $row->total_matriculados,
+                        'Fecha_Creacion' => $row->fecha_creacion
+                            ? strtotime((string) $row->fecha_creacion)
+                            : null,
+                        'Vigente' => isset($vigentes[(int) $row->CODIGO]),
+                    ];
+                })
+                ->values();
+
+            return response()->json([
+                'success' => true,
+                'Cursos' => $cursos,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@obtenerCursosMatriculas', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener los cursos para matriculas.',
+            ], 500);
+        }
+    }
+
     public function obtenerCurso(string $codigoCurso): JsonResponse
     {
         try {
@@ -1029,6 +1133,231 @@ class NewCapacController extends Controller
 
             return null;
         }
+    }
+
+    public function saveMatriculaNew(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'cursoId' => 'required|integer',
+                'programacionId' => 'required',
+                'personalIds' => 'required|array|min:1',
+                'personalIds.*' => 'required|string|max:20',
+                'notificar_email' => 'nullable|boolean',
+                'correo_notificacion' => 'nullable|email|max:150',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validacion.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        $usuarioId = auth()->id();
+
+        if (is_null($usuarioId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuario no autenticado.',
+            ], 401);
+        }
+
+        $curso = CursoNew::where('CODIGO', (int) $request->input('cursoId'))->first();
+
+        if (! $curso) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Curso no encontrado.',
+            ], 404);
+        }
+
+        if ((int) $curso->SW_CURS_AV_COD <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El curso no esta vinculado al aula virtual.',
+            ], 422);
+        }
+
+        $programacionId = (string) $request->input('programacionId');
+        $prog = CursoProgramacion::query()
+            ->habilitados()
+            ->delCurso($curso->CODIGO)
+            ->where(function ($query) use ($programacionId) {
+                $query->where('codigo_programacion', $programacionId)
+                    ->orWhere('codigo', $programacionId);
+            })
+            ->first();
+
+        if (! $prog) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Programacion no encontrada para el curso.',
+            ], 404);
+        }
+
+        if (strtoupper((string) $prog->estado_periodo) !== 'VIGENTE') {
+            return response()->json([
+                'success' => false,
+                'message' => 'La programacion seleccionada no esta vigente.',
+            ], 422);
+        }
+
+        $notificarEmail = $request->boolean('notificar_email');
+        $correoNotificacion = trim((string) $request->input('correo_notificacion', ''));
+
+        if ($notificarEmail && ! filter_var($correoNotificacion, FILTER_VALIDATE_EMAIL)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe indicar un correo valido para enviar el aviso.',
+            ], 422);
+        }
+
+        $personalIds = collect($request->input('personalIds', []))
+            ->map(fn ($id) => trim((string) $id))
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($personalIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe seleccionar al menos un personal.',
+            ], 422);
+        }
+
+        $sucursal = (int) $curso->SW_CURS_SUCURSAL_COD;
+        $sucursalId = $sucursal > 0
+            ? str_pad((string) $sucursal, 2, '0', STR_PAD_LEFT)
+            : null;
+        $codigoProgramacion = (string) ($prog->codigo_programacion ?: $prog->codigo);
+
+        dispatch(MatriculaMasivaJob::estandarNuevo(
+            (int) $curso->CODIGO,
+            $codigoProgramacion,
+            $personalIds,
+            (int) $usuarioId,
+            $sucursalId,
+            $notificarEmail,
+            $notificarEmail ? $correoNotificacion : null
+        ))->onQueue('training');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'La matriculacion fue enviada a procesamiento.',
+            'job_id' => $curso->CODIGO.'_'.$codigoProgramacion,
+        ]);
+    }
+
+    public function desmatricularUsuarioNew(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'cursoId' => 'required|integer',
+                'codPersonal' => 'required|string|max:20',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validacion.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        $curso = CursoNew::where('CODIGO', (int) $request->input('cursoId'))->first();
+
+        if (! $curso) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Curso no encontrado.',
+            ], 404);
+        }
+
+        $codPersonal = str_pad(trim((string) $request->input('codPersonal')), 5, '0', STR_PAD_LEFT);
+        $warnings = [];
+
+        $matricula = DB::table('sw_matriculas')
+            ->where('cod_curso', $curso->CODIGO)
+            ->where('cod_personal', $codPersonal)
+            ->first();
+
+        if (! $matricula) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontro una matricula para el personal indicado.',
+            ], 404);
+        }
+
+        DB::table('sw_matriculas')
+            ->where('cod_curso', $curso->CODIGO)
+            ->where('cod_personal', $codPersonal)
+            ->delete();
+
+        $moodleCourseId = (int) $curso->SW_CURS_AV_COD;
+
+        if ($moodleCourseId <= 0) {
+            $warnings[] = 'El curso no esta vinculado al aula virtual; solo se elimino la matricula local.';
+
+            return response()->json([
+                'success' => true,
+                'message' => implode(' ', $warnings),
+                'warnings' => $warnings,
+            ]);
+        }
+
+        $personal = Personal::where('CODI_PERS', $codPersonal)->first();
+        $dni = trim((string) ($personal->NRO_DOCU_IDEN ?? ''));
+
+        if ($personal === null || $dni === '') {
+            $warnings[] = 'No se pudo desmatricular en Moodle: personal sin DNI registrado.';
+
+            return response()->json([
+                'success' => true,
+                'message' => implode(' ', $warnings),
+                'warnings' => $warnings,
+            ]);
+        }
+
+        $moodleUser = DB::connection('mysql_grupoihb')
+            ->table('mdl_user')
+            ->where('username', $dni)
+            ->orWhere('idnumber', $dni)
+            ->first(['id']);
+
+        if (! $moodleUser) {
+            $warnings[] = 'No se pudo desmatricular en Moodle: usuario no encontrado.';
+
+            return response()->json([
+                'success' => true,
+                'message' => implode(' ', $warnings),
+                'warnings' => $warnings,
+            ]);
+        }
+
+        $moodleCourse = DB::connection('mysql_grupoihb')
+            ->table('mdl_course')
+            ->where('id', $moodleCourseId)
+            ->first(['idnumber']);
+
+        if (! $moodleCourse) {
+            $warnings[] = 'No se pudo desmatricular en Moodle: curso no encontrado.';
+
+            return response()->json([
+                'success' => true,
+                'message' => implode(' ', $warnings),
+                'warnings' => $warnings,
+            ]);
+        }
+
+        DB::connection('mysql_grupoihb')->select(
+            'SELECT F_USER_matricula_eliminar2(?, ?, ?, ?, ?) AS result',
+            [$moodleUser->id, $moodleCourse->idnumber, '00001', 'Desmatriculacion desde Intranet', 5]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Personal desmatriculado correctamente.',
+        ]);
     }
 
     /**

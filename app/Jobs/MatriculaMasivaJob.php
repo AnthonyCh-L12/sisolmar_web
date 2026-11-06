@@ -76,6 +76,28 @@ class MatriculaMasivaJob implements ShouldQueue
         );
     }
 
+    public static function estandarNuevo(
+        int              $cursoCodigo,
+        string           $programacionCodigo,
+        array            $personalIds,
+        int              $usuarioId,
+        string|int|null  $sucursalId = null,
+        bool             $notificarEmail = false,
+        ?string          $emailNotificacion = null
+    ): static {
+        return new static(
+            self::MODO_ESTANDAR,
+            $cursoCodigo,
+            $programacionCodigo,
+            $usuarioId,
+            $sucursalId,
+            $personalIds,
+            $notificarEmail,
+            $emailNotificacion,
+            'nuevo'
+        );
+    }
+
     public static function porTipoCurso(
         int              $cursoCodigo,
         string           $programacionCodigo,

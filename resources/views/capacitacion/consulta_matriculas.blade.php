@@ -687,10 +687,18 @@
 
         <!-- Footer -->
         <div class="flex justify-end items-center gap-3 px-6 py-4 border-t border-default-100 shrink-0 bg-default-50/50">
-            <label id="lblNotificarMatricula" class="mr-auto flex items-center gap-2 text-xs font-medium text-default-500 cursor-pointer select-none" title="Se avisará al coordinador por correo al finalizar (solo si son más de 10 personas)">
-                <input type="checkbox" id="chkNotificarMatricula" class="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary">
-                Avisar por correo al finalizar
-            </label>
+            <div id="lblNotificarMatricula" class="mr-auto flex flex-col gap-2">
+                <label class="flex items-center gap-2 text-xs font-medium text-default-500 cursor-pointer select-none" title="Se enviará un resumen al correo indicado al finalizar (solo si son más de 10 personas)">
+                    <input type="checkbox" id="chkNotificarMatricula" x-model="notificarCorreo" class="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary">
+                    Avisar por correo al finalizar
+                </label>
+                <div x-show="notificarCorreo" x-transition x-cloak class="flex flex-col gap-1">
+                    <label for="napCorreoNotificacion" class="text-[11px] font-medium text-default-500">Correo para el aviso</label>
+                    <input id="napCorreoNotificacion" type="email" x-model.trim="correoNotificacion" placeholder="tu.correo@solsecurity.pe"
+                        class="h-9 w-64 px-3 text-sm border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                    <p class="text-[10px] text-default-400">Recibirás el resumen de la matrícula en este correo.</p>
+                </div>
+            </div>
             <button type="button" @click="cerrar()"
                 class="h-9 px-4 inline-flex items-center justify-center gap-1.5 bg-white border border-default-200 text-default-700 text-sm font-medium rounded-lg shadow-sm hover:bg-default-50 transition cursor-pointer">
                 Cerrar
@@ -715,11 +723,15 @@
             sistema: '',
             responsable: '',
             descripcion: '',
+            notificarCorreo: false,
+            correoNotificacion: '',
 
             mostrar(data) {
                 this.open = true;
                 this.isLoading = true;
 
+                this.notificarCorreo = false;
+                this.correoNotificacion = '';
                 this.cursoId = data.LocalId;
                 this.nombre = data.Nombre || '';
                 this.area = data.Area || '';
@@ -734,6 +746,8 @@
             cerrar() {
                 this.open = false;
                 this.isLoading = false;
+                this.notificarCorreo = false;
+                this.correoNotificacion = '';
                 if (window._detenerTextoLoader) window._detenerTextoLoader();
                 if (window.limpiarModalMatriculados) window.limpiarModalMatriculados();
             },

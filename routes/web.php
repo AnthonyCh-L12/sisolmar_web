@@ -207,6 +207,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-plan-pca/{codCliente}', [CapacitacionController::class, 'obtenerPlanPCA']);
         Route::get('/obtener-cursos-por-plan/{tipo_curso}', [CapacitacionController::class, 'obtenerCursosPorPlan']);
         Route::get('/obtener-cursos-new', [NewCapacController::class, 'obtenerCursos']);
+        Route::get('/obtener-cursos-matriculas-new', [NewCapacController::class, 'obtenerCursosMatriculas']);
         Route::get('/obtener-curso-new/{codigoCurso}', [NewCapacController::class, 'obtenerCurso']);
         Route::get('/obtener-ultimo-codigo-curso-new', [NewCapacController::class, 'ultimoCodigoCurso']);
         Route::get('/obtener-dirigidos-new', [NewCapacController::class, 'dirigidos']);
@@ -222,10 +223,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/cursos/subir-av', [NewCapacController::class, 'subirCursoAv']);
         Route::post('/cursos/aperturar-curso', [NewCapacController::class, 'aperturarCurso']);
         Route::post('/cursos/aplazar-curso-new', [NewCapacController::class, 'aplazarCurso']);
+        Route::post('/capacitacion/save-matricula-new', [NewCapacController::class, 'saveMatriculaNew']);
         Route::get('/obtener-tipos-curso', [CapacitacionController::class, 'obtenerTiposDeCurso']);
         Route::post('/capacitacion/procesar-examen-word', [CapacitacionController::class, 'procesarExamenWord']);
         Route::post('/capacitacion/guardar-examen-word', [CapacitacionController::class, 'guardarExamenWord']);
         Route::post('/capacitacion/desmatricular-usuario', [CapacitacionController::class, 'desmatricularUsuario']);
+        Route::post('/capacitacion/desmatricular-usuario-new', [NewCapacController::class, 'desmatricularUsuarioNew']);
         Route::post('/capacitacion/suspender-usuario/{cursoId}', [CapacitacionController::class, 'suspenderUsuario']);
         Route::post('/capacitacion/registrar-reporte', [CapacitacionController::class, 'saveReporteCapacitacion']);
         Route::get('/capacitacion/listar-reportes', [CapacitacionController::class, 'listarReportesCapacitaciones']);

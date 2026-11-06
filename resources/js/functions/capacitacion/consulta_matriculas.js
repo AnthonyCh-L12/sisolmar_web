@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function initTableCursos() {
         const table = new Tabulator("#tblCursos", {
-            ajaxURL: `${VITE_URL_APP}/api/obtener-cursos`,
+            ajaxURL: `${VITE_URL_APP}/api/obtener-cursos-matriculas-new`,
             ajaxResponse: function (url, params, response) {
                 return response.Cursos;
             },
@@ -849,7 +849,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                             const codPersonal = String(rowData.codigo || rowData.dni || rowData.id);
                                             try {
                                                 Swal.fire({ title: 'Desmatriculando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                                                const resp = await axios.post(`${VITE_URL_APP}/api/capacitacion/desmatricular-usuario`, { codPersonal, cursoId });
+                                                const resp = await axios.post(`${VITE_URL_APP}/api/capacitacion/desmatricular-usuario-new`, { codPersonal, cursoId });
                                                 Swal.close();
                                                 if (resp.data.success) {
                                                     const progActual = window._programacionVigente?.codigo || '';
@@ -860,7 +860,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                                         );
                                                     }
                                                     cell.getRow().delete();
-                                                    await Swal.fire({ icon: 'success', title: 'Desmatriculado', text: 'El personal fue desmatriculado correctamente.', confirmButtonColor: '#6366f1', timer: 2000, showConfirmButton: false });
+                                                    await Swal.fire({ icon: 'success', title: 'Desmatriculado', text: resp.data.message || 'El personal fue desmatriculado correctamente.', confirmButtonColor: '#6366f1', timer: 2000, showConfirmButton: false });
                                                     updateMatricularButton();
                                                     actualizarContadores();
                                                     if (typeof window._aplicarFiltrosMatricula === 'function') window._aplicarFiltrosMatricula();
@@ -1007,25 +1007,33 @@ document.addEventListener("DOMContentLoaded", () => {
                                     return;
                                 }
 
+                                const notificar = !!alpineComponent?.notificarCorreo;
+                                const correo = String(alpineComponent?.correoNotificacion || '').trim();
+
+                                if (notificar && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+                                    Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingresa un correo válido para enviar el aviso.', confirmButtonColor: '#6366f1' });
+                                    return;
+                                }
+
                                 // Cerrar modal inmediatamente
                                 if (alpineComponent?.cerrar) alpineComponent.cerrar();
 
                                 Swal.fire({ title: 'Matriculando personal...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
                                 try {
-                                    const notificar = document.getElementById('chkNotificarMatricula')?.checked || false;
                                     const resp = await axios.post(
-                                        `${VITE_URL_APP}/capacitacion/save-matricula`,
+                                        `${VITE_URL_APP}/api/capacitacion/save-matricula-new`,
                                         {
                                             cursoId: String(cId),
                                             programacionId: String(progId),
                                             personalIds,
                                             notificar_email: notificar,
+                                            correo_notificacion: notificar ? correo : null,
                                         },
                                     );
                                     Swal.close();
                                     if (resp.data.success) {
-                                        await Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'La matriculación fue enviada a procesamiento.' + (notificar ? ' Se avisará por correo al coordinador al finalizar.' : ''), confirmButtonColor: '#6366f1' });
+                                        await Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'La matriculación fue enviada a procesamiento.' + (notificar ? ` Si son más de 10 personas, se enviará el resumen a ${correo} al finalizar.` : ''), confirmButtonColor: '#6366f1' });
                                     } else {
                                         await Swal.fire({ icon: 'error', title: 'Error', text: resp.data.message || 'Error desconocido', confirmButtonColor: '#6366f1' });
                                     }
