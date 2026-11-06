@@ -131,6 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function applyFilters(table) {
+        const nombre = document.getElementById("txtBuscarCurso")?.value?.trim();
         const tipo = document.getElementById("filtroTipoCurso")?.value;
         const area = document.getElementById("filtroAreaCurso")?.value;
         const sistema = document.getElementById("filtroSistemaCurso")?.value;
@@ -138,6 +139,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const cliente = document.getElementById("filtroClienteCurso")?.value;
         const filters = [];
 
+        if (nombre)
+            filters.push({ field: "Nombre", type: "like", value: nombre });
         if (tipo) filters.push({ field: "Tipo", type: "=", value: tipo });
         if (area) filters.push({ field: "Area", type: "=", value: area });
         if (sistema)
@@ -182,6 +185,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const el = document.getElementById(id);
             if (el) el.value = "";
         });
+        const busquedaEl = document.getElementById("txtBuscarCurso");
+        if (busquedaEl) busquedaEl.value = "";
+        document.getElementById("btnLimpiarBusquedaCurso")?.classList.add("hidden");
         const tipoEl = document.getElementById("filtroTipoCurso");
         if (tipoEl) {
             tipoEl.value = "PCE";
@@ -414,6 +420,24 @@ document.addEventListener("DOMContentLoaded", () => {
         document
             .getElementById("btnLimpiarFiltrosCursos")
             ?.addEventListener("click", () => clearFilters(table));
+
+        const buscarCursoEl = document.getElementById("txtBuscarCurso");
+        const btnLimpiarBusquedaCurso = document.getElementById("btnLimpiarBusquedaCurso");
+        if (buscarCursoEl) {
+            let debounceTimer;
+            buscarCursoEl.addEventListener("input", function () {
+                btnLimpiarBusquedaCurso?.classList.toggle("hidden", !this.value);
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => applyFilters(table), 200);
+            });
+        }
+        btnLimpiarBusquedaCurso?.addEventListener("click", () => {
+            if (!buscarCursoEl) return;
+            buscarCursoEl.value = "";
+            btnLimpiarBusquedaCurso.classList.add("hidden");
+            applyFilters(table);
+            buscarCursoEl.focus();
+        });
 
         window.tabulatorCursos = table;
     }
