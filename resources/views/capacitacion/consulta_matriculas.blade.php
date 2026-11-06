@@ -492,8 +492,7 @@
                     <label class="text-xs font-medium text-default-700">Buscar curso</label>
                     <div class="relative">
                         <input type="text" id="txtBuscarCurso" placeholder="Nombre del curso..."
-                            class="w-full h-9 pl-8 pr-8 text-sm border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                        <i class="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 text-sm"></i>
+                            class="w-full h-9 pl-3 pr-8 text-sm border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                         <button type="button" id="btnLimpiarBusquedaCurso"
                             class="absolute right-2.5 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700 transition cursor-pointer hidden">
                             <i class="ti ti-x text-sm"></i>
