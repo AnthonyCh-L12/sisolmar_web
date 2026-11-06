@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\CursoNew;
 use App\Models\CursoProgramacion;
 use App\Models\Personal;
+use App\Services\MoodleCursoService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class NewCapacController extends Controller
 {
@@ -602,5 +604,205 @@ class NewCapacController extends Controller
                 'message' => 'Error al guardar: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Sube al Aula Virtual un curso registrado en sw_cursos_new.
+     *
+     * Solo crea el curso en Moodle, sube las imágenes y sincroniza las
+     * preguntas con el quiz cuando aplica evaluación. No persiste exámenes
+     * ni preguntas en las tablas locales: esa información quedará en Moodle
+     * hasta definir la tabla definitiva.
+     */
+    public function subirCursoAv(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'codigo_curso' => 'required|string|max:40',
+                'aplica_evaluacion' => 'required|boolean',
+                'tiempo' => 'nullable|integer|min:1',
+                'nota' => 'nullable|numeric|min:0|max:20',
+                'intentos' => 'nullable|integer|min:1',
+                'cantidad_preguntas' => 'nullable|integer|min:1',
+                'preguntas_balotario' => 'nullable|integer|min:1',
+                'preguntas' => 'nullable',
+                'image_portada' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
+                'image_afiche' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validación.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        try {
+            $codigoCurso = trim((string) $request->input('codigo_curso'));
+            $aplicaEvaluacion = $request->boolean('aplica_evaluacion');
+            $tiempo = (int) $request->input('tiempo', 0);
+            $nota = (float) $request->input('nota', 0);
+            $intentos = (int) $request->input('intentos', 0);
+            $cantidadPreguntas = (int) $request->input('cantidad_preguntas', 0);
+
+            if ($aplicaEvaluacion && ($tiempo < 1 || $intentos < 1 || $cantidadPreguntas < 1)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Completa el tiempo, los intentos y la cantidad de preguntas del examen.',
+                ], 422);
+            }
+
+            $curso = CursoNew::where('SW_CURS_COD', $codigoCurso)->first();
+
+            if (! $curso) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se encontró el curso solicitado.',
+                ], 404);
+            }
+
+            if ((int) $curso->SW_CURS_AV_COD > 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso ya fue subido al AV.',
+                    'moodle_course_id' => (int) $curso->SW_CURS_AV_COD,
+                ], 422);
+            }
+
+            $preguntas = $this->decodificarPreguntas($request->input('preguntas'));
+
+            // Fechas provisionales: la apertura del curso definirá las reales.
+            $meses = in_array((int) $curso->SW_CURS_CANT_PERIOD, [1, 2, 3, 4, 6, 12], true)
+                ? (int) $curso->SW_CURS_CANT_PERIOD
+                : 1;
+
+            $inicio = Carbon::now()->startOfDay();
+            $fin = Carbon::now()->startOfDay()->addMonthsNoOverflow($meses)->endOfDay();
+
+            $codMoodleArea = null;
+            if ((int) $curso->SW_CURS_AREA_COD > 0) {
+                $areaMoodle = DB::table('sw_cursos_area')
+                    ->where('codigo', $curso->SW_CURS_AREA_COD)
+                    ->value('codigo_moodle');
+
+                $codMoodleArea = $areaMoodle !== null ? (int) $areaMoodle : null;
+            }
+
+            $codResponsable = (int) $curso->SW_CURS_RESP_COD > 0
+                ? str_pad((string) $curso->SW_CURS_RESP_COD, 5, '0', STR_PAD_LEFT)
+                : null;
+
+            $moodle = app(MoodleCursoService::class);
+
+            $courseId = $moodle->crearCurso(
+                (string) $curso->SW_CURS_NOMBRE,
+                (int) $curso->CODIGO,
+                $curso->SW_CURS_DESCRIPCION ?: null,
+                $codMoodleArea,
+                $codResponsable,
+                $aplicaEvaluacion ? 1 : 0,
+                $tiempo,
+                $intentos,
+                $nota,
+                $inicio->timestamp,
+                $fin->timestamp
+            );
+
+            if (! $courseId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo crear el curso en el Aula Virtual. Inténtalo nuevamente o contacta al administrador.',
+                ], 502);
+            }
+
+            // Guardamos el id de Moodle de inmediato para evitar duplicados
+            // si fallara un paso posterior.
+            $usuario = auth()->user()?->usuario ?? 'SISTEMA';
+
+            try {
+                $curso->update([
+                    'SW_CURS_AV_COD' => $courseId,
+                    'SW_CURS_EVALUACION' => $aplicaEvaluacion ? 1 : 0,
+                    'modificado_por' => $usuario,
+                    'fecha_modificacion' => Carbon::now()->format('Y-m-d\TH:i:s'),
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('Curso creado en Moodle pero no se pudo guardar SW_CURS_AV_COD', [
+                    'codigo_curso' => $codigoCurso,
+                    'moodle_course_id' => $courseId,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => "El curso se creó en el AV (ID {$courseId}) pero no se pudo actualizar la base local. Contacta al administrador.",
+                    'moodle_course_id' => $courseId,
+                ], 500);
+            }
+
+            $warnings = [];
+
+            if ($request->hasFile('image_portada')
+                && ! $moodle->subirPortada($courseId, $request->file('image_portada'))) {
+                $warnings[] = 'El curso se creó, pero no se pudo subir la portada.';
+            }
+
+            if ($request->hasFile('image_afiche')
+                && ! $moodle->subirAfiche($courseId, $request->file('image_afiche'))) {
+                $warnings[] = 'El curso se creó, pero no se pudo subir el afiche.';
+            }
+
+            if ($aplicaEvaluacion) {
+                if (empty($preguntas)) {
+                    $warnings[] = 'El examen se creó sin preguntas.';
+                } elseif (! $moodle->sincronizarPreguntas($courseId, $preguntas, $cantidadPreguntas)) {
+                    $warnings[] = 'El curso se creó, pero no se pudieron cargar las preguntas en el examen.';
+                }
+            }
+
+            $mensaje = 'Curso subido al AV correctamente.';
+            if (! empty($warnings)) {
+                $mensaje .= ' '.implode(' ', $warnings);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $mensaje,
+                'moodle_course_id' => $courseId,
+                'warnings' => $warnings,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@subirCursoAv', [
+                'codigo_curso' => $request->input('codigo_curso'),
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al subir el curso al AV. Inténtalo nuevamente.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Normaliza las preguntas recibidas (JSON o array) al formato del Word.
+     */
+    private function decodificarPreguntas($preguntas): array
+    {
+        if (is_string($preguntas)) {
+            $preguntas = json_decode($preguntas, true);
+        }
+
+        if (! is_array($preguntas)) {
+            return [];
+        }
+
+        return array_values(array_filter($preguntas, function ($pregunta) {
+            return is_array($pregunta)
+                && ! empty($pregunta['texto'])
+                && isset($pregunta['opciones'])
+                && is_array($pregunta['opciones']);
+        }));
     }
 }

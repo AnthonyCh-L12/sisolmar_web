@@ -12,6 +12,7 @@ import imageCompression from "browser-image-compression";
  *  - GET get-areas-encargadas / get-clientes-pac / obtener-sucursales / listar-jefaturas
  *  - POST capacitacion/procesar-examen-word (Word -> preguntas)
  *  - POST guardar-curso-new (alta en sw_cursos_new)
+ *  - POST cursos/subir-av (crear curso en Moodle, imágenes y examen)
  * Al abrir el modal se precargan sucursales, áreas, planes, dirigido a, etc.
  */
 
@@ -1217,11 +1218,12 @@ window.formCursoEditNew = function () {
     };
 };
 
-// ── Subir curso al AV (solo UI: recursos visuales + evaluación) ──
+// ── Subir curso al AV (recursos visuales + evaluación) ──
 window.formSubirAvNew = function () {
     return {
         showModal: false,
         cargando: false,
+        guardando: false,
         error: "",
         codigo: "",
         cursoCodigo: "",
@@ -1254,8 +1256,28 @@ window.formSubirAvNew = function () {
         modalPreviewSrc: "",
         modalPreviewTitulo: "",
 
+        get puedeSubir() {
+            if (this.guardando || !this.cursoCodigo) return false;
+            if (!this.aplicaEvaluacion) return true;
+
+            const num = (v) => (v === "" || v === null || v === undefined ? NaN : Number(v));
+            const tiempo = num(this.limiteTiempo);
+            const nota = num(this.nota);
+            const intentos = num(this.intentos);
+            const cantidad = num(this.cantidadPreguntas);
+
+            return (
+                Number.isFinite(tiempo) && tiempo >= 1 &&
+                Number.isFinite(nota) && nota >= 0 &&
+                Number.isFinite(intentos) && intentos >= 1 &&
+                Number.isFinite(cantidad) && cantidad >= 1 &&
+                this.preguntasExamen.length > 0
+            );
+        },
+
         resetFormulario() {
             this.error = "";
+            this.guardando = false;
             this.codigo = "";
             this.cursoCodigo = "";
             this.cursoNombre = "";
@@ -1407,6 +1429,92 @@ window.formSubirAvNew = function () {
                 Swal.fire("Error", "No se pudo procesar el archivo Word", "error");
             } finally {
                 this.cargandoWord = false;
+            }
+        },
+
+        async subirAlAv() {
+            if (!this.puedeSubir) {
+                const faltantes = [];
+                if (!this.cursoCodigo) faltantes.push("el código del curso");
+                if (this.aplicaEvaluacion) {
+                    const num = (v) => (v === "" || v === null || v === undefined ? NaN : Number(v));
+                    if (!(num(this.limiteTiempo) >= 1)) faltantes.push("el límite de tiempo");
+                    if (!(num(this.nota) >= 0)) faltantes.push("la nota mínima");
+                    if (!(num(this.intentos) >= 1)) faltantes.push("el número de intentos");
+                    if (!(num(this.cantidadPreguntas) >= 1)) faltantes.push("la cantidad de preguntas");
+                    if (!this.preguntasExamen.length) faltantes.push("al menos una pregunta analizada del Word");
+                }
+
+                Swal.fire(
+                    "Atención",
+                    `Completa ${faltantes.join(", ") || "los datos del curso"} antes de subir al AV.`,
+                    "warning"
+                );
+                return;
+            }
+
+            this.guardando = true;
+            this.error = "";
+
+            Swal.fire({
+                title: "Subiendo curso al AV...",
+                html: "Estamos creando el curso y cargando los recursos en Moodle.",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: () => Swal.showLoading(),
+            });
+
+            try {
+                const fd = new FormData();
+                fd.append("codigo_curso", this.cursoCodigo || this.codigo);
+                fd.append("aplica_evaluacion", this.aplicaEvaluacion ? "1" : "0");
+
+                if (this.aplicaEvaluacion) {
+                    fd.append("tiempo", String(Number(this.limiteTiempo)));
+                    fd.append("nota", String(Number(this.nota)));
+                    fd.append("intentos", String(Number(this.intentos)));
+                    fd.append("cantidad_preguntas", String(Number(this.cantidadPreguntas)));
+                    fd.append("preguntas_balotario", String(Number(this.preguntasBalotario) || 0));
+                    fd.append("preguntas", JSON.stringify(this.preguntasExamen));
+                }
+
+                if (this.imageFilePortada) fd.append("image_portada", this.imageFilePortada);
+                if (this.imageFileAfiche) fd.append("image_afiche", this.imageFileAfiche);
+
+                const res = await axios.post(`${VITE_URL_APP}/api/cursos/subir-av`, fd, {
+                    headers: { "Content-Type": "multipart/form-data" },
+                });
+
+                if (res.data?.success) {
+                    Swal.fire("Éxito", res.data.message || "Curso subido al AV correctamente.", "success");
+                    this.cerrar();
+                    if (window.tablaCursosNew) {
+                        try {
+                            await window.tablaCursosNew.setData(`${VITE_URL_APP}/api/obtener-cursos-new`);
+                        } catch {}
+                    }
+                } else {
+                    Swal.fire("Error", res.data?.message || "No se pudo subir el curso al AV", "error");
+                }
+            } catch (e) {
+                console.error("Error subiendo curso al AV:", e);
+                const errors = e.response?.data?.errors;
+
+                if (errors && typeof errors === "object") {
+                    let html = '<ul class="text-left text-sm">';
+                    for (const [campo, mensajes] of Object.entries(errors)) {
+                        html += `<li><b>${campo}</b>: ${mensajes[0]}</li>`;
+                    }
+                    html += "</ul>";
+                    Swal.fire({ title: "Errores de validación", html, icon: "warning" });
+                } else {
+                    const msg = e.response?.data?.message || "No se pudo subir el curso al AV.";
+                    this.error = msg;
+                    Swal.fire("Error", msg, "error");
+                }
+            } finally {
+                this.guardando = false;
             }
         },
 

@@ -313,7 +313,15 @@ class CapacitacionController extends Controller
                 $nombreExamen =
                     $request->nombre_exa ?? "Examen de " . $request->nombre;
 
-                if ($examen) {
+                // No se crea el examen automáticamente: el flujo nuevo
+                // (sw_cursos_new) aún no persiste exámenes localmente y un
+                // insert por defecto generaría una configuración distinta a
+                // la que realmente se subió a Moodle.
+                if (!$examen) {
+                    Log::warning(
+                        "updateCurso: el curso {$request->codigo} aplica evaluación pero no tiene examen local; no se crea automáticamente.",
+                    );
+                } else {
                     $examen->update([
                         "nombre" => $nombreExamen,
                         "descripcion" => $request->descripcion,
@@ -326,92 +334,72 @@ class CapacitacionController extends Controller
                         (int) ($request->preguntas_balotario ?? 0),
                         "fecha_modificacion" => date("Y-m-d\TH:i:s.000"),
                     ]);
-                } else {
-                    $examen = ExamenCurso::create([
-                        "cod_cursos" => $curso->codigo,
-                        "nombre" => $nombreExamen,
-                        "descripcion" => $request->descripcion,
-                        "tiempo" => (int) ($request->tiempo ?? 0),
-                        "nota_minima" => (int) ($request->nota ?? 0),
-                        "file_tiene" => 0,
-                        "file_nombre" => null,
-                        "file_ruta" => null,
-                        "file_extension" => null,
-                        "file_tipo" => null,
-                        "file_nombre_original" => null,
-                        "intentos" => (int) ($request->intentos ?? 0),
-                        "cantidad_preguntas" =>
-                        (int) ($request->cantidad_preguntas ?? 0),
-                        "preguntas_balotario" =>
-                        (int) ($request->preguntas_balotario ?? 0),
-                        "fecha_creacion" => date("Y-m-d\TH:i:s.000"),
-                    ]);
-                }
 
-                if ($request->hasFile("archivo")) {
-                    $archivo = $request->file("archivo");
+                    if ($request->hasFile("archivo")) {
+                        $archivo = $request->file("archivo");
 
-                    if (
-                        $examen->file_ruta &&
-                        Storage::disk("public")->exists($examen->file_ruta)
-                    ) {
-                        Storage::disk("public")->delete($examen->file_ruta);
-                    }
+                        if (
+                            $examen->file_ruta &&
+                            Storage::disk("public")->exists($examen->file_ruta)
+                        ) {
+                            Storage::disk("public")->delete($examen->file_ruta);
+                        }
 
-                    if ($archivo->getClientOriginalExtension() !== "mbz") {
-                        return response()->json(
-                            [
-                                "success" => false,
-                                "message" => "El archivo debe ser .mbz",
-                                "errors" => [
-                                    "archivo" => ["El archivo debe ser .mbz"],
+                        if ($archivo->getClientOriginalExtension() !== "mbz") {
+                            return response()->json(
+                                [
+                                    "success" => false,
+                                    "message" => "El archivo debe ser .mbz",
+                                    "errors" => [
+                                        "archivo" => ["El archivo debe ser .mbz"],
+                                    ],
                                 ],
-                            ],
-                            422,
+                                422,
+                            );
+                        }
+
+                        $tienePlantilla = true;
+
+                        $anio = date("Y");
+                        $mes = ucfirst(Carbon::now()->translatedFormat("F"));
+
+                        $tipoArchivo = $archivo->getClientMimeType();
+                        $extensionArchivo = $archivo->getClientOriginalExtension();
+                        $nombreArchivoOriginal = $archivo->getClientOriginalName();
+
+                        $baseNombre = "EXA_" . $codigo_curso . "_" . date("Ymd");
+                        $carpeta = "plantillas/{$anio}/{$mes}";
+
+                        if (!Storage::disk("public")->exists($carpeta)) {
+                            Storage::disk("public")->makeDirectory($carpeta);
+                        }
+
+                        $contador = 1;
+
+                        do {
+                            $nombreArchivoFinal =
+                                "{$baseNombre}_{$contador}." . $extensionArchivo;
+                            $rutaCompleta = storage_path(
+                                "app/public/{$carpeta}/{$nombreArchivoFinal}",
+                            );
+                            $contador++;
+                        } while (file_exists($rutaCompleta));
+
+                        $rutaArchivo = $archivo->storeAs(
+                            $carpeta,
+                            $nombreArchivoFinal,
+                            "public",
                         );
+
+                        $examen->update([
+                            "file_tiene" => $tienePlantilla ? 1 : 0,
+                            "file_nombre" => $nombreArchivoFinal,
+                            "file_ruta" => $rutaArchivo,
+                            "file_extension" => $extensionArchivo,
+                            "file_tipo" => $tipoArchivo,
+                            "file_nombre_original" => $nombreArchivoOriginal,
+                        ]);
                     }
-
-                    $tienePlantilla = true;
-
-                    $anio = date("Y");
-                    $mes = ucfirst(Carbon::now()->translatedFormat("F"));
-
-                    $tipoArchivo = $archivo->getClientMimeType();
-                    $extensionArchivo = $archivo->getClientOriginalExtension();
-                    $nombreArchivoOriginal = $archivo->getClientOriginalName();
-
-                    $baseNombre = "EXA_" . $codigo_curso . "_" . date("Ymd");
-                    $carpeta = "plantillas/{$anio}/{$mes}";
-
-                    if (!Storage::disk("public")->exists($carpeta)) {
-                        Storage::disk("public")->makeDirectory($carpeta);
-                    }
-
-                    $contador = 1;
-
-                    do {
-                        $nombreArchivoFinal =
-                            "{$baseNombre}_{$contador}." . $extensionArchivo;
-                        $rutaCompleta = storage_path(
-                            "app/public/{$carpeta}/{$nombreArchivoFinal}",
-                        );
-                        $contador++;
-                    } while (file_exists($rutaCompleta));
-
-                    $rutaArchivo = $archivo->storeAs(
-                        $carpeta,
-                        $nombreArchivoFinal,
-                        "public",
-                    );
-
-                    $examen->update([
-                        "file_tiene" => $tienePlantilla ? 1 : 0,
-                        "file_nombre" => $nombreArchivoFinal,
-                        "file_ruta" => $rutaArchivo,
-                        "file_extension" => $extensionArchivo,
-                        "file_tipo" => $tipoArchivo,
-                        "file_nombre_original" => $nombreArchivoOriginal,
-                    ]);
                 }
             } else {
                 // Si no aplica evaluación, eliminar examen si existe

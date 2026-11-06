@@ -283,9 +283,12 @@
                         class="h-9 px-4 inline-flex items-center justify-center gap-1.5 bg-white border border-default-200 text-default-700 text-sm font-medium rounded-lg shadow-sm hover:bg-default-50 transition">
                         Cancelar
                     </button>
-                    <button type="button" disabled title="La integración con el AV se implementará en una siguiente fase"
-                        class="h-9 px-4 inline-flex items-center justify-center gap-1.5 bg-emerald-500 text-white text-sm font-medium rounded-lg shadow-sm opacity-50 cursor-not-allowed">
-                        <i class="ti ti-cloud-upload"></i> Subir al AV
+                    <button type="button" @click="subirAlAv()"
+                        :disabled="guardando || !puedeSubir"
+                        :title="guardando ? 'Subiendo curso al AV...' : (puedeSubir ? 'Crear el curso en el Aula Virtual' : 'Completa los datos del curso y del examen')"
+                        class="h-9 px-4 inline-flex items-center justify-center gap-1.5 bg-emerald-500 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-emerald-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="ti" :class="guardando ? 'ti-loader-2 animate-spin' : 'ti-cloud-upload'"></i>
+                        <span x-text="guardando ? 'Subiendo...' : 'Subir al AV'"></span>
                     </button>
                 </div>
             </div>
