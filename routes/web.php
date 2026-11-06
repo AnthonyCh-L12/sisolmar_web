@@ -221,6 +221,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/actualizar-curso-new', [NewCapacController::class, 'actualizarCursoNew']);
         Route::post('/cursos/subir-av', [NewCapacController::class, 'subirCursoAv']);
         Route::post('/cursos/aperturar-curso', [NewCapacController::class, 'aperturarCurso']);
+        Route::post('/cursos/aplazar-curso-new', [NewCapacController::class, 'aplazarCurso']);
         Route::get('/obtener-tipos-curso', [CapacitacionController::class, 'obtenerTiposDeCurso']);
         Route::post('/capacitacion/procesar-examen-word', [CapacitacionController::class, 'procesarExamenWord']);
         Route::post('/capacitacion/guardar-examen-word', [CapacitacionController::class, 'guardarExamenWord']);

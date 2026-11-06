@@ -1032,6 +1032,141 @@ class NewCapacController extends Controller
     }
 
     /**
+     * Extiende el plazo de la programación VIGENTE de un curso de sw_cursos_new.
+     *
+     * Actualiza la fecha final local, las fechas del curso en Moodle y la
+     * fecha de fin de las inscripciones de los alumnos.
+     */
+    public function aplazarCurso(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'cod_curso' => 'required|integer|min:1',
+                'nueva_fecha_final' => 'required|date_format:Y-m-d',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validación.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $curso = CursoNew::query()
+                ->where('CODIGO', (int) $request->input('cod_curso'))
+                ->where('habilitado', 1)
+                ->first();
+
+            if (! $curso) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Curso no encontrado o no habilitado.',
+                ], 404);
+            }
+
+            $programacion = CursoProgramacion::query()
+                ->habilitados()
+                ->delCurso($curso->CODIGO)
+                ->vigentes()
+                ->first();
+
+            if (! $programacion) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso no tiene una programación vigente.',
+                ], 404);
+            }
+
+            $fechaInicioActual = Carbon::parse($programacion->fecha_inicio);
+            $fechaFinActual = $programacion->fecha_final
+                ? Carbon::parse($programacion->fecha_final)
+                : null;
+            $nuevaFechaFin = Carbon::parse($request->input('nueva_fecha_final'));
+
+            if ($nuevaFechaFin->lessThanOrEqualTo($fechaInicioActual)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La nueva fecha de fin no puede ser menor o igual a la fecha de inicio.',
+                ], 422);
+            }
+
+            if ($fechaFinActual && $nuevaFechaFin->lessThanOrEqualTo($fechaFinActual)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La nueva fecha de fin debe ser posterior a la fecha de fin actual.',
+                ], 422);
+            }
+
+            DB::table('sw_cursos_programacion')
+                ->where('codigo_programacion', $programacion->codigo_programacion)
+                ->update([
+                    'fecha_final' => DB::raw("CONVERT(datetime, '{$nuevaFechaFin->format('Y-m-d H:i:s')}', 120)"),
+                    'fecha_modificacion' => DB::raw("CONVERT(datetime, '".now()->format('Y-m-d H:i:s')."', 120)"),
+                ]);
+
+            $warnings = [];
+            $moodleCourseId = (int) $curso->SW_CURS_AV_COD;
+
+            if ($moodleCourseId > 0) {
+                $moodleService = app(MoodleCursoService::class);
+
+                if (! $moodleService->actualizarFechasCurso(
+                    $moodleCourseId,
+                    $fechaInicioActual->timestamp,
+                    $nuevaFechaFin->timestamp
+                )) {
+                    $warnings[] = 'No se pudo actualizar la fecha del curso en el Aula Virtual.';
+                }
+
+                if (! $moodleService->actualizarFechasMatriculas(
+                    $moodleCourseId,
+                    $nuevaFechaFin->timestamp
+                )) {
+                    $warnings[] = 'No se pudieron actualizar las inscripciones en el Aula Virtual.';
+                }
+            }
+
+            DB::commit();
+
+            $mensaje = 'Curso aplazado correctamente.';
+            if (! empty($warnings)) {
+                $mensaje .= ' '.implode(' ', $warnings);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $mensaje,
+                'warnings' => $warnings,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Error en NewCapacController@aplazarCurso', [
+                'cod_curso' => $request->input('cod_curso'),
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al aplazar el curso: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Normaliza las preguntas recibidas (JSON o array) al formato del Word.
      */
     private function decodificarPreguntas($preguntas): array

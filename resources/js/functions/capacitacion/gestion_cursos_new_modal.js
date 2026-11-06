@@ -63,7 +63,7 @@ window.cerrarModalAperturaNew = () => {
 
 // ── Extender plazo (misma lógica que modalApertura/modalAplazarCurso original) ──
 // Endpoints: GET obtener-curso-new/{cod} (PK + programación VIGENTE),
-// POST cursos/aplazar-curso (actualiza fecha fin del curso y de matriculados, incl. Moodle).
+// POST cursos/aplazar-curso-new (actualiza fecha fin del curso y de matriculados, incl. Moodle).
 window.abrirModalAplazarNew = (cursCod) => {
     if (cursCod) window.__pendingAplazarNew = String(cursCod);
     const el = document.getElementById("formAplazarNewRoot");
@@ -170,7 +170,7 @@ window.formAplazarNew = function () {
             if (!this.fechaValida || !this.fechaNuevaFin || this.guardando) return;
             this.guardando = true;
             try {
-                const res = await axios.post(`${VITE_URL_APP}/api/cursos/aplazar-curso`, {
+                const res = await axios.post(`${VITE_URL_APP}/api/cursos/aplazar-curso-new`, {
                     cod_curso: this.codigoPk,
                     nueva_fecha_final: this.fechaNuevaFin,
                 });

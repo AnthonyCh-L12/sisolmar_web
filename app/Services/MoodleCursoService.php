@@ -126,6 +126,44 @@ class MoodleCursoService
     }
 
     /**
+     * Actualiza la fecha de fin de las inscripciones de los alumnos en Moodle.
+     */
+    public function actualizarFechasMatriculas(int $courseId, int $fin): bool
+    {
+        if ($courseId <= 0) {
+            return true;
+        }
+
+        try {
+            DB::connection('mysql_grupoihb')
+                ->table('mdl_user_enrolments as ue')
+                ->join('mdl_enrol as e', 'e.id', '=', 'ue.enrolid')
+                ->join('mdl_role_assignments as ra', 'ra.userid', '=', 'ue.userid')
+                ->join('mdl_context as ctx', function ($join) use ($courseId) {
+                    $join->on('ctx.id', '=', 'ra.contextid')
+                        ->where('ctx.contextlevel', 50)
+                        ->where('ctx.instanceid', $courseId);
+                })
+                ->where('e.courseid', $courseId)
+                ->where('ue.status', 0)
+                ->where('ra.roleid', 5)
+                ->update([
+                    'ue.timeend' => $fin,
+                    'ue.timemodified' => time(),
+                ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Error al actualizar fechas de matrículas en Moodle', [
+                'error' => $e->getMessage(),
+                'courseId' => $courseId,
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Sube la imagen de portada del curso a Moodle.
      *
      * Devuelve true si la imagen se envió o si no había imagen; false si
