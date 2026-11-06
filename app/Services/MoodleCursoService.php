@@ -81,6 +81,51 @@ class MoodleCursoService
     }
 
     /**
+     * Actualiza las fechas de inicio y fin del curso en Moodle.
+     */
+    public function actualizarFechasCurso(int $courseId, int $inicio, int $fin): bool
+    {
+        try {
+            $http = app()->isProduction()
+                ? Http::asForm()
+                : Http::withoutVerifying()->asForm();
+
+            $response = $http->post(
+                config('services.moodle.url').'/webservice/rest/server.php',
+                [
+                    'wstoken' => config('services.moodle.ws_token'),
+                    'wsfunction' => 'core_course_update_courses',
+                    'moodlewsrestformat' => 'json',
+                    'courses[0][id]' => $courseId,
+                    'courses[0][startdate]' => $inicio,
+                    'courses[0][enddate]' => $fin,
+                ]
+            );
+
+            $json = $response->json();
+
+            if (! $response->successful() || (is_array($json) && isset($json['exception']))) {
+                Log::warning('No se pudieron actualizar las fechas del curso en Moodle', [
+                    'courseId' => $courseId,
+                    'status' => $response->status(),
+                    'response' => $json,
+                ]);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Error al actualizar fechas del curso en Moodle', [
+                'error' => $e->getMessage(),
+                'courseId' => $courseId,
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Sube la imagen de portada del curso a Moodle.
      *
      * Devuelve true si la imagen se envió o si no había imagen; false si

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\MatriculaMasivaJob;
 use App\Models\CursoNew;
 use App\Models\CursoProgramacion;
 use App\Models\Personal;
@@ -782,6 +783,251 @@ class NewCapacController extends Controller
                 'success' => false,
                 'message' => 'Error al subir el curso al AV. Inténtalo nuevamente.',
             ], 500);
+        }
+    }
+
+    /**
+     * Apertura un curso registrado en sw_cursos_new.
+     *
+     * Crea (o activa) la programación VIGENTE en sw_cursos_programacion,
+     * actualiza las fechas del curso en Moodle y, si el usuario lo solicita,
+     * encola la matrícula automática usando los datos de la tabla nueva.
+     */
+    public function aperturarCurso(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'cod_curso' => 'required|integer|min:1',
+                'fecha_inicio' => 'required|date_format:Y-m-d',
+                'fecha_final' => 'nullable|date_format:Y-m-d|after_or_equal:fecha_inicio',
+                'incluir_automatico' => 'nullable|boolean',
+                'matricular_automatico' => 'nullable|boolean',
+                'notificar_email' => 'nullable|boolean',
+                'correo_notificacion' => 'nullable|email|max:150',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validación.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $curso = CursoNew::where('CODIGO', (int) $request->input('cod_curso'))->first();
+
+            if (! $curso) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se encontró el curso solicitado.',
+                ], 404);
+            }
+
+            if ((int) $curso->SW_CURS_AV_COD <= 0) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso debe subirse al AV antes de aperturarse.',
+                ], 422);
+            }
+
+            $yaVigente = CursoProgramacion::query()
+                ->habilitados()
+                ->delCurso($curso->CODIGO)
+                ->vigentes()
+                ->exists();
+
+            if ($yaVigente) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso ya tiene una programación VIGENTE activa.',
+                ], 422);
+            }
+
+            $fechaInicio = Carbon::parse($request->input('fecha_inicio'));
+            $cantPeriod = (int) $curso->SW_CURS_CANT_PERIOD;
+            $frecuenciaValida = in_array($cantPeriod, [1, 2, 3, 4, 6, 12], true);
+
+            if ($curso->SW_CURS_PERIODICIDAD) {
+                $meses = $frecuenciaValida ? $cantPeriod : 1;
+                $fechaFin = $fechaInicio->copy()->addMonthsNoOverflow($meses);
+            } else {
+                if (! $request->filled('fecha_final')) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Debe indicar la fecha de fin del curso.',
+                    ], 422);
+                }
+
+                $fechaFin = Carbon::parse($request->input('fecha_final'));
+
+                if ($fechaFin->lessThanOrEqualTo($fechaInicio)) {
+                    DB::rollBack();
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'La fecha de fin debe ser posterior a la fecha de inicio.',
+                    ], 422);
+                }
+            }
+
+            $pendiente = CursoProgramacion::query()
+                ->habilitados()
+                ->delCurso($curso->CODIGO)
+                ->where('estado_periodo', 'PENDIENTE')
+                ->first();
+
+            $toSqlDate = fn (Carbon $d) => DB::raw("CONVERT(datetime, '{$d->format('Y-m-d H:i:s')}', 120)");
+
+            if ($pendiente) {
+                DB::table('sw_cursos_programacion')
+                    ->where('codigo_programacion', $pendiente->codigo_programacion)
+                    ->update([
+                        'periodo' => $fechaInicio->format('Y-m'),
+                        'fecha_inicio' => $toSqlDate($fechaInicio),
+                        'fecha_final' => $toSqlDate($fechaFin),
+                        'estado_periodo' => 'VIGENTE',
+                        'fecha_modificacion' => $toSqlDate(Carbon::now()),
+                    ]);
+
+                $codigoProgramacion = (string) $pendiente->codigo_programacion;
+            } else {
+                $last = DB::table('sw_cursos_programacion')
+                    ->orderBy('codigo_programacion', 'desc')
+                    ->first();
+
+                $codigoProgramacion = $last
+                    ? str_pad(((int) $last->codigo_programacion) + 1, 4, '0', STR_PAD_LEFT)
+                    : '1001';
+
+                DB::table('sw_cursos_programacion')->insert([
+                    'codigo_programacion' => $codigoProgramacion,
+                    'cod_curso' => $curso->CODIGO,
+                    'periodo' => $fechaInicio->format('Y-m'),
+                    'tipo' => 'REGULAR',
+                    'fecha_inicio' => $toSqlDate($fechaInicio),
+                    'fecha_final' => $toSqlDate($fechaFin),
+                    'estado_periodo' => 'VIGENTE',
+                    'fecha_creacion' => $toSqlDate(Carbon::now()),
+                    'habilitado' => 1,
+                ]);
+            }
+
+            $quiereMatricula = $request->has('incluir_automatico') || $request->has('matricular_automatico')
+                ? ($request->boolean('incluir_automatico', true) && $request->boolean('matricular_automatico', true))
+                : true;
+
+            $dirigido = trim((string) $curso->SW_CURS_DIRIGIDO_COD);
+            $puedeMatricular = $quiereMatricula && $dirigido !== '0';
+            $notificarEmail = $puedeMatricular && $request->boolean('notificar_email');
+            $correoNotificacion = $notificarEmail
+                ? trim((string) $request->input('correo_notificacion'))
+                : null;
+
+            if ($notificarEmail && ! filter_var($correoNotificacion, FILTER_VALIDATE_EMAIL)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Debe indicar un correo válido para enviar el aviso.',
+                ], 422);
+            }
+
+            $warnings = [];
+
+            if ((int) $curso->SW_CURS_AV_COD > 0) {
+                $moodleActualizado = app(MoodleCursoService::class)->actualizarFechasCurso(
+                    (int) $curso->SW_CURS_AV_COD,
+                    $fechaInicio->timestamp,
+                    $fechaFin->timestamp
+                );
+
+                if (! $moodleActualizado) {
+                    $warnings[] = 'No se pudieron actualizar las fechas en el Aula Virtual.';
+                }
+            }
+
+            $jobId = $puedeMatricular
+                ? $this->despacharMatriculaCursoNuevo($curso, $codigoProgramacion, $notificarEmail, $correoNotificacion)
+                : null;
+
+            DB::commit();
+
+            $mensaje = 'Curso aperturado correctamente.';
+            if (! $quiereMatricula) {
+                $mensaje .= ' Programación creada sin matrícula automática.';
+            } elseif (! $puedeMatricular) {
+                $mensaje .= ' La matrícula deberá realizarse manualmente (dirigido a Otros).';
+            }
+            if ($notificarEmail) {
+                $mensaje .= ' El resumen se enviará a '.$correoNotificacion.'.';
+            }
+            if (! empty($warnings)) {
+                $mensaje .= ' '.implode(' ', $warnings);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $mensaje,
+                'job_id' => $jobId,
+                'codigo_programacion' => $codigoProgramacion,
+                'warnings' => $warnings,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Error en NewCapacController@aperturarCurso', [
+                'cod_curso' => $request->input('cod_curso'),
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al aperturar el curso: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Encola la matrícula masiva para un curso de sw_cursos_new.
+     */
+    private function despacharMatriculaCursoNuevo(CursoNew $curso, string $codigoProgramacion, bool $notificarEmail, ?string $correoNotificacion): ?string
+    {
+        try {
+            $sucursal = (int) $curso->SW_CURS_SUCURSAL_COD;
+            $sucursalId = $sucursal > 0
+                ? str_pad((string) $sucursal, 2, '0', STR_PAD_LEFT)
+                : null;
+
+            dispatch(MatriculaMasivaJob::porTipoCursoNuevo(
+                (int) $curso->CODIGO,
+                $codigoProgramacion,
+                (int) (auth()->id() ?? 0),
+                $sucursalId,
+                $notificarEmail,
+                $correoNotificacion
+            ))->onQueue('training');
+
+            return $curso->CODIGO.'_'.$codigoProgramacion;
+        } catch (\Throwable $e) {
+            Log::error('Error al encolar matrícula del curso nuevo', [
+                'curso_id' => $curso->CODIGO,
+                'programacion' => $codigoProgramacion,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 

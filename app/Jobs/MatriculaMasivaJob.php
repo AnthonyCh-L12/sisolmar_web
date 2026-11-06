@@ -6,6 +6,7 @@ use App\Mail\MatriculaMasivaResumenMail;
 use App\Models\Matricula;
 use App\Models\Personal;
 use App\Models\Cursos;
+use App\Models\CursoNew;
 use App\Models\CursoProgramacion;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,6 +32,8 @@ class MatriculaMasivaJob implements ShouldQueue
     protected int    $cursoCodigo;
     protected int    $usuarioId;
     protected bool   $notificarEmail;
+    protected ?string $emailNotificacion;
+    protected string $origen = 'legacy';
 
     private function __construct(
         string           $modo,
@@ -39,7 +42,9 @@ class MatriculaMasivaJob implements ShouldQueue
         int              $usuarioId,
         string|int|null  $sucursalId = null,
         array            $personalIds = [],
-        bool             $notificarEmail = false
+        bool             $notificarEmail = false,
+        ?string          $emailNotificacion = null,
+        string           $origen = 'legacy'
     ) {
         $this->modo               = $modo;
         $this->cursoCodigo        = $cursoCodigo;
@@ -48,6 +53,8 @@ class MatriculaMasivaJob implements ShouldQueue
         $this->sucursalId         = $sucursalId;
         $this->personalIds        = $personalIds;
         $this->notificarEmail     = $notificarEmail;
+        $this->emailNotificacion  = $emailNotificacion;
+        $this->origen             = $origen;
     }
 
     public static function estandar(
@@ -87,9 +94,32 @@ class MatriculaMasivaJob implements ShouldQueue
         );
     }
 
+    public static function porTipoCursoNuevo(
+        int              $cursoCodigo,
+        string           $programacionCodigo,
+        int              $usuarioId,
+        string|int|null  $sucursalId = null,
+        bool             $notificarEmail = false,
+        ?string          $emailNotificacion = null
+    ): static {
+        return new static(
+            self::MODO_POR_TIPO_CURSO,
+            $cursoCodigo,
+            $programacionCodigo,
+            $usuarioId,
+            $sucursalId,
+            [],
+            $notificarEmail,
+            $emailNotificacion,
+            'nuevo'
+        );
+    }
+
     public function handle(): void
     {
-        $curso = Cursos::find($this->cursoCodigo);
+        $curso = $this->origen === 'nuevo'
+            ? $this->cargarCursoNuevo($this->cursoCodigo)
+            : Cursos::find($this->cursoCodigo);
         $prog  = CursoProgramacion::where('codigo', $this->programacionCodigo)
             ->orWhere('codigo_programacion', $this->programacionCodigo)
             ->first();
@@ -149,6 +179,36 @@ class MatriculaMasivaJob implements ShouldQueue
         }
     }
 
+    /**
+     * Carga un curso de sw_cursos_new y lo expone con los campos históricos
+     * que consume el resto del job (nombre, tipo_curso, cod_cliente, etc.).
+     */
+    private function cargarCursoNuevo(int $cursoCodigo): ?Cursos
+    {
+        $row = CursoNew::where('CODIGO', $cursoCodigo)->first();
+
+        if (! $row) {
+            return null;
+        }
+
+        $sucursal = (int) $row->SW_CURS_SUCURSAL_COD;
+
+        $curso = new Cursos();
+        $curso->setRawAttributes([
+            'codigo' => (int) $row->CODIGO,
+            'nombre' => $row->SW_CURS_NOMBRE,
+            'codigo_curso' => (string) $row->SW_CURS_COD,
+            'tipo_curso' => $row->SW_CURS_PLAN_CAPAC_COD !== null ? (string) $row->SW_CURS_PLAN_CAPAC_COD : null,
+            'cod_cliente' => $row->SW_CURS_CLIENTE_COD,
+            'dirigido_a' => (string) $row->SW_CURS_DIRIGIDO_COD,
+            'sucursal' => $sucursal > 0 ? str_pad((string) $sucursal, 2, '0', STR_PAD_LEFT) : null,
+            'cod_responsable' => (string) $row->SW_CURS_RESP_COD,
+            'codigo_moodle' => (int) $row->SW_CURS_AV_COD > 0 ? (int) $row->SW_CURS_AV_COD : null,
+        ], true);
+
+        return $curso;
+    }
+
     private function marcarSeguimiento(string $jobId, array $datos): void
     {
         try {
@@ -161,10 +221,10 @@ class MatriculaMasivaJob implements ShouldQueue
 
     private function notificarCoordinador(string $nombreCurso, array $resumen): void
     {
-        $destino = config('capacitacion.coord_email');
+        $destino = trim((string) ($this->emailNotificacion ?: config('capacitacion.coord_email')));
 
         if (empty($destino) || !filter_var($destino, FILTER_VALIDATE_EMAIL)) {
-            Log::warning("MatriculaMasivaJob: CAPA_COORD_EMAIL no configurado o inválido, no se envía aviso.", [
+            Log::warning("MatriculaMasivaJob: sin correo de destino válido, no se envía aviso.", [
                 'curso' => $nombreCurso,
             ]);
             return;
@@ -180,7 +240,7 @@ class MatriculaMasivaJob implements ShouldQueue
                 origen: $this->modo === self::MODO_POR_TIPO_CURSO ? 'apertura automática' : 'gestión de matrícula',
             ));
         } catch (\Exception $e) {
-            Log::error("MatriculaMasivaJob: no se pudo encolar el aviso al coordinador.", ['error' => $e->getMessage()]);
+            Log::error("MatriculaMasivaJob: no se pudo encolar el aviso por correo.", ['error' => $e->getMessage()]);
         }
     }
 

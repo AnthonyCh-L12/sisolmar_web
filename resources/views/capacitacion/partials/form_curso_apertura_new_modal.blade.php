@@ -127,9 +127,16 @@
                         <input id="napNotificar" type="checkbox" x-model="notificarCorreo" :disabled="!matricularAutomaticamente || esDirigidoOtros" class="mt-0.5 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary">
                         <span>
                             <span class="block text-sm font-semibold text-default-800">Avisar por correo al finalizar</span>
-                            <span class="block text-xs text-default-500 mt-0.5">Se notificará al coordinador cuando termine la matrícula masiva (solo si son más de 10 personas).</span>
+                            <span class="block text-xs text-default-500 mt-0.5">Se enviará el resumen al correo que indiques cuando termine la matrícula masiva (solo si son más de 10 personas).</span>
                         </span>
                     </label>
+
+                    <div x-show="notificarCorreo && !esDirigidoOtros && matricularAutomaticamente" x-transition class="mt-2">
+                        <label for="napCorreoNotificacion" class="text-sm font-medium text-gray-800 inline-block mb-1">Correo para el aviso <span class="text-red-500">*</span></label>
+                        <input id="napCorreoNotificacion" type="email" x-model.trim="correoNotificacion" placeholder="tu.correo@solsecurity.pe"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                        <p class="text-xs text-default-500 mt-1">Ingresa tu propio correo para recibir el resumen de la matrícula.</p>
+                    </div>
 
                 </div>
 
