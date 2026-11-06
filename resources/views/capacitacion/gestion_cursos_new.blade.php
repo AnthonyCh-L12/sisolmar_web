@@ -255,6 +255,9 @@
 
     {{-- Modal: extender plazo --}}
     @include('capacitacion.partials.form_curso_aplazar_new_modal')
+
+    {{-- Modal: subir curso al AV --}}
+    @include('capacitacion.partials.form_curso_subir_av_new_modal')
 </div>
 @endsection
 

@@ -85,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // NUEVO: Dispatcher para Subir al AV
     window.solicitarSubirCursoAV = (cod) => {
         if (!cod) return;
+        window.__pendingSubirAvNew = String(cod);
         window.dispatchEvent(new CustomEvent("subir-curso-av", { detail: { codigo: String(cod) } }));
     };
 

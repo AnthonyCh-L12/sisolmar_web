@@ -1217,6 +1217,233 @@ window.formCursoEditNew = function () {
     };
 };
 
+// ── Subir curso al AV (solo UI: recursos visuales + evaluación) ──
+window.formSubirAvNew = function () {
+    return {
+        showModal: false,
+        cargando: false,
+        error: "",
+        codigo: "",
+        cursoCodigo: "",
+        cursoNombre: "",
+        planNombre: "",
+        areaNombre: "",
+        responsableNombre: "",
+
+        // Evaluación (vacía por defecto)
+        aplicaEvaluacion: false,
+        limiteTiempo: "",
+        nota: "",
+        intentos: "",
+        cantidadPreguntas: "",
+        preguntasBalotario: "",
+
+        // Banco de preguntas
+        archivoWord: null,
+        archivoWordNombre: "",
+        cargandoWord: false,
+        preguntasExamen: [],
+        wordMetrics: { tokensInput: 0, tokensOutput: 0, tokensTotal: 0, costoUSD: 0, tiempoSeg: 0 },
+
+        // Recursos visuales
+        imageFilePortada: null,
+        imagePreviewPortada: null,
+        imageFileAfiche: null,
+        imagePreviewAfiche: null,
+        modalPreviewAbierto: false,
+        modalPreviewSrc: "",
+        modalPreviewTitulo: "",
+
+        resetFormulario() {
+            this.error = "";
+            this.codigo = "";
+            this.cursoCodigo = "";
+            this.cursoNombre = "";
+            this.planNombre = "";
+            this.areaNombre = "";
+            this.responsableNombre = "";
+            this.aplicaEvaluacion = false;
+            this.limiteTiempo = "";
+            this.nota = "";
+            this.intentos = "";
+            this.cantidadPreguntas = "";
+            this.preguntasBalotario = "";
+            this.archivoWord = null;
+            this.archivoWordNombre = "";
+            this.cargandoWord = false;
+            this.preguntasExamen = [];
+            this.imageFilePortada = null;
+            this.imagePreviewPortada = null;
+            this.imageFileAfiche = null;
+            this.imagePreviewAfiche = null;
+            this.modalPreviewAbierto = false;
+            this.modalPreviewSrc = "";
+            this.modalPreviewTitulo = "";
+        },
+
+        async abrir(codigo) {
+            const cod = codigo || window.__pendingSubirAvNew;
+            if (!cod) return;
+            window.__pendingSubirAvNew = null;
+
+            this.resetFormulario();
+            this.codigo = String(cod);
+            this.showModal = true;
+            document.body.style.overflow = "hidden";
+            this.cargando = true;
+
+            try {
+                const res = await axios.get(`${VITE_URL_APP}/api/obtener-curso-new/${cod}`);
+                const curso = res?.data?.data;
+                if (!res?.data?.success || !curso) throw new Error("No se pudo cargar el curso.");
+
+                this.cursoCodigo = curso.CURS_COD || String(cod);
+                this.cursoNombre = curso.CURS_NOMBRE || "";
+                this.planNombre = curso.CURS_PLAN_CAPAC_NOMBRE || "—";
+                this.areaNombre = curso.CURS_AREA_RESPONSABLE_NOMBRE || "—";
+                this.responsableNombre = curso.CURS_RESPONSABLE_NOMBRE || "—";
+            } catch (e) {
+                console.error("Error abriendo subir al AV:", e);
+                this.error = "No se pudo cargar la información del curso seleccionado.";
+            } finally {
+                this.cargando = false;
+            }
+        },
+
+        cerrar() {
+            this.showModal = false;
+            document.body.style.overflow = "";
+            this.resetFormulario();
+        },
+
+        previewImage(src, titulo) {
+            this.modalPreviewSrc = src;
+            this.modalPreviewTitulo = titulo;
+            this.modalPreviewAbierto = true;
+        },
+
+        async handleImageUpload(event, type = "portada") {
+            let file = event.target.files?.[0];
+            if (!file) return;
+
+            const allowed = ["image/jpeg", "image/jpg", "image/png"];
+            if (!allowed.includes(file.type)) {
+                Swal.fire("Atención", "Solo se permiten imágenes .jpg, .jpeg o .png", "warning");
+                event.target.value = "";
+                return;
+            }
+
+            if (file.size > 1990 * 1024) {
+                await Swal.fire({
+                    title: "Imagen pesada",
+                    text: "Supera 1.9 MB, se intentará comprimir automáticamente.",
+                    icon: "info",
+                    confirmButtonText: "Entendido",
+                });
+                try {
+                    file = await imageCompression(file, { maxSizeMB: 1.9, maxWidthOrHeight: 1920, useWebWorker: true });
+                } catch {
+                    Swal.fire("Error", "No se pudo comprimir la imagen.", "error");
+                    event.target.value = "";
+                    return;
+                }
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (type === "portada") {
+                    this.imagePreviewPortada = e.target.result;
+                    this.imageFilePortada = file;
+                } else {
+                    this.imagePreviewAfiche = e.target.result;
+                    this.imageFileAfiche = file;
+                }
+            };
+            reader.readAsDataURL(file);
+        },
+
+        async analizarExamenWord() {
+            if (!this.archivoWord) return;
+
+            const ext = this.archivoWord.name.split(".").pop().toLowerCase();
+            if (ext === "doc" || ext === "dot") {
+                Swal.fire({
+                    title: "Formato deprecado",
+                    html: "Abre el archivo y <b>guárdalo como .docx</b> antes de subirlo.",
+                    icon: "warning",
+                    confirmButtonText: "Entendido",
+                });
+                return;
+            }
+
+            this.cargandoWord = true;
+            try {
+                const fd = new FormData();
+                fd.append("archivo", this.archivoWord);
+                const res = await axios.post(`${VITE_URL_APP}/api/capacitacion/procesar-examen-word`, fd, {
+                    headers: { "Content-Type": "multipart/form-data" },
+                });
+
+                if (res.data?.success) {
+                    this.preguntasExamen = res.data.preguntas || [];
+                    if (res.data.metrics) {
+                        this.wordMetrics = {
+                            tokensInput: res.data.metrics.tokens_input,
+                            tokensOutput: res.data.metrics.tokens_output,
+                            tokensTotal: res.data.metrics.tokens_total,
+                            costoUSD: res.data.metrics.costo_usd,
+                            tiempoSeg: res.data.metrics.tiempo_seg,
+                        };
+                    }
+                    const count = this.preguntasExamen.length;
+                    this.cantidadPreguntas = String(count);
+                    this.preguntasBalotario = String(count);
+                    this.verVistaPrevia();
+                } else {
+                    Swal.fire("Error", res.data?.message || "No se pudo procesar el Word", "error");
+                }
+            } catch (e) {
+                console.error(e);
+                Swal.fire("Error", "No se pudo procesar el archivo Word", "error");
+            } finally {
+                this.cargandoWord = false;
+            }
+        },
+
+        verVistaPrevia() {
+            if (!this.preguntasExamen.length) {
+                Swal.fire("Sin preguntas", "Primero analiza un archivo Word.", "info");
+                return;
+            }
+            window.dispatchEvent(
+                new CustomEvent("abrir-modal-word-new", {
+                    detail: {
+                        preguntas: this.preguntasExamen,
+                        nombreArc: this.archivoWordNombre,
+                        metrics: this.wordMetrics,
+                    },
+                })
+            );
+        },
+
+        init() {
+            window.addEventListener("subir-curso-av", (e) => {
+                const c = e.detail?.codigo || window.__pendingSubirAvNew;
+                if (c) this.abrir(c);
+            });
+            window.addEventListener("close-modal-subir-av-new", () => {
+                this.showModal = false;
+                document.body.style.overflow = "";
+            });
+            if (window.__pendingSubirAvNew && !this.showModal) {
+                const c = window.__pendingSubirAvNew;
+                window.__pendingSubirAvNew = null;
+                this.abrir(c);
+            }
+        },
+    };
+};
+
 // Modal simple de revisión Word para la vista nueva (solo lectura/confirmación)
 window.modalExamenWordNew = function () {
     return {
