@@ -2,9 +2,16 @@ import axios from "axios";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
+function _assetUrl(path) {
+    const env = typeof APP_ENV !== "undefined" ? APP_ENV : (typeof window !== "undefined" ? window.APP_ENV : undefined);
+    // local => raíz del sitio; cualquier otro/fallback => prefijo /sisolmar (producción)
+    const base = env === "local" ? "" : "/sisolmar";
+    return `${base}${path}`;
+}
+
 async function _cargarLogoExcel(workbook) {
     try {
-        const response = await fetch("/sisolmar/images/logo_sol.png");
+        const response = await fetch(_assetUrl("/images/logo_sol.png"));
         const arrayBuffer = await response.arrayBuffer();
         return workbook.addImage({ buffer: arrayBuffer, extension: "png" });
     } catch (e) {
@@ -1101,7 +1108,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 const nombreCurso = this.nombreCursosSeleccionados;
 
-                const logoSol = await _cargarImagen("/sisolmar/images/logo_sol.png");
+                const logoSol = await _cargarImagen(_assetUrl("/images/logo_sol.png"));
 
                 const dibujarEncabezado = () => {
                     let logoBottomY = 26;
@@ -2148,7 +2155,7 @@ export default document.addEventListener("alpine:init", () => {
                         : "TODAS LAS ÁREAS";
 
                 const logoSol = await _cargarImagen(
-                    "/sisolmar/images/logo_sol.png",
+                    _assetUrl("/images/logo_sol.png"),
                 );
 
                 let logoBottomY = 26;
@@ -3655,7 +3662,7 @@ export default document.addEventListener("alpine:init", () => {
                 });
 
                 const logoSol = await _cargarImagen(
-                    "/sisolmar/images/logo_sol.png",
+                    _assetUrl("/images/logo_sol.png"),
                 );
 
                 const pageWidth = doc.internal.pageSize.getWidth();
@@ -4769,7 +4776,7 @@ export default document.addEventListener("alpine:init", () => {
                 });
 
                 const logoSol = await _cargarImagen(
-                    "/sisolmar/images/logo_sol.png",
+                    _assetUrl("/images/logo_sol.png"),
                 );
                 const pageWidth = doc.internal.pageSize.getWidth();
                 const pageHeight = doc.internal.pageSize.getHeight();
@@ -5616,7 +5623,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 const data = this.reporteData;
                 const logoSol = await _cargarImagen(
-                    "/sisolmar/images/logo_sol.png",
+                    _assetUrl("/images/logo_sol.png"),
                 );
 
                 // Proxy server-side: convierte la URL cross-origin de la firma

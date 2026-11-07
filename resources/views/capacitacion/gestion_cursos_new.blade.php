@@ -291,7 +291,7 @@
                     </div>
                     <div>
                         <h3 class="text-xl font-bold text-default-900">Pasos para crear un curso</h3>
-                        <p class="text-sm text-default-500 mt-0.5">Del registro local a la publicación en el Aula Virtual.</p>
+                        <p class="text-sm text-default-500 mt-0.5">El paso a paso para registrar un curso y subirlo al AV.</p>
                     </div>
                 </div>
                 <button type="button" @click="guiaPasosOpen = false"
@@ -305,18 +305,13 @@
                     {{-- Paso 1 --}}
                     <li class="relative flex gap-4">
                         <div class="flex flex-col items-center">
-                            <span class="w-9 h-9 rounded-full bg-green-500 text-white inline-flex items-center justify-center shrink-0 shadow-sm">
-                                <i class="ti ti-check text-lg"></i>
-                            </span>
+                            <span class="w-9 h-9 rounded-full bg-primary/10 text-primary inline-flex items-center justify-center shrink-0 font-bold text-sm">1</span>
                             <span class="w-px flex-1 bg-default-200 mt-1"></span>
                         </div>
                         <div class="pb-1">
-                            <div class="flex items-center gap-2">
-                                <h4 class="text-sm font-bold text-default-900">Crear el curso en el sistema</h4>
-                                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-bold uppercase tracking-wide">Hecho</span>
-                            </div>
+                            <h4 class="text-sm font-bold text-default-900">Crear el curso en el sistema</h4>
                             <p class="text-xs text-default-500 mt-1 leading-6">
-                                Se registra el curso en el módulo local (<span class="font-semibold text-default-700">sw_cursos_new</span>) con sus datos base.
+                                Se registra el curso en el módulo con los datos correspondientes.
                             </p>
                         </div>
                     </li>
@@ -329,7 +324,7 @@
                         </div>
                         <div class="pb-1">
                             <div class="flex items-center gap-2">
-                                <h4 class="text-sm font-bold text-default-900">Completar los datos del curso</h4>
+                                <h4 class="text-sm font-bold text-default-900">Verificar y editar los datos del curso</h4>
                                 <span class="px-2 py-0.5 rounded-full bg-default-100 text-default-500 text-[10px] font-bold uppercase tracking-wide">Opcional</span>
                             </div>
                             <p class="text-xs text-default-500 mt-1 leading-6">
@@ -349,7 +344,7 @@
                                 <h4 class="text-sm font-bold text-default-900">Subir el curso al Aula Virtual (AV)</h4>
                             </div>
                             <p class="text-xs text-default-500 mt-1 leading-6">
-                                Carga los recursos del curso: examen, portada, afiche informativo, nota mínima y demás media necesaria.
+                                Se abrirá un formulario para cargar los recursos del curso: examen, portada, afiche informativo, nota mínima y demás datos necesarios. Al hacer clic en "Subir al AV", el curso será subido al AV y estará disponible para poder realizar la apertura del curso.
                             </p>
                         </div>
                     </li>
@@ -358,13 +353,30 @@
                     <li class="relative flex gap-4">
                         <div class="flex flex-col items-center">
                             <span class="w-9 h-9 rounded-full bg-primary text-white inline-flex items-center justify-center shrink-0 font-bold text-sm shadow-sm">4</span>
+                            <span class="w-px flex-1 bg-default-200 mt-1"></span>
                         </div>
-                        <div>
+                        <div class="pb-1">
                             <div class="flex items-center gap-2">
                                 <h4 class="text-sm font-bold text-default-900">Aperturar el curso</h4>
                             </div>
                             <p class="text-xs text-default-500 mt-1 leading-6">
-                                Al aperturar el curso se genera la <span class="font-semibold text-default-700">matriculación automática</span> de los participantes.
+                                Al aperturar el curso se generará la <span class="font-semibold text-default-700">matriculación automática</span> de los participantes según la configuración que se registró en el primer paso: sucursal y para quienes va dirigido.
+                            </p>
+                        </div>
+                    </li>
+
+                    {{-- Estado final: completado --}}
+                    <li class="relative flex gap-4">
+                        <div class="flex flex-col items-center">
+                            <span class="w-9 h-9 rounded-full bg-success text-white inline-flex items-center justify-center shrink-0 shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 6L9 17l-5-5" />
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="flex items-center">
+                            <p class="text-sm font-bold text-success leading-6">
+                                ¡Listo! - ¡Curso subido y personal matriculado!
                             </p>
                         </div>
                     </li>

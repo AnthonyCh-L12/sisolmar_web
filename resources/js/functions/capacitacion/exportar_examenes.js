@@ -1,5 +1,12 @@
 import axios from "axios";
 
+function _assetUrl(path) {
+    const env = typeof APP_ENV !== "undefined" ? APP_ENV : (typeof window !== "undefined" ? window.APP_ENV : undefined);
+    // local => raíz del sitio; cualquier otro/fallback => prefijo /sisolmar (producción)
+    const base = env === "local" ? "" : "/sisolmar";
+    return `${base}${path}`;
+}
+
 function _cargarImagen(url) {
     return new Promise((resolve) => {
         const img = new Image();
@@ -774,9 +781,9 @@ export default document.addEventListener("alpine:init", () => {
             const anchoMitad = anchoTabla / 2;
 
             const logoSol = await _cargarImagen(
-                "/sisolmar/images/logo_sol.png",
+                _assetUrl("/images/logo_sol.png"),
             );
-            const logoAV = await _cargarImagen("/sisolmar/images/AV.png");
+            const logoAV = await _cargarImagen(_assetUrl("/images/AV.png"));
 
             const ctx = {
                 pageWidth,
