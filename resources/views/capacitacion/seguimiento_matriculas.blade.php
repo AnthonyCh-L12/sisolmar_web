@@ -2468,7 +2468,7 @@
                 this.open = true;
 
                 const courseId = data.course_id || data.codigo_moodle || data.codigo;
-                fetch(`${VITE_URL_APP}/api/obtener-detalle-curso/${courseId}`)
+                fetch(`${VITE_URL_APP}/api/obtener-detalle-curso-new/${courseId}`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error('Error en la respuesta del servidor');
@@ -3011,7 +3011,7 @@
                         this.memoCargado = true;
                     });
 
-                fetch(`${VITE_URL_APP}/api/obtener-cursos-alumno?dni=${data.dni}`)
+                fetch(`${VITE_URL_APP}/api/obtener-cursos-alumno-new?dni=${data.dni}`)
                     .then(r => r.json())
                     .then(res => {
                         if (res.success) {
@@ -3355,5 +3355,5 @@
 
 @endsection
 @section('script')
-@vite(['resources/js/functions/capacitacion/seguimiento_matriculas.js'])
+@vite(['resources/js/functions/capacitacion/seguimiento_matriculas_new.js'])
 @endsection

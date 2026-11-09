@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ActualizacionesDjController;
 use App\Http\Controllers\Api\NewCapacController;
+use App\Http\Controllers\Api\PlanesCapacitacionNewController;
+use App\Http\Controllers\Api\SeguimientoMatriculasNewController;
 use App\Http\Controllers\BiometricoController;
 use App\Http\Controllers\CapacitacionController;
 use App\Http\Controllers\ConsultaController;
@@ -191,6 +193,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-detalle-curso/{course_id}', [CapacitacionController::class, 'obtenerDetalleCurso']);
         Route::get('/get-estudiantes-curso', [CapacitacionController::class, 'obtenerEstudiantesCurso']);
         Route::get('/obtener-cursos-alumno', [CapacitacionController::class, 'obtenerEstadoCursosAlumno']);
+        // Seguimiento AV respaldado por sw_cursos_new (vista nueva)
+        Route::get('/get-cursos-seguimiento-new', [SeguimientoMatriculasNewController::class, 'getCursosSeguimientoNew']);
+        Route::get('/obtener-detalle-curso-new/{course_id}', [SeguimientoMatriculasNewController::class, 'obtenerDetalleCursoNew']);
+        Route::get('/obtener-cursos-alumno-new', [SeguimientoMatriculasNewController::class, 'obtenerEstadoCursosAlumnoNew']);
         Route::post('/comparar-memos', [CapacitacionController::class, 'compararMemos']);
         Route::post('/cursos/aplazar-curso', [CapacitacionController::class, 'aplazarCurso']);
         Route::get('/cursos/obtener-prog-actual/{courseId}', [CapacitacionController::class, 'obtenerProgActual']);
@@ -206,6 +212,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-plan-pce', [CapacitacionController::class, 'obtenerPlanPCE']);
         Route::get('/obtener-plan-pca/{codCliente}', [CapacitacionController::class, 'obtenerPlanPCA']);
         Route::get('/obtener-cursos-por-plan/{tipo_curso}', [CapacitacionController::class, 'obtenerCursosPorPlan']);
+        // Planes de capacitación respaldados por sw_cursos_new (vista nueva)
+        Route::get('/obtener-plan-pce-new', [PlanesCapacitacionNewController::class, 'obtenerPlanPCENew']);
+        Route::get('/obtener-plan-pca-new/{codCliente}', [PlanesCapacitacionNewController::class, 'obtenerPlanPCANew']);
+        Route::get('/obtener-cursos-por-plan-new/{tipo_curso}', [PlanesCapacitacionNewController::class, 'obtenerCursosPorPlanNew']);
         Route::get('/obtener-cursos-new', [NewCapacController::class, 'obtenerCursos']);
         Route::get('/obtener-cursos-matriculas-new', [NewCapacController::class, 'obtenerCursosMatriculas']);
         Route::get('/obtener-curso-new/{codigoCurso}', [NewCapacController::class, 'obtenerCurso']);
@@ -223,8 +233,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/cursos/subir-av', [NewCapacController::class, 'subirCursoAv']);
         Route::post('/cursos/aperturar-curso', [NewCapacController::class, 'aperturarCurso']);
         Route::post('/cursos/aplazar-curso-new', [NewCapacController::class, 'aplazarCurso']);
+        Route::post('/cursos/actualizar-fechas-programacion', [NewCapacController::class, 'actualizarFechasProgramacion']);
         Route::post('/capacitacion/save-matricula-new', [NewCapacController::class, 'saveMatriculaNew']);
         Route::get('/obtener-tipos-curso', [CapacitacionController::class, 'obtenerTiposDeCurso']);
+        Route::get('/obtener-tipos-curso-new', [PlanesCapacitacionNewController::class, 'obtenerTiposDeCursoNew']);
         Route::post('/capacitacion/procesar-examen-word', [CapacitacionController::class, 'procesarExamenWord']);
         Route::post('/capacitacion/guardar-examen-word', [CapacitacionController::class, 'guardarExamenWord']);
         Route::post('/capacitacion/desmatricular-usuario', [CapacitacionController::class, 'desmatricularUsuario']);

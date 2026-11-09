@@ -72,14 +72,14 @@ document.addEventListener("DOMContentLoaded", () => {
         window.abrirModalAperturaNew(cod);
     };
 
-    window.solicitarAplazarCursoNew = (cod) => {
-        if (!cod || typeof window.abrirModalAplazarNew !== "function") {
+    window.solicitarEditarFechasProgramacionNew = (cod) => {
+        if (!cod || typeof window.abrirModalEditarFechasNew !== "function") {
             if (!cod) return;
-            window.__pendingAplazarNew = String(cod);
-            window.dispatchEvent(new CustomEvent("open-modal-aplazar-new", { detail: { codigo: String(cod) } }));
+            window.__pendingEditarFechasNew = String(cod);
+            window.dispatchEvent(new CustomEvent("open-modal-editar-fechas-new", { detail: { codigo: String(cod) } }));
             return;
         }
-        window.abrirModalAplazarNew(cod);
+        window.abrirModalEditarFechasNew(cod);
     };
 
     // NUEVO: Dispatcher para Subir al AV
@@ -126,15 +126,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 <i class="bx bx-calendar-star text-base pointer-events-none"></i>
             </button>`;
             
-        // 3. Aplazar
-        const btnAplazar = tieneVigente
-            ? `<button type="button" title="Extender plazo del curso" onclick="window.solicitarAplazarCursoNew('${safeCod}')"
+        // 3. Editar fechas de la programación vigente
+        const btnEditarFechas = tieneVigente
+            ? `<button type="button" title="Editar fechas de la programación vigente" onclick="window.solicitarEditarFechasProgramacionNew('${safeCod}')"
                 class="btn btn-sm rounded bg-success/10 text-success hover:bg-success hover:text-white transition-colors">
-                <i class="bx bx-time-five text-base pointer-events-none"></i>
+                <i class="bx bx-calendar-edit text-base pointer-events-none"></i>
             </button>`
             : `<button type="button" disabled title="Solo disponible con un periodo VIGENTE activo"
                 class="${bloqueado}">
-                <i class="bx bx-time-five text-base pointer-events-none"></i>
+                <i class="bx bx-calendar-edit text-base pointer-events-none"></i>
             </button>`;
 
         // 4. Subir al AV (Se mantiene igual: bloqueado si ya se subió)
@@ -163,7 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="flex items-center justify-center gap-1.5">
             ${btnEditar}
             ${btnAperturar}
-            ${btnAplazar}
+            ${btnEditarFechas}
             ${btnSubirAV}
             ${btnEliminar}
         </div>`;

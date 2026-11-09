@@ -125,6 +125,34 @@
                                 <p x-show="areaBloqueada" class="text-[11px] text-default-400 font-medium mt-1">Primero selecciona un sistema de gestión.</p>
                             </div>
                         </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="nediSucursal" class="text-sm font-medium text-gray-800 inline-block mb-1">Sucursal <span class="text-red-500">*</span></label>
+                                <select id="nediSucursal" x-model="sucursal"
+                                    class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                                    <option value="">Seleccione sucursal…</option>
+                                    <option value="0">Todas las sucursales</option>
+                                    <template x-for="s in sucursalesDisponibles" :key="s.codigo">
+                                        <option :value="s.codigo" x-text="s.nombre"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="nediDirigido" class="text-sm font-medium text-gray-800 inline-block mb-1">Dirigido a <span class="text-red-500">*</span></label>
+                                <select id="nediDirigido" x-model="dirigido"
+                                    class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                                    <option value="">Seleccione a quién va dirigido…</option>
+                                    <template x-for="o in opcionesDirigidoEdit" :key="o.codigo">
+                                        <option :value="String(o.codigo)" x-text="o.texto"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+                        <div x-show="advertenciaAudiencia" x-transition
+                            class="flex items-start gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <i class="ti ti-alert-triangle text-amber-500 text-lg shrink-0 mt-0.5"></i>
+                            <p class="text-[12px] text-amber-800 font-medium" x-text="advertenciaAudiencia"></p>
+                        </div>
                     </div>
                 </div>
 

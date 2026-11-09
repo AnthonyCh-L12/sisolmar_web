@@ -126,15 +126,25 @@ class MoodleCursoService
     }
 
     /**
-     * Actualiza la fecha de fin de las inscripciones de los alumnos en Moodle.
+     * Actualiza las fechas de inicio y fin de las inscripciones de los alumnos
+     * en Moodle. Si no se indica el inicio, solo se actualiza el fin.
      */
-    public function actualizarFechasMatriculas(int $courseId, int $fin): bool
+    public function actualizarFechasMatriculas(int $courseId, int $fin, ?int $inicio = null): bool
     {
         if ($courseId <= 0) {
             return true;
         }
 
         try {
+            $valores = [
+                'ue.timeend' => $fin,
+                'ue.timemodified' => time(),
+            ];
+
+            if ($inicio !== null) {
+                $valores['ue.timestart'] = $inicio;
+            }
+
             DB::connection('mysql_grupoihb')
                 ->table('mdl_user_enrolments as ue')
                 ->join('mdl_enrol as e', 'e.id', '=', 'ue.enrolid')
@@ -147,10 +157,7 @@ class MoodleCursoService
                 ->where('e.courseid', $courseId)
                 ->where('ue.status', 0)
                 ->where('ra.roleid', 5)
-                ->update([
-                    'ue.timeend' => $fin,
-                    'ue.timemodified' => time(),
-                ]);
+                ->update($valores);
 
             return true;
         } catch (\Throwable $e) {

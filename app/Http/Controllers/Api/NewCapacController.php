@@ -34,6 +34,8 @@ class NewCapacController extends Controller
                     'p.nombre as plan_nombre',
                     DB::raw('COALESCE(sa.abreviatura, s.nombre) as sistema_nombre'),
                     'c.fecha_creacion',
+                    DB::raw("CONVERT(varchar(10), c.fecha_creacion, 103) as fecha_creacion_dmy"),
+                    DB::raw("CONVERT(varchar(10), c.fecha_creacion, 23) as fecha_creacion_iso"),
                     'c.habilitado',
                 )
                 ->orderBy('c.SW_CURS_COD')
@@ -58,12 +60,8 @@ class NewCapacController extends Controller
                         ),
                         'CURS_PLAN_CAPAC_NOMBRE' => $row->plan_nombre,
                         'CURS_SIST_GESTION_NOMBRE' => $row->sistema_nombre,
-                        'CURS_CREADO_FECHA' => $row->fecha_creacion
-                            ? Carbon::parse($row->fecha_creacion)->format('d/m/Y')
-                            : null,
-                        'CURS_CREADO_FECHA_ISO' => $row->fecha_creacion
-                            ? Carbon::parse($row->fecha_creacion)->format('Y-m-d')
-                            : null,
+                        'CURS_CREADO_FECHA' => $row->fecha_creacion_dmy ?: null,
+                        'CURS_CREADO_FECHA_ISO' => $row->fecha_creacion_iso ?: null,
                         'CURS_HABILITADO' => (bool) $row->habilitado,
                         'CURS_SUBIDO_AV' => (int) $row->SW_CURS_AV_COD != 0,
                         'CURS_TIENE_VIGENTE' => isset($vigentes[(int) $row->CODIGO]),
@@ -122,6 +120,7 @@ class NewCapacController extends Controller
                     'c.SW_CURS_AV_COD',
                     'c.SW_CURS_RESP_COD',
                     'c.fecha_creacion',
+                    DB::raw("CONVERT(varchar(19), c.fecha_creacion, 120) as fecha_creacion_iso"),
                     'p.nombre as plan_nombre',
                     'p.descripcion as plan_descripcion',
                     's.nombre as sistema_nombre',
@@ -168,8 +167,8 @@ class NewCapacController extends Controller
                             : 'Sin responsable',
                         'Descripcion' => $row->SW_CURS_DESCRIPCION ?: 'Sin descripcion',
                         'Total_Matriculados' => (int) $row->total_matriculados,
-                        'Fecha_Creacion' => $row->fecha_creacion
-                            ? strtotime((string) $row->fecha_creacion)
+                        'Fecha_Creacion' => $row->fecha_creacion_iso
+                            ? strtotime((string) $row->fecha_creacion_iso)
                             : null,
                         'Vigente' => isset($vigentes[(int) $row->CODIGO]),
                     ];
@@ -220,6 +219,8 @@ class NewCapacController extends Controller
                     'c.SW_CURS_SUCURSAL_COD',
                     'c.habilitado',
                     'c.fecha_creacion',
+                    DB::raw("CONVERT(varchar(10), c.fecha_creacion, 103) as fecha_creacion_dmy"),
+                    DB::raw("CONVERT(varchar(10), c.fecha_creacion, 23) as fecha_creacion_iso"),
                     'p.nombre as plan_nombre',
                     DB::raw('COALESCE(sa.abreviatura, s.nombre) as sistema_nombre'),
                     'ar.nombre as area_responsable_nombre',
@@ -325,6 +326,9 @@ class NewCapacController extends Controller
                     'CURS_AREA_RESPONSABLE' => $areaCodigo > 0 ? (string) $areaCodigo : null,
                     'CURS_AREA_RESPONSABLE_NOMBRE' => $row->area_responsable_nombre,
                     'CURS_COD_MOODLE_AREA' => $row->area_codigo_moodle !== null ? (string) $row->area_codigo_moodle : null,
+                    'CURS_AV_COD' => $row->SW_CURS_AV_COD !== null && (int) $row->SW_CURS_AV_COD > 0
+                        ? (string) $row->SW_CURS_AV_COD
+                        : null,
                     'CURS_COD_RESPONSABLE' => $responsableCodigo > 0
                         ? str_pad((string) $responsableCodigo, 5, '0', STR_PAD_LEFT)
                         : null,
@@ -336,12 +340,8 @@ class NewCapacController extends Controller
                     'CURS_SUCURSAL' => $this->formatearSucursal((int) $row->SW_CURS_SUCURSAL_COD),
                     'CURS_SUCURSALES' => $sucursales,
                     'CURS_HABILITADO' => (bool) $row->habilitado,
-                    'CURS_CREADO_FECHA' => $row->fecha_creacion
-                        ? Carbon::parse($row->fecha_creacion)->format('d/m/Y')
-                        : null,
-                    'CURS_CREADO_FECHA_ISO' => $row->fecha_creacion
-                        ? Carbon::parse($row->fecha_creacion)->format('Y-m-d')
-                        : null,
+                    'CURS_CREADO_FECHA' => $row->fecha_creacion_dmy ?: null,
+                    'CURS_CREADO_FECHA_ISO' => $row->fecha_creacion_iso ?: null,
                     'CURS_TIENE_VIGENTE' => in_array('VIGENTE', $estados, true),
                     'CURS_TIENE_PENDIENTE' => in_array('PENDIENTE', $estados, true),
                     'CURS_PROGRAMACIONES' => $programaciones,
@@ -511,6 +511,8 @@ class NewCapacController extends Controller
                 'SW_CURS_CANT_PERIOD' => 'nullable|integer|min:1',
                 'SW_CURS_SIST_GESTION_COD' => 'nullable|integer|min:0',
                 'SW_CURS_AREA_COD' => 'nullable|integer|min:0',
+                'SW_CURS_DIRIGIDO_COD' => 'nullable|integer|min:0',
+                'SW_CURS_SUCURSAL_COD' => 'nullable|integer|min:0',
             ]);
 
             $curso = CursoNew::where('SW_CURS_COD', $request->input('SW_CURS_COD'))->first();
@@ -523,7 +525,7 @@ class NewCapacController extends Controller
             }
 
             $usuario = auth()->user()?->usuario ?? 'SISTEMA';
-            $ahora = Carbon::now()->format('Y-m-d\\TH:i:s');
+            $ahora = Carbon::now()->format('Y-m-d H:i:s');
 
             $data = [];
 
@@ -558,6 +560,15 @@ class NewCapacController extends Controller
 
             if ($request->filled('SW_CURS_AREA_COD')) {
                 $data['SW_CURS_AREA_COD'] = (int) $request->input('SW_CURS_AREA_COD');
+            }
+
+            // Sucursal y dirigido usan "has" porque 0 es un valor válido (TODAS / Otros).
+            if ($request->has('SW_CURS_DIRIGIDO_COD')) {
+                $data['SW_CURS_DIRIGIDO_COD'] = (int) $request->input('SW_CURS_DIRIGIDO_COD');
+            }
+
+            if ($request->has('SW_CURS_SUCURSAL_COD')) {
+                $data['SW_CURS_SUCURSAL_COD'] = (int) $request->input('SW_CURS_SUCURSAL_COD');
             }
 
             $data['modificado_por'] = $usuario;
@@ -658,7 +669,7 @@ class NewCapacController extends Controller
             }
 
             $usuario = auth()->user()?->usuario ?? 'SISTEMA';
-            $ahora = Carbon::now()->format('Y-m-d\TH:i:s');
+            $ahora = Carbon::now()->format('Y-m-d H:i:s');
             $descripcion = trim((string) $request->input('SW_CURS_DESCRIPCION', ''));
 
             $curso = CursoNew::create([
@@ -829,7 +840,7 @@ class NewCapacController extends Controller
                     'SW_CURS_AV_COD' => $courseId,
                     'SW_CURS_EVALUACION' => $aplicaEvaluacion ? 1 : 0,
                     'modificado_por' => $usuario,
-                    'fecha_modificacion' => Carbon::now()->format('Y-m-d\TH:i:s'),
+                    'fecha_modificacion' => Carbon::now(),
                 ]);
             } catch (\Throwable $e) {
                 Log::error('Curso creado en Moodle pero no se pudo guardar SW_CURS_AV_COD', [
@@ -1491,6 +1502,164 @@ class NewCapacController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al aplazar el curso: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Actualiza las fechas de inicio/fin de la programación vigente de un curso.
+     * Opcionalmente sincroniza el aula virtual y las inscripciones existentes.
+     */
+    public function actualizarFechasProgramacion(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'cod_curso' => 'required|integer|min:1',
+                'codigo_programacion' => 'required',
+                'fecha_inicio' => 'required|date_format:Y-m-d',
+                'fecha_final' => 'required|date_format:Y-m-d|after_or_equal:fecha_inicio',
+                'actualizar_matriculas' => 'sometimes|boolean',
+                'actualizar_curso_av' => 'sometimes|boolean',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validación.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $curso = CursoNew::query()
+                ->where('CODIGO', (int) $request->input('cod_curso'))
+                ->where('habilitado', 1)
+                ->first();
+
+            if (! $curso) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Curso no encontrado o no habilitado.',
+                ], 404);
+            }
+
+            $programacion = CursoProgramacion::query()
+                ->habilitados()
+                ->delCurso($curso->CODIGO)
+                ->vigentes()
+                ->where('codigo_programacion', (string) $request->input('codigo_programacion'))
+                ->first();
+
+            if (! $programacion) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso no tiene la programación vigente indicada.',
+                ], 404);
+            }
+
+            $fechaInicio = Carbon::parse($request->input('fecha_inicio'))->startOfDay();
+            $fechaFinal = Carbon::parse($request->input('fecha_final'))->endOfDay();
+
+            if ($fechaFinal->lessThanOrEqualTo($fechaInicio)) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La fecha de fin debe ser posterior a la fecha de inicio.',
+                ], 422);
+            }
+
+            $nuevoPeriodo = $fechaInicio->format('Y-m');
+
+            $existe = CursoProgramacion::query()
+                ->where('cod_curso', $curso->CODIGO)
+                ->where('periodo', $nuevoPeriodo)
+                ->where('tipo', $programacion->tipo)
+                ->where('habilitado', 1)
+                ->where('codigo_programacion', '!=', $programacion->codigo_programacion)
+                ->exists();
+
+            if ($existe) {
+                DB::rollBack();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => "Ya existe otra programación {$programacion->tipo} para este curso en el periodo {$nuevoPeriodo}.",
+                ], 409);
+            }
+
+            DB::table('sw_cursos_programacion')
+                ->where('codigo_programacion', $programacion->codigo_programacion)
+                ->update([
+                    'fecha_inicio' => DB::raw("CONVERT(datetime, '{$fechaInicio->format('Y-m-d H:i:s')}', 120)"),
+                    'fecha_final' => DB::raw("CONVERT(datetime, '{$fechaFinal->format('Y-m-d H:i:s')}', 120)"),
+                    'periodo' => $nuevoPeriodo,
+                    'fecha_modificacion' => DB::raw("CONVERT(datetime, '".now()->format('Y-m-d H:i:s')."', 120)"),
+                ]);
+
+            $warnings = [];
+            $moodleCourseId = (int) $curso->SW_CURS_AV_COD;
+            $actualizarCursoAv = $request->boolean('actualizar_curso_av');
+            $actualizarMatriculas = $request->boolean('actualizar_matriculas');
+
+            if (($actualizarCursoAv || $actualizarMatriculas) && $moodleCourseId <= 0) {
+                $warnings[] = 'El curso no tiene un aula virtual asociada; no se pudo sincronizar Moodle.';
+            } elseif ($moodleCourseId > 0) {
+                $moodleService = app(MoodleCursoService::class);
+
+                if ($actualizarCursoAv && ! $moodleService->actualizarFechasCurso(
+                    $moodleCourseId,
+                    $fechaInicio->timestamp,
+                    $fechaFinal->timestamp
+                )) {
+                    $warnings[] = 'No se pudieron actualizar las fechas del curso en el Aula Virtual.';
+                }
+
+                if ($actualizarMatriculas && ! $moodleService->actualizarFechasMatriculas(
+                    $moodleCourseId,
+                    $fechaFinal->timestamp,
+                    $fechaInicio->timestamp
+                )) {
+                    $warnings[] = 'No se pudieron actualizar las inscripciones en el Aula Virtual.';
+                }
+            }
+
+            DB::commit();
+
+            $mensaje = 'Fechas de la programación actualizadas correctamente.';
+            if (! empty($warnings)) {
+                $mensaje .= ' '.implode(' ', $warnings);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $mensaje,
+                'warnings' => $warnings,
+                'data' => [
+                    'fecha_inicio' => $fechaInicio->format('Y-m-d'),
+                    'fecha_final' => $fechaFinal->format('Y-m-d'),
+                    'periodo' => $nuevoPeriodo,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Error en NewCapacController@actualizarFechasProgramacion', [
+                'cod_curso' => $request->input('cod_curso'),
+                'codigo_programacion' => $request->input('codigo_programacion'),
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar las fechas: '.$e->getMessage(),
             ], 500);
         }
     }

@@ -33,6 +33,16 @@ class CursoNew extends Model
 
     public $timestamps = false;
 
+    /**
+     * Formato de fecha usado al escribir en SQL Server.
+     *
+     * La sesión de SQL Server usa DATEFORMAT dmy. Si Eloquent serializa las
+     * fechas como "Y-m-d H:i:s" (con espacio), SQL Server interpreta el valor
+     * como "yyyy-dd-mm" y termina intercambiando día y mes. El formato ISO 8601
+     * con "T" es inequívoco para SQL Server y evita ese intercambio.
+     */
+    protected $dateFormat = 'Y-m-d\TH:i:s';
+
     protected $fillable = [
         'SW_CURS_COD',
         'SW_CURS_NOMBRE',

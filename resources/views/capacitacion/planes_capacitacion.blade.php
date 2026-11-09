@@ -43,7 +43,7 @@
 @include('layouts.shared/page-title', ['subtitle' => 'Capacitación', 'title' => 'Planes de capacitación'])
 
 @section('content')
-<div x-data="planesCapacApp" class="px-6 py-6">
+<div x-data="planesCapacAppNew" class="px-6 py-6">
     {{-- Header --}}
     <div
         class="relative overflow-hidden rounded-2xl border border-default-200/60 bg-gradient-to-br from-white via-default-50/50 to-primary/5 shadow-sm mb-6">
@@ -629,5 +629,5 @@
         </div>
     </div>
 </div>
-@vite(['resources/js/app.js', 'resources/js/functions/capacitacion/planes_capacitaciones.js'])
+@vite('resources/js/app.js')
 @endsection

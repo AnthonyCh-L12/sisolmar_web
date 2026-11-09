@@ -6,6 +6,7 @@ import "simplebar";
 import "boxicons/css/boxicons.min.css";
 import "./functions/capacitacion/reportes_capacitaciones.js";
 import "./functions/capacitacion/planes_capacitaciones.js";
+import "./functions/capacitacion/planes_capacitaciones_new.js";
 import "./functions/capacitacion/exportar_examenes.js";
 import "./functions/capacitacion/cursos_externos.js";
 import Waves from "node-waves";

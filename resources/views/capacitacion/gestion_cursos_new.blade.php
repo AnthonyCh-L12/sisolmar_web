@@ -266,8 +266,8 @@
     {{-- Modal: aperturar curso --}}
     @include('capacitacion.partials.form_curso_apertura_new_modal')
 
-    {{-- Modal: extender plazo --}}
-    @include('capacitacion.partials.form_curso_aplazar_new_modal')
+    {{-- Modal: actualizar fechas de la programación vigente --}}
+    @include('capacitacion.partials.form_curso_editar_fechas_new_modal')
 
     {{-- Modal: subir curso al AV --}}
     @include('capacitacion.partials.form_curso_subir_av_new_modal')

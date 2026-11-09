@@ -61,12 +61,12 @@ window.cerrarModalAperturaNew = () => {
     window.dispatchEvent(new CustomEvent("close-modal-apertura-new"));
 };
 
-// ── Extender plazo (misma lógica que modalApertura/modalAplazarCurso original) ──
+// ── Actualizar fechas de la programación vigente ──
 // Endpoints: GET obtener-curso-new/{cod} (PK + programación VIGENTE),
-// POST cursos/aplazar-curso-new (actualiza fecha fin del curso y de matriculados, incl. Moodle).
-window.abrirModalAplazarNew = (cursCod) => {
-    if (cursCod) window.__pendingAplazarNew = String(cursCod);
-    const el = document.getElementById("formAplazarNewRoot");
+// POST cursos/actualizar-fechas-programacion (programación + AV opcional + inscripciones opcional).
+window.abrirModalEditarFechasNew = (cursCod) => {
+    if (cursCod) window.__pendingEditarFechasNew = String(cursCod);
+    const el = document.getElementById("formEditarFechasProgramacionNewRoot");
     if (el && window.Alpine) {
         try {
             const data = window.Alpine.$data(el);
@@ -75,17 +75,17 @@ window.abrirModalAplazarNew = (cursCod) => {
                 return;
             }
         } catch (e) {
-            console.warn("Aplazar: no se pudo usar Alpine.$data, uso evento", e);
+            console.warn("Editar fechas: no se pudo usar Alpine.$data, uso evento", e);
         }
     }
-    window.dispatchEvent(new CustomEvent("open-modal-aplazar-new", { detail: { codigo: cursCod } }));
+    window.dispatchEvent(new CustomEvent("open-modal-editar-fechas-new", { detail: { codigo: cursCod } }));
 };
 
-window.cerrarModalAplazarNew = () => {
-    window.dispatchEvent(new CustomEvent("close-modal-aplazar-new"));
+window.cerrarModalEditarFechasNew = () => {
+    window.dispatchEvent(new CustomEvent("close-modal-editar-fechas-new"));
 };
 
-window.formAplazarNew = function () {
+window.formEditarFechasProgramacionNew = function () {
     return {
         showModal: false,
         cargando: false,
@@ -93,46 +93,61 @@ window.formAplazarNew = function () {
         error: "",
         errorFecha: "",
         codigoPk: "",
+        codigoProgramacion: "",
         cursoNombre: "",
         programacion: null,
-        fechaNuevaFin: "",
-        fechaValida: false,
+        fechaInicio: "",
+        fechaFin: "",
+        actualizarMatriculas: true,
+        actualizarCursoAv: true,
+        tieneAulaVirtual: true,
 
         get fechaMinima() {
-            if (!this.programacion?.fecha_final) return "";
-            return String(this.programacion.fecha_final).slice(0, 10);
+            const t = new Date();
+            return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+        },
+        get fechasValidas() {
+            if (!this.fechaInicio || !this.fechaFin) return false;
+            return this.fechaFin >= this.fechaInicio;
+        },
+        get diasDuracion() {
+            if (!this.fechasValidas) return 0;
+            return Math.round((new Date(this.fechaFin) - new Date(this.fechaInicio)) / 86400000) + 1;
+        },
+        get nuevoPeriodo() {
+            return this.fechaInicio ? String(this.fechaInicio).slice(0, 7) : "";
+        },
+        get cambioPeriodo() {
+            if (!this.programacion?.periodo || !this.nuevoPeriodo) return false;
+            return String(this.programacion.periodo).slice(0, 7) !== this.nuevoPeriodo;
+        },
+        get inicioEnPasado() {
+            return !!this.fechaInicio && this.fechaInicio < this.fechaMinima;
         },
         fmtFecha(v) {
             if (!v) return "—";
             const p = String(v).slice(0, 10).split("-");
             return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : v;
         },
-        get extensionDias() {
-            if (!this.programacion?.fecha_final || !this.fechaNuevaFin) return 0;
-            const d = Math.round((new Date(this.fechaNuevaFin) - new Date(String(this.programacion.fecha_final).slice(0, 10))) / 86400000);
-            return d > 0 ? d : 0;
-        },
 
-        validarFecha() {
+        validarFechas() {
             this.errorFecha = "";
-            this.fechaValida = false;
-            if (!this.fechaNuevaFin || !this.programacion) return;
-            if (this.extensionDias <= 0) {
-                this.errorFecha = "La nueva fecha de fin debe ser posterior a la fecha actual de fin.";
-                return;
+            if (!this.fechaInicio || !this.fechaFin) return;
+            if (this.fechaFin < this.fechaInicio) {
+                this.errorFecha = "La fecha de fin debe ser igual o posterior a la fecha de inicio.";
             }
-            this.fechaValida = true;
         },
 
         async abrir(cursCod) {
-            const cod = cursCod || window.__pendingAplazarNew;
+            const cod = cursCod || window.__pendingEditarFechasNew;
             if (!cod) return;
-            window.__pendingAplazarNew = null;
+            window.__pendingEditarFechasNew = null;
             this.error = "";
             this.errorFecha = "";
-            this.fechaNuevaFin = "";
-            this.fechaValida = false;
             this.programacion = null;
+            this.fechaInicio = "";
+            this.fechaFin = "";
+            this.codigoProgramacion = "";
             this.showModal = true;
             document.body.style.overflow = "hidden";
             this.cargando = true;
@@ -146,14 +161,20 @@ window.formAplazarNew = function () {
                 if (!vigente) {
                     this.showModal = false;
                     document.body.style.overflow = "";
-                    Swal.fire("Sin programación vigente", "Solo se puede extender el plazo de un curso con periodo VIGENTE.", "warning");
+                    Swal.fire("Sin programación vigente", "Solo se pueden editar las fechas de un curso con periodo VIGENTE.", "warning");
                     return;
                 }
                 this.codigoPk = curso.CURS_PK ? String(curso.CURS_PK) : "";
                 this.cursoNombre = curso.CURS_NOMBRE || "";
+                this.codigoProgramacion = String(vigente.codigo_programacion || "");
                 this.programacion = vigente;
+                this.fechaInicio = String(vigente.fecha_inicio || "").slice(0, 10);
+                this.fechaFin = String(vigente.fecha_final || "").slice(0, 10);
+                this.tieneAulaVirtual = !!curso.CURS_AV_COD;
+                this.actualizarCursoAv = this.tieneAulaVirtual;
+                this.actualizarMatriculas = this.tieneAulaVirtual;
             } catch (e) {
-                console.error("Error abriendo extender plazo:", e);
+                console.error("Error abriendo editar fechas:", e);
                 this.error = "No se pudo cargar la programación del curso.";
             } finally {
                 this.cargando = false;
@@ -162,39 +183,57 @@ window.formAplazarNew = function () {
         cerrar() {
             this.showModal = false;
             document.body.style.overflow = "";
-            window.dispatchEvent(new CustomEvent("close-modal-aplazar-new"));
+            window.dispatchEvent(new CustomEvent("close-modal-editar-fechas-new"));
         },
 
-        async guardarExtension() {
-            this.validarFecha();
-            if (!this.fechaValida || !this.fechaNuevaFin || this.guardando) return;
+        async guardarFechas() {
+            this.validarFechas();
+            if (!this.fechasValidas || this.guardando) return;
             this.guardando = true;
             try {
-                const res = await axios.post(`${VITE_URL_APP}/api/cursos/aplazar-curso-new`, {
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+                const headers = { "Content-Type": "application/json" };
+                if (csrf) headers["X-CSRF-TOKEN"] = csrf;
+                const res = await axios.post(`${VITE_URL_APP}/api/cursos/actualizar-fechas-programacion`, {
                     cod_curso: this.codigoPk,
-                    nueva_fecha_final: this.fechaNuevaFin,
-                });
+                    codigo_programacion: this.codigoProgramacion,
+                    fecha_inicio: this.fechaInicio,
+                    fecha_final: this.fechaFin,
+                    actualizar_matriculas: this.actualizarMatriculas ? 1 : 0,
+                    actualizar_curso_av: this.actualizarCursoAv ? 1 : 0,
+                }, { headers });
+
                 if (res.data?.success) {
+                    const warnings = res.data?.warnings || [];
                     this.cerrar();
-                    Swal.fire({
-                        toast: true,
-                        position: "top-end",
-                        showConfirmButton: false,
-                        timer: 3000,
-                        timerProgressBar: true,
-                        icon: "success",
-                        title: res.data.message || "Plazo extendido correctamente",
-                    });
+                    if (warnings.length) {
+                        Swal.fire({
+                            icon: "warning",
+                            title: "Fechas actualizadas con avisos",
+                            html: `<p class="text-sm text-gray-700">${res.data.message || "La programación se actualizó."}</p>`,
+                            confirmButtonColor: "#2563eb",
+                        });
+                    } else {
+                        Swal.fire({
+                            toast: true,
+                            position: "top-end",
+                            showConfirmButton: false,
+                            timer: 3000,
+                            timerProgressBar: true,
+                            icon: "success",
+                            title: res.data.message || "Fechas actualizadas correctamente",
+                        });
+                    }
                     if (window.tablaCursosNew) {
                         try {
                             await window.tablaCursosNew.setData(`${VITE_URL_APP}/api/obtener-cursos-new`);
                         } catch {}
                     }
                 } else {
-                    Swal.fire("No se pudo extender", res.data?.message || "Error al procesar la solicitud.", "error");
+                    Swal.fire("No se pudo actualizar", res.data?.message || "Error al procesar la solicitud.", "error");
                 }
             } catch (err) {
-                console.error("Error al extender plazo:", err);
+                console.error("Error al actualizar fechas:", err);
                 Swal.fire("Error de Servidor", err.response?.data?.message || "Ocurrió un problema de conectividad con el servidor.", "error");
             } finally {
                 this.guardando = false;
@@ -202,20 +241,21 @@ window.formAplazarNew = function () {
         },
 
         init() {
-            window.addEventListener("open-modal-aplazar-new", (e) => {
-                const c = e.detail?.codigo || window.__pendingAplazarNew;
+            window.addEventListener("open-modal-editar-fechas-new", (e) => {
+                const c = e.detail?.codigo || window.__pendingEditarFechasNew;
                 if (c) this.abrir(c);
             });
-            window.addEventListener("close-modal-aplazar-new", () => {
+            window.addEventListener("close-modal-editar-fechas-new", () => {
                 this.showModal = false;
                 document.body.style.overflow = "";
             });
-            if (window.__pendingAplazarNew && !this.showModal) {
-                const c = window.__pendingAplazarNew;
-                window.__pendingAplazarNew = null;
+            if (window.__pendingEditarFechasNew && !this.showModal) {
+                const c = window.__pendingEditarFechasNew;
+                window.__pendingEditarFechasNew = null;
                 this.abrir(c);
             }
-            this.$watch("fechaNuevaFin", () => this.validarFecha());
+            this.$watch("fechaInicio", () => this.validarFechas());
+            this.$watch("fechaFin", () => this.validarFechas());
         },
     };
 };
@@ -1013,11 +1053,51 @@ window.formCursoEditNew = function () {
         areasResponsables: [],
         areaResponsable: "",
         codMoodleArea: "",
+        dirigido: "",
+        sucursal: "",
+        sucursalesDisponibles: [],
+        tieneProgramaciones: false,
+        subidoAV: false,
         lastSistemaId: null,
         _original: {},
 
         get esPCU() {
             return String(this.tipoCursoCodigo) === "6";
+        },
+        get opcionesDirigidoEdit() {
+            let ops;
+            if (String(this.tipoCursoCodigo) === "5") {
+                ops = [
+                    { codigo: "1", texto: "Todos" },
+                    { codigo: "7", texto: "Personal Administrativo (Todos)" },
+                    { codigo: "8", texto: "Personal Administrativo (4°)" },
+                    { codigo: "9", texto: "Personal Administrativo (5°)" },
+                    { codigo: "10", texto: "Personal Operativo (Todos)" },
+                    { codigo: "11", texto: "Personal Operativo (4°)" },
+                    { codigo: "12", texto: "Personal Operativo (5°)" },
+                    { codigo: "0", texto: "Otros" },
+                ];
+            } else {
+                const raw = Array.isArray(window.dirigidosNew) ? window.dirigidosNew : [];
+                ops = raw.map((o) => ({ codigo: String(o.codigo), texto: o.texto }));
+                if (!ops.some((o) => o.codigo === "0")) ops.push({ codigo: "0", texto: "Otros" });
+            }
+            // Garantizar que el valor actual se pueda mostrar aunque no esté en el catálogo
+            if (this.dirigido && !ops.some((o) => o.codigo === String(this.dirigido))) {
+                ops = [...ops, { codigo: String(this.dirigido), texto: `Código ${this.dirigido}` }];
+            }
+            return ops;
+        },
+        get advertenciaAudiencia() {
+            const o = this._original || {};
+            const cambioDirigido = String(this.dirigido) !== String(o.dirigido ?? "");
+            const cambioSucursal = String(this.sucursal) !== String(o.sucursal ?? "");
+            if (!cambioDirigido && !cambioSucursal) return "";
+            const motivos = [];
+            if (this.tieneProgramaciones) motivos.push("ya tiene programaciones cerradas con participantes");
+            if (this.subidoAV) motivos.push("ya está subido al Aula Virtual");
+            if (!motivos.length) return "";
+            return `Este curso ${motivos.join(" y ")}. El cambio de sucursal/dirigido solo aplicará a futuras matrículas; no moverá ni desmatriculará a las personas ya inscritas.`;
         },
         get areaBloqueada() {
             return !this.esPCU && !this.areaConocimiento;
@@ -1026,11 +1106,12 @@ window.formCursoEditNew = function () {
             if (!this.nombre.trim() || !this.categoria || !this.codResponsable || !this.areaResponsable) return false;
             if (!this.esPCU && !this.areaConocimiento) return false;
             if (this.esPeriodico && !this.frecuencia) return false;
+            if (this.dirigido === "" || this.sucursal === "") return false;
             return true;
         },
         get hayCambios() {
             const o = this._original || {};
-            return ["nombre", "descripcion", "categoria", "codResponsable", "esPeriodico", "frecuencia", "areaConocimiento", "areaResponsable"]
+            return ["nombre", "descripcion", "categoria", "codResponsable", "esPeriodico", "frecuencia", "areaConocimiento", "areaResponsable", "dirigido", "sucursal"]
                 .some((k) => String(this[k] ?? "") !== String(o[k] ?? ""));
         },
         get tituloBoton() {
@@ -1051,10 +1132,11 @@ window.formCursoEditNew = function () {
             document.body.style.overflow = "hidden";
             this.cargando = true;
             try {
-                const [cursoRes, sistRes, jefRes] = await Promise.all([
+                const [cursoRes, sistRes, jefRes, sucRes] = await Promise.all([
                     axios.get(`${VITE_URL_APP}/api/obtener-curso-new/${cod}`),
                     axios.get(`${VITE_URL_APP}/api/obtener-capacitacion-sistemas`).catch(() => null),
                     axios.get(`${VITE_URL_APP}/api/listar-jefaturas`).catch(() => null),
+                    axios.get(`${VITE_URL_APP}/api/obtener-sucursales`).catch(() => null),
                 ]);
                 const curso = cursoRes?.data?.data;
                 if (!cursoRes?.data?.success || !curso) {
@@ -1112,6 +1194,23 @@ window.formCursoEditNew = function () {
                 }
                 this.areaResponsable = curso.CURS_AREA_RESPONSABLE != null ? String(curso.CURS_AREA_RESPONSABLE) : "";
 
+                // ── Sucursal y dirigido a ──
+                const normSucursal = (v) => {
+                    const s = String(v ?? "").trim();
+                    if (!s || s.toUpperCase() === "TODAS") return "0";
+                    const n = parseInt(s, 10);
+                    return Number.isFinite(n) ? String(n).padStart(2, "0") : s;
+                };
+                this.sucursalesDisponibles = (sucRes?.data?.success ? (sucRes.data.data || []) : [])
+                    .map((s) => ({ codigo: normSucursal(s.Codigo), nombre: s.Sucursal }));
+                this.sucursal = normSucursal(curso.CURS_SUCURSAL);
+                if (this.sucursal !== "0" && !this.sucursalesDisponibles.some((s) => s.codigo === this.sucursal)) {
+                    this.sucursalesDisponibles = [...this.sucursalesDisponibles, { codigo: this.sucursal, nombre: `Sucursal ${this.sucursal}` }];
+                }
+                this.dirigido = curso.CURS_DIRIGIDO_A != null ? String(curso.CURS_DIRIGIDO_A) : "";
+                this.tieneProgramaciones = progs.length > 0;
+                this.subidoAV = !!curso.CURS_AV_COD;
+
                 this._original = {
                     nombre: this.nombre,
                     descripcion: this.descripcion,
@@ -1121,7 +1220,9 @@ window.formCursoEditNew = function () {
                     frecuencia: this.frecuencia,
                     areaConocimiento: this.areaConocimiento,
                     areaResponsable: this.areaResponsable,
-                    codMoodleArea: this.codMoodleArea
+                    codMoodleArea: this.codMoodleArea,
+                    dirigido: this.dirigido,
+                    sucursal: this.sucursal
                 };
             } catch (e) {
                 console.error("Error abriendo edición:", e);
@@ -1175,6 +1276,8 @@ window.formCursoEditNew = function () {
             if (changed("areaConocimiento") && !this.esPCU) fd.append("SW_CURS_SIST_GESTION_COD", String(this.areaConocimiento));
             if (changed("areaResponsable")) fd.append("SW_CURS_AREA_COD", String(this.areaResponsable));
             if (changed("codMoodleArea") && this.codMoodleArea) fd.append("cod_moodle_area", this.codMoodleArea);
+            if (changed("dirigido"))       fd.append("SW_CURS_DIRIGIDO_COD", String(toInt(this.dirigido)));
+            if (changed("sucursal"))       fd.append("SW_CURS_SUCURSAL_COD", String(toInt(this.sucursal)));
             if (changed("esPeriodico")) fd.append("SW_CURS_PERIODICIDAD", this.esPeriodico ? 1 : 0);
             if (changed("frecuencia")) fd.append("SW_CURS_CANT_PERIOD", toInt(this.frecuencia));
             
