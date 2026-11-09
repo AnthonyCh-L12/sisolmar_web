@@ -23,7 +23,6 @@ class NewCapacController extends Controller
             $cursos = DB::table('sw_cursos_new as c')
                 ->leftJoin('sw_cursos_plan as p', 'p.codigo', '=', 'c.SW_CURS_PLAN_CAPAC_COD')
                 ->leftJoin('sw_cursos_sistema as s', 's.codigo', '=', 'c.SW_CURS_SIST_GESTION_COD')
-                // Compatibilidad temporal: el JSON actual expone la abreviatura histórica (ej. SGC).
                 ->leftJoin('sw_capacitacion_areas as sa', 'sa.codigo', '=', 'c.SW_CURS_SIST_GESTION_COD')
                 ->select(
                     'c.CODIGO',
