@@ -1250,6 +1250,8 @@ export default document.addEventListener("alpine:init", () => {
                         p.Estado || "",
                     ]);
 
+                    let primeraPagina = true;
+
                     doc.autoTable({
                         startY,
                         head: [
@@ -1309,8 +1311,32 @@ export default document.addEventListener("alpine:init", () => {
                             },
                         },
                         margin: {
+                            top: 24,
                             left: 14,
                             right: 14,
+                        },
+                        didDrawPage: () => {
+                            if (primeraPagina) {
+                                primeraPagina = false;
+                                return;
+                            }
+
+                            doc.setFont("helvetica", "bold");
+                            doc.setFontSize(10);
+                            doc.setTextColor(0, 0, 0);
+                            doc.text(
+                                (nombreCurso || "CURSO").toUpperCase(),
+                                startX,
+                                14,
+                            );
+
+                            doc.setFont("helvetica", "normal");
+                            doc.setFontSize(9);
+                            doc.text(
+                                `${sucursalGrupoNombre} - ${personalCurso.length} personal(es)`,
+                                startX,
+                                19,
+                            );
                         },
                     });
                 };
@@ -1341,7 +1367,7 @@ export default document.addEventListener("alpine:init", () => {
                     sucursalesCurso.forEach((sucursalGrupo, si) => {
                         if (si > 0) {
                             nextY =
-                                (doc.lastAutoTable?.finalY || nextY) + 14;
+                                (doc.lastAutoTable?.finalY || nextY) + 20;
                         }
 
                         if (nextY > pageHeight - 22) {

@@ -2570,21 +2570,24 @@
                                                                 'bg-green-50 text-green-700 border-green-200': curso.Estado === 'APROBADO',
                                                                 'bg-red-50 text-red-700 border-red-200': curso.Estado === 'DESAPROBADO',
                                                                 'bg-gray-50 text-gray-600 border-gray-200': curso.Estado === 'SIN ACCEDER' || curso.Estado === 'SIN NOTA',
-                                                                'bg-blue-50 text-blue-700 border-blue-200': curso.Estado === 'EN CURSO'
+                                                                'bg-blue-50 text-blue-700 border-blue-200': curso.Estado === 'EN CURSO',
+                                                                'bg-slate-100 text-slate-600 border-slate-300': curso.Estado === 'NO MATRICULADO'
                                                             }">
                                                                 <span class="badge-dot" :class="{
                                                                     'bg-amber-500': curso.Estado === 'PENDIENTE',
                                                                     'bg-green-500': curso.Estado === 'APROBADO',
                                                                     'bg-red-500': curso.Estado === 'DESAPROBADO',
                                                                     'bg-gray-400': curso.Estado === 'SIN ACCEDER' || curso.Estado === 'SIN NOTA',
-                                                                    'bg-blue-500': curso.Estado === 'EN CURSO'
+                                                                    'bg-blue-500': curso.Estado === 'EN CURSO',
+                                                                    'bg-slate-400': curso.Estado === 'NO MATRICULADO'
                                                                 }"></span>
                                                                 <i class="ti text-[11px]" :class="{
                                                                     'ti-clock': curso.Estado === 'PENDIENTE',
                                                                     'ti-circle-check': curso.Estado === 'APROBADO',
                                                                     'ti-circle-x': curso.Estado === 'DESAPROBADO',
                                                                     'ti-player-off': curso.Estado === 'SIN ACCEDER' || curso.Estado === 'SIN NOTA',
-                                                                    'ti-player-play': curso.Estado === 'EN CURSO'
+                                                                    'ti-player-play': curso.Estado === 'EN CURSO',
+                                                                    'ti-user-off': curso.Estado === 'NO MATRICULADO'
                                                                 }"></i>
                                                                 <span x-text="curso.Estado"></span>
                                                             </span>
