@@ -532,7 +532,8 @@ export default document.addEventListener("alpine:init", () => {
         sortColumn: null,
         sortDirection: null,
 
-        exportando: false,
+        exportandoExcel: false,
+        exportandoPDF: false,
 
         selectedCursoIndex: -1,
         selectedSucursalIdx: 0,
@@ -1007,18 +1008,20 @@ export default document.addEventListener("alpine:init", () => {
                 }
                 grupos[codigo].Personales.push(p);
             });
-            return Object.values(grupos);
+            return Object.values(grupos).sort((a, b) =>
+                a.SucursalNombre.localeCompare(b.SucursalNombre),
+            );
         },
 
         async exportarExcel() {
-            this.exportando = true;
+            this.exportandoExcel = true;
             try {
                 const sucursal = this.sucursales.find(
                     (s) => s.codigo == this.selectedSucursal,
                 );
                 const sucursalNombre = sucursal
-                    ? sucursal.sucursal
-                    : "SUCURSAL";
+                    ? sucursal.sucursal.toUpperCase()
+                    : "TODAS LAS SUCURSALES";
 
                 const workbook = new ExcelJS.Workbook();
                 const logoImageId = await _cargarLogoExcel(workbook);
@@ -1057,7 +1060,7 @@ export default document.addEventListener("alpine:init", () => {
                     const subRow = sheet.getRow(currentRow);
                     subRow.height = 16;
                     const subCell = subRow.getCell(1);
-                    subCell.value = `Total: ${grupo.Total} personal(es) - ${sucursalNombre}`;
+                    subCell.value = `Total del curso: ${(grupo.Personales || []).length} personal(es)`;
                     subCell.font = {
                         size: 9,
                         italic: true,
@@ -1066,11 +1069,41 @@ export default document.addEventListener("alpine:init", () => {
                     sheet.mergeCells(`A${currentRow}:G${currentRow}`);
                     currentRow++;
 
-                    currentRow = this._agregarFilasPersonalExcel(
-                        sheet,
+                    const sucursalesCurso = this._agruparPorSucursal(
                         grupo.Personales || [],
-                        currentRow,
                     );
+
+                    sucursalesCurso.forEach((sucursalGrupo, si) => {
+                        if (si > 0) {
+                            currentRow += 1;
+                        }
+
+                        const sucursalRow = sheet.getRow(currentRow);
+                        sucursalRow.height = 18;
+                        const sucursalCell = sucursalRow.getCell(1);
+                        sucursalCell.value = `Sucursal: ${sucursalGrupo.SucursalNombre} - ${sucursalGrupo.Personales.length} personal(es)`;
+                        sucursalCell.font = {
+                            bold: true,
+                            size: 10,
+                            color: { argb: "FF333333" },
+                        };
+                        sucursalCell.fill = {
+                            type: "pattern",
+                            pattern: "solid",
+                            fgColor: { argb: "FFF2F2F2" },
+                        };
+                        sucursalCell.alignment = {
+                            vertical: "middle",
+                        };
+                        sheet.mergeCells(`A${currentRow}:G${currentRow}`);
+                        currentRow++;
+
+                        currentRow = this._agregarFilasPersonalExcel(
+                            sheet,
+                            sucursalGrupo.Personales,
+                            currentRow,
+                        );
+                    });
                 });
 
                 sheet.columns = [
@@ -1107,12 +1140,12 @@ export default document.addEventListener("alpine:init", () => {
                 console.error(error);
                 Swal.fire("Error", "No se pudo exportar el Excel.", "error");
             } finally {
-                this.exportando = false;
+                this.exportandoExcel = false;
             }
         },
 
         async exportarPDF() {
-            this.exportando = true;
+            this.exportandoPDF = true;
             try {
                 const { jsPDF } = window.jspdf;
 
@@ -1122,7 +1155,7 @@ export default document.addEventListener("alpine:init", () => {
                     format: "a4",
                 });
 
-                const nombreCurso = this.nombreCursosSeleccionados;
+                const pageHeight = doc.internal.pageSize.getHeight();
 
                 const logoSol = await _cargarImagen(_assetUrl("/images/logo_sol.png"));
 
@@ -1172,16 +1205,9 @@ export default document.addEventListener("alpine:init", () => {
                     };
                 };
 
-                const sucursal = this.sucursales.find(
-                    (s) => s.codigo == this.selectedSucursal,
-                );
-
-                const sucursalNombre = sucursal
-                    ? sucursal.sucursal.toUpperCase()
-                    : "TODOS";
-
                 const generarTablaCurso = (
                     nombreCurso,
+                    sucursalGrupoNombre,
                     personalCurso,
                     startX,
                     startY,
@@ -1201,7 +1227,7 @@ export default document.addEventListener("alpine:init", () => {
                     doc.setFontSize(9);
 
                     doc.text(
-                        `${sucursalNombre} - ${personalCurso.length} personal(es)`,
+                        `${sucursalGrupoNombre} - ${personalCurso.length} personal(es)`,
                         startX,
                         startY - 4,
                     );
@@ -1295,13 +1321,42 @@ export default document.addEventListener("alpine:init", () => {
                     }
 
                     const { startX, startY } = dibujarEncabezado();
-
-                    generarTablaCurso(
-                        cursoData.Curso,
+                    const sucursalesCurso = this._agruparPorSucursal(
                         cursoData.Personales || [],
-                        startX,
-                        startY,
                     );
+
+                    if (sucursalesCurso.length === 0) {
+                        generarTablaCurso(
+                            cursoData.Curso,
+                            "SIN SUCURSAL",
+                            [],
+                            startX,
+                            startY,
+                        );
+                        return;
+                    }
+
+                    let nextY = startY;
+
+                    sucursalesCurso.forEach((sucursalGrupo, si) => {
+                        if (si > 0) {
+                            nextY =
+                                (doc.lastAutoTable?.finalY || nextY) + 14;
+                        }
+
+                        if (nextY > pageHeight - 22) {
+                            doc.addPage();
+                            nextY = dibujarEncabezado().startY;
+                        }
+
+                        generarTablaCurso(
+                            cursoData.Curso,
+                            sucursalGrupo.SucursalNombre,
+                            sucursalGrupo.Personales,
+                            startX,
+                            nextY,
+                        );
+                    });
                 });
 
                 const d = new Date();
@@ -1328,7 +1383,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 Swal.fire("Error", "No se pudo generar el PDF.", "error");
             } finally {
-                this.exportando = false;
+                this.exportandoPDF = false;
             }
         },
 
@@ -1512,10 +1567,10 @@ export default document.addEventListener("alpine:init", () => {
                 );
                 return;
             }
-            this.exportando = true;
+            this.exportandoExcel = true;
             const ok = await this._fetchPersonal();
             if (!ok || this.personal.length === 0) {
-                this.exportando = false;
+                this.exportandoExcel = false;
                 if (ok)
                     Swal.fire(
                         "Atención",
@@ -1536,10 +1591,10 @@ export default document.addEventListener("alpine:init", () => {
                 );
                 return;
             }
-            this.exportando = true;
+            this.exportandoPDF = true;
             const ok = await this._fetchPersonal();
             if (!ok || this.personal.length === 0) {
-                this.exportando = false;
+                this.exportandoPDF = false;
                 if (ok)
                     Swal.fire(
                         "Atención",
@@ -1575,7 +1630,8 @@ export default document.addEventListener("alpine:init", () => {
         sortColumn: null,
         sortDirection: null,
 
-        exportando: false,
+        exportandoExcel: false,
+        exportandoPDF: false,
 
         selectedSistemaIndex: 0,
         selectedAreaIdx: 0,
@@ -1930,10 +1986,10 @@ export default document.addEventListener("alpine:init", () => {
         },
 
         async exportarExcelHistorialCursosDesdeFiltros() {
-            this.exportando = true;
+            this.exportandoExcel = true;
             const ok = await this._fetchCursos();
             if (!ok || this.cursosFilas.length === 0) {
-                this.exportando = false;
+                this.exportandoExcel = false;
                 if (ok)
                     Swal.fire(
                         "Atención",
@@ -1946,10 +2002,10 @@ export default document.addEventListener("alpine:init", () => {
         },
 
         async exportarPDFHistorialCursosDesdeFiltros() {
-            this.exportando = true;
+            this.exportandoPDF = true;
             const ok = await this._fetchCursos();
             if (!ok || this.cursosFilas.length === 0) {
-                this.exportando = false;
+                this.exportandoPDF = false;
                 if (ok)
                     Swal.fire(
                         "Atención",
@@ -1971,7 +2027,7 @@ export default document.addEventListener("alpine:init", () => {
                 return;
             }
 
-            this.exportando = true;
+            this.exportandoExcel = true;
             try {
                 const filasExport =
                     this.obtenerCursosFilasOrdenadosParaExport();
@@ -2131,7 +2187,7 @@ export default document.addEventListener("alpine:init", () => {
                 console.error(error);
                 Swal.fire("Error", "No se pudo exportar el Excel.", "error");
             } finally {
-                this.exportando = false;
+                this.exportandoExcel = false;
             }
         },
 
@@ -2145,7 +2201,7 @@ export default document.addEventListener("alpine:init", () => {
                 return;
             }
 
-            this.exportando = true;
+            this.exportandoPDF = true;
             try {
                 const { jsPDF } = window.jspdf;
 
@@ -2323,7 +2379,7 @@ export default document.addEventListener("alpine:init", () => {
                 console.error(error);
                 Swal.fire("Error", "No se pudo generar el PDF.", "error");
             } finally {
-                this.exportando = false;
+                this.exportandoPDF = false;
             }
         },
 
@@ -2962,7 +3018,6 @@ export default document.addEventListener("alpine:init", () => {
         loadingClientes: false,
         loadingSucursales: false,
         buscando: false,
-        exportando: false,
         generandoPDF: false,
         generandoExcel: false,
         loadingInicial: true,
@@ -4589,7 +4644,8 @@ export default document.addEventListener("alpine:init", () => {
             }
         },
 
-        exportando: false,
+        exportandoExcel: false,
+        exportandoPDF: false,
         buscando: false,
         view: "filters",
         resultados: [],
@@ -4766,7 +4822,7 @@ export default document.addEventListener("alpine:init", () => {
         },
 
         async exportarPDFReporteGeneral() {
-            this.exportando = true;
+            this.exportandoPDF = true;
 
             try {
                 const personales =
@@ -5023,12 +5079,12 @@ export default document.addEventListener("alpine:init", () => {
                 console.error(error);
                 Swal.fire("Error", "No se pudo generar el PDF.", "error");
             } finally {
-                this.exportando = false;
+                this.exportandoPDF = false;
             }
         },
 
         async exportarExcelReporteGeneral() {
-            this.exportando = true;
+            this.exportandoExcel = true;
 
             try {
                 const personales =
@@ -5191,7 +5247,7 @@ export default document.addEventListener("alpine:init", () => {
                 console.error(error);
                 Swal.fire("Error", "No se pudo generar el Excel.", "error");
             } finally {
-                this.exportando = false;
+                this.exportandoExcel = false;
             }
         },
 

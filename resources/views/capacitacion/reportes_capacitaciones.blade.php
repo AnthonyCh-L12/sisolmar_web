@@ -934,18 +934,18 @@
                         {{-- Exportar --}}
                         <div x-show="personal.length > 0" class="flex items-center gap-2">
                             <button type="button" @click="exportarExcel()"
-                                :disabled="exportando"
+                                :disabled="exportandoExcel || exportandoPDF"
                                 class="px-4 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="ti ti-file-spreadsheet text-sm" x-show="!exportando"></i>
-                                <i class="ti ti-loader animate-spin text-sm" x-show="exportando"></i>
-                                <span x-text="exportando ? 'Generando Excel...' : 'Exportar Excel'"></span>
+                                <i class="ti ti-file-spreadsheet text-sm" x-show="!exportandoExcel"></i>
+                                <i class="ti ti-loader animate-spin text-sm" x-show="exportandoExcel"></i>
+                                <span x-text="exportandoExcel ? 'Generando Excel...' : 'Exportar Excel'"></span>
                             </button>
                             <button type="button" @click="exportarPDF()"
-                                :disabled="exportando"
+                                :disabled="exportandoExcel || exportandoPDF"
                                 class="px-4 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="ti ti-file-type-pdf text-sm" x-show="!exportando"></i>
-                                <i class="ti ti-loader animate-spin text-sm" x-show="exportando"></i>
-                                <span x-text="exportando ? 'Generando PDF...' : 'Exportar PDF'"></span>
+                                <i class="ti ti-file-type-pdf text-sm" x-show="!exportandoPDF"></i>
+                                <i class="ti ti-loader animate-spin text-sm" x-show="exportandoPDF"></i>
+                                <span x-text="exportandoPDF ? 'Generando PDF...' : 'Exportar PDF'"></span>
                             </button>
                         </div>
                     </div>
@@ -1299,18 +1299,18 @@
                         </button>
                         <div x-show="cursosFilas.length > 0 && !loadingCursos" class="flex items-center gap-2">
                             <button type="button" @click="exportarExcelHistorialCursos()"
-                                :disabled="exportando"
+                                :disabled="exportandoExcel || exportandoPDF"
                                 class="px-4 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="ti ti-file-spreadsheet text-sm" x-show="!exportando"></i>
-                                <i class="ti ti-loader animate-spin text-sm" x-show="exportando"></i>
-                                <span x-text="exportando ? 'Generando Excel...' : 'Exportar Excel'"></span>
+                                <i class="ti ti-file-spreadsheet text-sm" x-show="!exportandoExcel"></i>
+                                <i class="ti ti-loader animate-spin text-sm" x-show="exportandoExcel"></i>
+                                <span x-text="exportandoExcel ? 'Generando Excel...' : 'Exportar Excel'"></span>
                             </button>
                             <button type="button" @click="exportarPDFHistorialCursos()"
-                                :disabled="exportando"
+                                :disabled="exportandoExcel || exportandoPDF"
                                 class="px-4 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="ti ti-file-type-pdf text-sm" x-show="!exportando"></i>
-                                <i class="ti ti-loader animate-spin text-sm" x-show="exportando"></i>
-                                <span x-text="exportando ? 'Generando PDF...' : 'Generar PDF'"></span>
+                                <i class="ti ti-file-type-pdf text-sm" x-show="!exportandoPDF"></i>
+                                <i class="ti ti-loader animate-spin text-sm" x-show="exportandoPDF"></i>
+                                <span x-text="exportandoPDF ? 'Generando PDF...' : 'Generar PDF'"></span>
                             </button>
                         </div>
                     </div>
@@ -2668,18 +2668,18 @@
                                 <span x-text="resultados.length"></span> personal(es) · <span x-text="resultados.reduce((acc, p) => acc + (p.Cursos ? p.Cursos.length : 0), 0)"></span> registro(s) de cursos
                             </span>
                             <button type="button" @click="exportarExcelReporteGeneral()"
-                                :disabled="exportando"
+                                :disabled="exportandoExcel || exportandoPDF"
                                 class="px-4 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="ti ti-file-spreadsheet text-sm" x-show="!exportando"></i>
-                                <i class="ti ti-loader animate-spin text-sm" x-show="exportando"></i>
-                                <span x-text="exportando ? 'Generando Excel...' : 'Exportar Excel'"></span>
+                                <i class="ti ti-file-spreadsheet text-sm" x-show="!exportandoExcel"></i>
+                                <i class="ti ti-loader animate-spin text-sm" x-show="exportandoExcel"></i>
+                                <span x-text="exportandoExcel ? 'Generando Excel...' : 'Exportar Excel'"></span>
                             </button>
                             <button type="button" @click="exportarPDFReporteGeneral()"
-                                :disabled="exportando"
+                                :disabled="exportandoExcel || exportandoPDF"
                                 class="px-4 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="ti ti-file-type-pdf text-sm" x-show="!exportando"></i>
-                                <i class="ti ti-loader animate-spin text-sm" x-show="exportando"></i>
-                                <span x-text="exportando ? 'Generando PDF...' : 'Exportar PDF'"></span>
+                                <i class="ti ti-file-type-pdf text-sm" x-show="!exportandoPDF"></i>
+                                <i class="ti ti-loader animate-spin text-sm" x-show="exportandoPDF"></i>
+                                <span x-text="exportandoPDF ? 'Generando PDF...' : 'Exportar PDF'"></span>
                             </button>
                         </div>
                     </div>
