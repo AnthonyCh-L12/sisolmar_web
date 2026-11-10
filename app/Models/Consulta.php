@@ -269,8 +269,8 @@ class Consulta extends Model
                     sis.[nombre] AS sistema_nombre,
                     sis.[descripcion] AS sistema_descripcion,
                     tipo.[descripcion] AS tipo_descripcion,
-                    plan.[nombre] AS plan_nombre,
-                    plan.[descripcion] AS plan_descripcion,
+                    pl.[nombre] AS plan_nombre,
+                    pl.[descripcion] AS plan_descripcion,
                     dir.[nombre] AS dirigido_nombre,
                     cli.[abreviatura] AS cliente_abreviatura,
                     LTRIM(RTRIM(
@@ -286,8 +286,8 @@ class Consulta extends Model
                     ON sis.[codigo] = c.[SW_CURS_SIST_GESTION_COD]
                 LEFT JOIN [sisolm_web].[dbo].[sw_cursos_tipo] tipo
                     ON tipo.[codigo] = c.[SW_CURS_TIPO_COD]
-                LEFT JOIN [sisolm_web].[dbo].[sw_cursos_plan] plan
-                    ON plan.[codigo] = c.[SW_CURS_PLAN_CAPAC_COD]
+                LEFT JOIN [sisolm_web].[dbo].[sw_cursos_plan] pl
+                    ON pl.[codigo] = c.[SW_CURS_PLAN_CAPAC_COD]
                 LEFT JOIN [sisolm_web].[dbo].[sw_cursos_dirigido] dir
                     ON dir.[codigo] = c.[SW_CURS_DIRIGIDO_COD]
                 LEFT JOIN [sw_clientes] cli
