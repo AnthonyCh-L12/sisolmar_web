@@ -36,9 +36,10 @@
         color: #64748b !important;
     }
     .tabulator-col-sorter { color: #94a3b8 !important; }
-    /* Encabezados centrados: Tipo / Plan / Creación / Acciones */
+    /* Encabezados centrados: Tipo / Plan / Año / Creación / Acciones */
     .tabulator-header .tabulator-col[tabulator-field="CURS_TIPO"] .tabulator-col-title,
     .tabulator-header .tabulator-col[tabulator-field="CURS_PLAN_CAPAC_NOMBRE"] .tabulator-col-title,
+    .tabulator-header .tabulator-col[tabulator-field="CURS_ANIO"] .tabulator-col-title,
     .tabulator-header .tabulator-col[tabulator-field="CURS_CREADO_FECHA"] .tabulator-col-title,
     .tabulator-header .tabulator-col[tabulator-field="ACCIONES"] .tabulator-col-title { text-align: center !important; }
     .tabulator-tableholder { overflow-x: auto !important; overflow-y: hidden !important; scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.35) transparent; }
@@ -213,7 +214,7 @@
             </div>
 
             {{-- Filtros organizados --}}
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 rounded-xl bg-default-50/60 border border-default-100 p-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7 gap-3 rounded-xl bg-default-50/60 border border-default-100 p-3">
                 <div class="flex flex-col gap-1.5">
                     <label for="filtroPlanCursoNew" class="text-[11px] font-bold uppercase tracking-wider text-default-500">Plan</label>
                     <select id="filtroPlanCursoNew"
@@ -244,6 +245,24 @@
                     <label for="filtroHastaCursoNew" class="text-[11px] font-bold uppercase tracking-wider text-default-500">Hasta</label>
                     <input id="filtroHastaCursoNew" type="date"
                         class="w-full h-10 px-3 text-sm text-default-700 bg-white border border-default-200 rounded-lg shadow-sm outline-none transition hover:border-default-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10">
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <label for="filtroAVCursoNew" class="text-[11px] font-bold uppercase tracking-wider text-default-500">Subida al AV</label>
+                    <select id="filtroAVCursoNew"
+                        class="w-full h-10 px-3 text-sm text-default-700 bg-white border border-default-200 rounded-lg shadow-sm outline-none transition hover:border-default-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10">
+                        <option value="">Todos</option>
+                        <option value="1">Subidos al AV</option>
+                        <option value="0">Sin subir al AV</option>
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <label for="filtroEstadoCursoNew" class="text-[11px] font-bold uppercase tracking-wider text-default-500">Estado</label>
+                    <select id="filtroEstadoCursoNew"
+                        class="w-full h-10 px-3 text-sm text-default-700 bg-white border border-default-200 rounded-lg shadow-sm outline-none transition hover:border-default-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10">
+                        <option value="">Todos</option>
+                        <option value="1">Habilitados</option>
+                        <option value="0">Eliminados</option>
+                    </select>
                 </div>
             </div>
         </div>

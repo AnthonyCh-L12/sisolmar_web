@@ -61,6 +61,9 @@ class NewCapacController extends Controller
                         'CURS_SIST_GESTION_NOMBRE' => $row->sistema_nombre,
                         'CURS_CREADO_FECHA' => $row->fecha_creacion_dmy ?: null,
                         'CURS_CREADO_FECHA_ISO' => $row->fecha_creacion_iso ?: null,
+                        'CURS_ANIO' => $row->fecha_creacion_iso
+                            ? (int) substr($row->fecha_creacion_iso, 0, 4)
+                            : null,
                         'CURS_HABILITADO' => (bool) $row->habilitado,
                         'CURS_SUBIDO_AV' => (int) $row->SW_CURS_AV_COD != 0,
                         'CURS_TIENE_VIGENTE' => isset($vigentes[(int) $row->CODIGO]),

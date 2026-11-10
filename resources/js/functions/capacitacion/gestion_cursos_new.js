@@ -12,11 +12,13 @@ document.addEventListener("DOMContentLoaded", () => {
         filtroAnio: document.getElementById("filtroAnioCursoNew"),
         filtroDesde: document.getElementById("filtroDesdeCursoNew"),
         filtroHasta: document.getElementById("filtroHastaCursoNew"),
+        filtroAV: document.getElementById("filtroAVCursoNew"),
+        filtroEstado: document.getElementById("filtroEstadoCursoNew"),
         btnLimpiar: document.getElementById("btnLimpiarFiltrosCursosNew"),
         statTotal: document.getElementById("statTotalCursos"),
     };
 
-    const state = { term: "", plan: "", tipo: "", anio: "", desde: "", hasta: "" };
+    const state = { term: "", plan: "", tipo: "", anio: "", desde: "", hasta: "", av: "", estado: "" };
 
     const esLocale = {
         pagination: {
@@ -189,8 +191,12 @@ document.addEventListener("DOMContentLoaded", () => {
         langs: { "es-es": esLocale },
         initialSort: [{ column: "CURS_CREADO_FECHA", dir: "desc" }],
         rowFormatter(row) {
-            row.getElement().style.cursor = "pointer";
-            row.getElement().setAttribute("title", "Clic para editar el curso");
+            const el = row.getElement();
+            el.style.cursor = "pointer";
+            el.setAttribute("title", "Clic para editar el curso");
+            if (row.getData()?.CURS_HABILITADO === false) {
+                el.classList.add("tabulator-row-disabled");
+            }
         },
         rowClick(e, row) {
             // Los botones de acción tienen su propio onclick; el clic en fila también abre edición
@@ -237,6 +243,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 headerSort: true,
                 formatter: (cell) =>
                     `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-600">${esc(cell.getValue()) || "—"}</span>`,
+            },
+            {
+                title: "Año",
+                field: "CURS_ANIO",
+                width: 90,
+                hozAlign: "center",
+                headerHozAlign: "center",
+                headerSort: true,
+                sorter: (a, b, aRow, bRow) =>
+                    Number(aRow.getData().CURS_ANIO || anioDe(aRow.getData()) || 0) -
+                    Number(bRow.getData().CURS_ANIO || anioDe(bRow.getData()) || 0),
+                formatter: (cell) =>
+                    `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-600">${esc(cell.getValue() || anioDe(cell.getData())) || "—"}</span>`,
             },
             {
                 title: "Creación",
@@ -302,12 +321,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function aplicarFiltros() {
-        const { term, plan, tipo, anio, desde, hasta } = state;
-        if (term || plan || tipo || anio || desde || hasta) {
+        const { term, plan, tipo, anio, desde, hasta, av, estado } = state;
+        if (term || plan || tipo || anio || desde || hasta || av || estado) {
             table.setFilter((data) => {
                 if (plan && (data.CURS_PLAN_CAPAC_NOMBRE || "") !== plan) return false;
                 if (tipo && (data.CURS_TIPO || "") !== tipo) return false;
                 if (anio && anioDe(data) !== anio) return false;
+                if (av !== "" && Boolean(data.CURS_SUBIDO_AV) !== (av === "1")) return false;
+                if (estado !== "" && Boolean(data.CURS_HABILITADO) !== (estado === "1")) return false;
                 if (desde || hasta) {
                     const iso = data.CURS_CREADO_FECHA_ISO || fechaAISO(data.CURS_CREADO_FECHA);
                     if (!iso) return false;
@@ -353,6 +374,14 @@ document.addEventListener("DOMContentLoaded", () => {
         state.hasta = this.value;
         aplicarFiltros();
     });
+    elements.filtroAV?.addEventListener("change", function () {
+        state.av = this.value;
+        aplicarFiltros();
+    });
+    elements.filtroEstado?.addEventListener("change", function () {
+        state.estado = this.value;
+        aplicarFiltros();
+    });
     elements.btnLimpiar?.addEventListener("click", () => {
         state.term = "";
         state.plan = "";
@@ -360,12 +389,16 @@ document.addEventListener("DOMContentLoaded", () => {
         state.anio = "";
         state.desde = "";
         state.hasta = "";
+        state.av = "";
+        state.estado = "";
         if (elements.search) elements.search.value = "";
         if (elements.filtroPlan) elements.filtroPlan.value = "";
         if (elements.filtroTipo) elements.filtroTipo.value = "";
         if (elements.filtroAnio) elements.filtroAnio.value = "";
         if (elements.filtroDesde) elements.filtroDesde.value = "";
         if (elements.filtroHasta) elements.filtroHasta.value = "";
+        if (elements.filtroAV) elements.filtroAV.value = "";
+        if (elements.filtroEstado) elements.filtroEstado.value = "";
         table.clearFilter();
     });
 

@@ -496,6 +496,7 @@ export default document.addEventListener("alpine:init", () => {
             DESAPROBADO: 1,
             "EN CURSO": 2,
             "SIN ACCEDER": 3,
+            "NO MATRICULADO": 4,
         };
         return orden[estado] ?? 4;
     };

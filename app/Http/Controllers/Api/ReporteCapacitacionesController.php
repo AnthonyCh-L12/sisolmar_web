@@ -17,6 +17,8 @@ class ReporteCapacitacionesController extends Controller
 {
     use ReporteFormatoHelpers;
 
+    private const ESTADO_NO_MATRICULADO = 5;
+
     private ?Collection $cursosLocalesCache = null;
     private ?Collection $programacionesVigentesCache = null;
     private ?Collection $cursosPorNombreCache = null;
@@ -28,7 +30,7 @@ class ReporteCapacitacionesController extends Controller
             $systemId = $request->systemId ?? null;
 
             $cursosRaw = DB::connection('mysql_grupoihb')
-                ->select('CALL grupoihb_see.SP_OBTENER_CURSOS(NULL)');
+                ->select('CALL grupoihb_see.SP_OBTENER_CURSOS(2026)');
 
             $categorias = collect(Consulta::obtenerAreas())
                 ->keyBy(fn($area) => (string) ($area->codModdle ?? ''));
@@ -212,6 +214,10 @@ class ReporteCapacitacionesController extends Controller
             $desde = $request->desde ?? null;
             $hasta = $request->hasta ?? null;
 
+            $estadoFiltro = (int) $estadoId;
+            $esNoMatriculado = $estadoFiltro === self::ESTADO_NO_MATRICULADO;
+            $estadoConsulta = $esNoMatriculado ? 0 : $estadoFiltro;
+
             $usernamesStr = !empty($usernames) ? implode(',', $usernames) : null;
             $courseIdsStr = !empty($courseIds) ? implode(',', $courseIds) : null;
 
@@ -222,13 +228,13 @@ class ReporteCapacitacionesController extends Controller
             $cursosRaw = collect(
                 DB::connection('mysql_grupoihb')->select(
                     'CALL grupoihb_see.SP_OBTENER_ESTADO_CURSOS_POR_USUARIOS(?, ?, ?)',
-                    [$usernamesStr, $courseIdsStr, (int) $estadoId]
+                    [$usernamesStr, $courseIdsStr, $estadoConsulta]
                 )
             );
 
             $cursosMatricula = $cursosRaw;
 
-            if ((int) $estadoId !== 0) {
+            if ($estadoConsulta !== 0) {
                 $cursosMatricula = collect(
                     DB::connection('mysql_grupoihb')->select(
                         'CALL grupoihb_see.SP_OBTENER_ESTADO_CURSOS_POR_USUARIOS(?, ?, ?)',
@@ -373,6 +379,20 @@ class ReporteCapacitacionesController extends Controller
                 })
                 ->filter()
                 ->values();
+
+            if ($esNoMatriculado) {
+                $personales = $personales
+                    ->map(function ($personal) {
+                        $personal['Cursos'] = array_values(array_filter(
+                            $personal['Cursos'],
+                            fn($curso) => ($curso['Estado'] ?? '') === 'NO MATRICULADO'
+                        ));
+
+                        return $personal;
+                    })
+                    ->filter(fn($personal) => count($personal['Cursos']) > 0)
+                    ->values();
+            }
 
             return response()->json([
                 'success' => true,
