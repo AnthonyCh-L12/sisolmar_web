@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\ActualizacionesDjController;
+use App\Http\Controllers\Api\CatalogoCapacitacionController;
 use App\Http\Controllers\Api\NewCapacController;
 use App\Http\Controllers\Api\PlanesCapacitacionNewController;
+use App\Http\Controllers\Api\ReporteCapacitacionesController;
 use App\Http\Controllers\Api\SeguimientoMatriculasNewController;
 use App\Http\Controllers\BiometricoController;
 use App\Http\Controllers\CapacitacionController;
@@ -260,6 +262,24 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/obtener-personal-record', [CapacitacionController::class, 'obtenerPersonalParaRecord']);
         Route::post('/obtener-reporte-general', [CapacitacionController::class, 'obtenerReporteGeneral']);
         Route::post('/obtener-reporte-formato', [CapacitacionController::class, 'obtenerReporteFormato']);
+
+        Route::prefix('reportes-capacitaciones')->group(function () {
+            Route::get('/cursos', [ReporteCapacitacionesController::class, 'cursos']);
+            Route::post('/personal', [ReporteCapacitacionesController::class, 'personal']);
+            Route::post('/personal-record', [ReporteCapacitacionesController::class, 'recordPersonal']);
+            Route::post('/general', [ReporteCapacitacionesController::class, 'general']);
+            Route::post('/formato', [ReporteCapacitacionesController::class, 'formato']);
+        });
+
+        Route::prefix('catalogos-capacitacion')->group(function () {
+            Route::get('/', [CatalogoCapacitacionController::class, 'index']);
+            Route::get('/sistemas', [CatalogoCapacitacionController::class, 'sistemas']);
+            Route::get('/areas', [CatalogoCapacitacionController::class, 'areas']);
+            Route::get('/areas-por-sistema/{sistemaId}', [CatalogoCapacitacionController::class, 'areasPorSistema']);
+            Route::get('/tipos', [CatalogoCapacitacionController::class, 'tipos']);
+            Route::get('/planes', [CatalogoCapacitacionController::class, 'planes']);
+            Route::get('/dirigidos', [CatalogoCapacitacionController::class, 'dirigidos']);
+        });
         Route::get('/capacitacion/descargar-reporte/{id}/{tipo}', [CapacitacionController::class, 'descargarReporte']);
         Route::put('/capacitacion/actualizar-reporte/{id}', [CapacitacionController::class, 'actualizarReporte']);
         Route::patch('/capacitacion/actualizar-estado-reporte/{id}', [CapacitacionController::class, 'actualizarEstadoReporte']);

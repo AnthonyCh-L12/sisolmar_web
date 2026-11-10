@@ -196,4 +196,125 @@ class Consulta extends Model
             ->orderBy('NOMBRE_COMPLETO')
             ->get();
     }
+
+    public static function catalogosCapacitacion(): array
+    {
+        return [
+            'sistemas' => DB::table('sw_cursos_sistema')
+                ->select('codigo', 'nombre', 'descripcion')
+                ->where('habilitado', 1)
+                ->orderBy('nombre')
+                ->get(),
+            'areas' => DB::table('sw_cursos_area')
+                ->select('codigo as codArea', 'nombre as Area', 'codigo_moodle as codModdle')
+                ->where('habilitado', 1)
+                ->whereNotNull('codigo_moodle')
+                ->where('codigo_moodle', '!=', '')
+                ->orderBy('nombre')
+                ->get(),
+            'tipos' => DB::table('sw_cursos_tipo')
+                ->select('codigo', 'descripcion')
+                ->where('habilitado', 1)
+                ->orderBy('descripcion')
+                ->get(),
+            'planes' => DB::table('sw_cursos_plan')
+                ->select('codigo', 'nombre', 'descripcion')
+                ->where('habilitado', 1)
+                ->orderBy('nombre')
+                ->get(),
+            'dirigidos' => DB::table('sw_cursos_dirigido')
+                ->select('codigo', 'nombre')
+                ->where('habilitado', 1)
+                ->orderBy('nombre')
+                ->get(),
+        ];
+    }
+
+    public static function areasPorSistemaCapacitacion($sistemaId)
+    {
+        return DB::table('sw_cursos_area as a')
+            ->join('sw_cursos_new as c', 'c.SW_CURS_AREA_COD', '=', 'a.codigo')
+            ->where('c.SW_CURS_SIST_GESTION_COD', $sistemaId)
+            ->where('c.habilitado', 1)
+            ->where('a.habilitado', 1)
+            ->whereNotNull('a.codigo_moodle')
+            ->where('a.codigo_moodle', '!=', '')
+            ->select('a.codigo as codArea', 'a.nombre as Area', 'a.codigo_moodle as codModdle')
+            ->distinct()
+            ->orderBy('a.nombre')
+            ->get();
+    }
+
+    public static function cursosLocalesReporte()
+    {
+        return collect(
+            DB::connection('sqlsrv')->select("
+                SELECT
+                    c.[CODIGO],
+                    c.[SW_CURS_COD],
+                    c.[SW_CURS_NOMBRE],
+                    c.[SW_CURS_DESCRIPCION],
+                    c.[SW_CURS_AV_COD],
+                    c.[SW_CURS_TIPO_COD],
+                    c.[SW_CURS_RESP_COD],
+                    c.[SW_CURS_PLAN_CAPAC_COD],
+                    c.[SW_CURS_SIST_GESTION_COD],
+                    c.[SW_CURS_AREA_COD],
+                    c.[SW_CURS_DIRIGIDO_COD],
+                    c.[SW_CURS_CLIENTE_COD],
+                    c.[habilitado],
+                    c.[fecha_creacion],
+                    area.[nombre] AS area_nombre,
+                    area.[codigo_moodle] AS area_codigo_moodle,
+                    sis.[nombre] AS sistema_nombre,
+                    sis.[descripcion] AS sistema_descripcion,
+                    tipo.[descripcion] AS tipo_descripcion,
+                    plan.[nombre] AS plan_nombre,
+                    plan.[descripcion] AS plan_descripcion,
+                    dir.[nombre] AS dirigido_nombre,
+                    cli.[abreviatura] AS cliente_abreviatura,
+                    LTRIM(RTRIM(
+                        ISNULL(per.[APEL_1], '') + ' ' +
+                        ISNULL(per.[APEL_2], '') + ' ' +
+                        ISNULL(per.[NOMB_1], '') + ' ' +
+                        ISNULL(per.[NOMB_2], '')
+                    )) AS responsable_nombre
+                FROM [sisolm_web].[dbo].[sw_cursos_new] c
+                LEFT JOIN [sisolm_web].[dbo].[sw_cursos_area] area
+                    ON area.[codigo] = c.[SW_CURS_AREA_COD]
+                LEFT JOIN [sisolm_web].[dbo].[sw_cursos_sistema] sis
+                    ON sis.[codigo] = c.[SW_CURS_SIST_GESTION_COD]
+                LEFT JOIN [sisolm_web].[dbo].[sw_cursos_tipo] tipo
+                    ON tipo.[codigo] = c.[SW_CURS_TIPO_COD]
+                LEFT JOIN [sisolm_web].[dbo].[sw_cursos_plan] plan
+                    ON plan.[codigo] = c.[SW_CURS_PLAN_CAPAC_COD]
+                LEFT JOIN [sisolm_web].[dbo].[sw_cursos_dirigido] dir
+                    ON dir.[codigo] = c.[SW_CURS_DIRIGIDO_COD]
+                LEFT JOIN [sw_clientes] cli
+                    ON cli.[cod_legacy] = c.[SW_CURS_CLIENTE_COD]
+                LEFT JOIN [si_solm].[dbo].[PERSONAL] per
+                    ON TRY_CAST(per.[CODI_PERS] AS INT) = TRY_CAST(c.[SW_CURS_RESP_COD] AS INT)
+                WHERE c.[SW_CURS_AV_COD] IS NOT NULL
+                  AND TRY_CAST(c.[SW_CURS_AV_COD] AS INT) > 0
+            ")
+        )
+            ->sortByDesc(fn($row) => (int) ($row->habilitado ?? 0) . '|' . (string) ($row->fecha_creacion ?? ''))
+            ->unique(fn($row) => (string) $row->SW_CURS_AV_COD)
+            ->keyBy(fn($row) => (string) $row->SW_CURS_AV_COD);
+    }
+
+    public static function programacionesVigentesReporte()
+    {
+        return collect(
+            DB::connection('sqlsrv')->select("
+                SELECT [cod_curso], [fecha_inicio], [fecha_final], [codigo_programacion]
+                FROM [sisolm_web].[dbo].[sw_cursos_programacion]
+                WHERE [habilitado] = 1
+                  AND [estado_periodo] = 'VIGENTE'
+            ")
+        )
+            ->sortByDesc('codigo_programacion')
+            ->unique(fn($row) => (string) $row->cod_curso)
+            ->keyBy(fn($row) => (string) $row->cod_curso);
+    }
 }

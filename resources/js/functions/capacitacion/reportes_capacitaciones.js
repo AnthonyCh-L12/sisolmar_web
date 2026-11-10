@@ -139,16 +139,30 @@ async function _cargarFirma(url) {
     }
 }
 
+let _catalogosCapacitacionPromise = null;
+
+async function _fetchCatalogosCapacitacion() {
+    if (!_catalogosCapacitacionPromise) {
+        _catalogosCapacitacionPromise = axios
+            .get(`${VITE_URL_APP}/api/catalogos-capacitacion`)
+            .then(({ data }) => data)
+            .catch((error) => {
+                _catalogosCapacitacionPromise = null;
+                throw error;
+            });
+    }
+
+    return _catalogosCapacitacionPromise;
+}
+
 async function _fetchSistemas() {
-    const { data } = await axios.get(
-        `${VITE_URL_APP}/api/obtener-capacitacion-sistemas`,
-    );
-    return data;
+    const data = await _fetchCatalogosCapacitacion();
+    return Array.isArray(data?.sistemas) ? data.sistemas : [];
 }
 
 async function _fetchAreas() {
-    const { data } = await axios.get(`${VITE_URL_APP}/api/obtener-areas`);
-    return data.success ? data.areas : [];
+    const data = await _fetchCatalogosCapacitacion();
+    return Array.isArray(data?.areas) ? data.areas : [];
 }
 
 async function _fetchSucursales() {
@@ -220,19 +234,17 @@ async function ensureCatalogsLoaded() {
             try {
                 const [
                     sucursalesRes,
-                    sistemasRes,
-                    areasRes,
+                    catalogos,
                     cursosRes,
                     personalesRes,
                     empresasRes,
                     personalTodasEmpresasRes,
                 ] = await Promise.all([
                     axios.get(`${VITE_URL_APP}/api/get-sucursales`),
+                    _fetchCatalogosCapacitacion(),
                     axios.get(
-                        `${VITE_URL_APP}/api/obtener-capacitacion-sistemas`,
+                        `${VITE_URL_APP}/api/reportes-capacitaciones/cursos`,
                     ),
-                    axios.get(`${VITE_URL_APP}/api/obtener-areas`),
-                    axios.get(`${VITE_URL_APP}/api/reporte-cursos`),
                     axios.get(`${VITE_URL_APP}/api/obtener-personal`),
                     axios.get(`${VITE_URL_APP}/api/get-empresas`),
                     axios.get(
@@ -262,8 +274,12 @@ async function ensureCatalogsLoaded() {
                     sucursales: sucursalesRes.data.success
                         ? sucursalesRes.data.sucursales
                         : [],
-                    sistemas: sistemasRes.data || [],
-                    areas: areasRes.data.success ? areasRes.data.areas : [],
+                    sistemas: Array.isArray(catalogos?.sistemas)
+                        ? catalogos.sistemas
+                        : [],
+                    areas: Array.isArray(catalogos?.areas)
+                        ? catalogos.areas
+                        : [],
                     cursos: cursosRes.data.success
                         ? cursosRes.data.Cursos || []
                         : [],
@@ -602,7 +618,7 @@ export default document.addEventListener("alpine:init", () => {
             this.loadingCursos = true;
             try {
                 const response = await axios.get(
-                    `${VITE_URL_APP}/api/reporte-cursos`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/cursos`,
                 );
 
                 if (response.data.success) {
@@ -1390,7 +1406,7 @@ export default document.addEventListener("alpine:init", () => {
 
             try {
                 const response = await axios.post(
-                    `${VITE_URL_APP}/api/obtener-personal-reporte`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/personal`,
                     params,
                 );
 
@@ -1454,7 +1470,7 @@ export default document.addEventListener("alpine:init", () => {
 
             try {
                 const response = await axios.post(
-                    `${VITE_URL_APP}/api/obtener-personal-reporte`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/personal`,
                     params,
                 );
                 if (response.data.success) {
@@ -1886,7 +1902,7 @@ export default document.addEventListener("alpine:init", () => {
                 if (this.selectedArea) params.areaId = this.selectedArea;
 
                 const response = await axios.get(
-                    `${VITE_URL_APP}/api/reporte-cursos`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/cursos`,
                     {
                         params,
                     },
@@ -2355,7 +2371,7 @@ export default document.addEventListener("alpine:init", () => {
                 if (this.selectedArea) params.areaId = this.selectedArea;
 
                 const response = await axios.get(
-                    `${VITE_URL_APP}/api/reporte-cursos`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/cursos`,
                     {
                         params,
                     },
@@ -3113,7 +3129,7 @@ export default document.addEventListener("alpine:init", () => {
                 let areas = [];
                 if (this.selectedSistema) {
                     const { data } = await axios.get(
-                        `${VITE_URL_APP}/api/obtener-areas-por-sistema/${this.selectedSistema}`,
+                        `${VITE_URL_APP}/api/catalogos-capacitacion/areas-por-sistema/${this.selectedSistema}`,
                     );
                     if (data.success) {
                         areas = (data.areas || []).map((a) => ({
@@ -3137,7 +3153,7 @@ export default document.addEventListener("alpine:init", () => {
             this.loadingCursos = true;
             try {
                 const response = await axios.get(
-                    `${VITE_URL_APP}/api/reporte-cursos`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/cursos`,
                 );
                 if (response.data.success) {
                     this.todosLosCursos = response.data.Cursos || [];
@@ -3465,7 +3481,7 @@ export default document.addEventListener("alpine:init", () => {
                 };
 
                 const response = await axios.post(
-                    `${VITE_URL_APP}/api/obtener-personal-record`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/personal-record`,
                     payload,
                 );
 
@@ -3629,7 +3645,7 @@ export default document.addEventListener("alpine:init", () => {
                 };
 
                 const response = await axios.post(
-                    `${VITE_URL_APP}/api/obtener-personal-record`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/personal-record`,
                     payload,
                 );
 
@@ -4120,7 +4136,7 @@ export default document.addEventListener("alpine:init", () => {
                 };
 
                 const response = await axios.post(
-                    `${VITE_URL_APP}/api/obtener-personal-record`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/personal-record`,
                     payload,
                 );
 
@@ -4704,7 +4720,7 @@ export default document.addEventListener("alpine:init", () => {
             };
 
             const response = await axios.post(
-                `${VITE_URL_APP}/api/obtener-reporte-general`,
+                `${VITE_URL_APP}/api/reportes-capacitaciones/general`,
                 payload,
             );
 
@@ -5556,7 +5572,7 @@ export default document.addEventListener("alpine:init", () => {
             this.generando = true;
             try {
                 const { data } = await axios.post(
-                    `${VITE_URL_APP}/api/obtener-reporte-formato`,
+                    `${VITE_URL_APP}/api/reportes-capacitaciones/formato`,
                     {
                         courseId: this.selectedCursoId,
                         persDnis: this.selectedPersonalDnis,
