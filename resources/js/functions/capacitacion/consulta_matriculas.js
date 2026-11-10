@@ -109,16 +109,34 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // Fecha_Creacion llega como timestamp Unix (segundos).
+    function anioDeCurso(data) {
+        if (!data?.Fecha_Creacion) return "";
+        const d = new Date(Number(data.Fecha_Creacion) * 1000);
+        return Number.isNaN(d.getTime()) ? "" : String(d.getFullYear());
+    }
+
     function populateFilters(data) {
         _cursosFullData = data;
         const unique = (field) =>
             [...new Set(data.map((d) => d[field]).filter(Boolean))].sort();
+
+        const anios = [...new Set(data.map(anioDeCurso).filter(Boolean))]
+            .sort()
+            .reverse();
+        const selectAnio = document.getElementById("filtroAnioCurso");
+        const anioActual = selectAnio?.value || "";
 
         fillSelect("filtroTipoCurso", unique("Tipo"));
         fillSelect("filtroAreaCurso", unique("Area"), "Todas las áreas");
         fillSelect("filtroSistemaCurso", unique("Sistema"), "Todos los sistemas");
         fillSelect("filtroJefaturaCurso", unique("Responsable"), "Todas las jefaturas");
         fillSelect("filtroClienteCurso", unique("Cliente"), "Todos los clientes");
+        fillSelect("filtroAnioCurso", anios, "Todos los años");
+
+        if (selectAnio && anioActual && anios.includes(anioActual)) {
+            selectAnio.value = anioActual;
+        }
     }
 
     function repopulateSecondaryFilters(tipo) {
@@ -146,6 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const sistema = document.getElementById("filtroSistemaCurso")?.value;
         const jefatura = document.getElementById("filtroJefaturaCurso")?.value;
         const cliente = document.getElementById("filtroClienteCurso")?.value;
+        const anio = document.getElementById("filtroAnioCurso")?.value;
         const filters = [];
 
         if (nombre)
@@ -161,6 +180,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         table.clearFilter();
         if (filters.length) table.setFilter(filters);
+
+        if (anio) {
+            table.addFilter((data) => anioDeCurso(data) === anio);
+        }
     }
 
     function toggleSecondaryFilters(tipo) {
@@ -190,6 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "filtroSistemaCurso",
             "filtroJefaturaCurso",
             "filtroClienteCurso",
+            "filtroAnioCurso",
         ].forEach((id) => {
             const el = document.getElementById(id);
             if (el) el.value = "";
@@ -414,6 +438,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "filtroSistemaCurso",
             "filtroJefaturaCurso",
             "filtroClienteCurso",
+            "filtroAnioCurso",
         ].forEach((id) => {
             document
                 .getElementById(id)
@@ -685,6 +710,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         "#tblPersonalMatriculado",
                         {
                             data: tableData,
+                            placeholder: () =>
+                                (window._activeTab || "por-matricular") ===
+                                "matriculados"
+                                    ? '<div style="padding:28px 16px; text-align:center; color:#94a3b8; font-size:13px; font-weight:600;">No hay personal matriculado para desmatricular.</div>'
+                                    : '<div style="padding:28px 16px; text-align:center; color:#94a3b8; font-size:13px; font-weight:600;">No hay personal pendiente para matricular.</div>',
                             layout: "fitDataFill",
                             pagination: "local",
                             paginationSize: 10,
@@ -726,43 +756,6 @@ document.addEventListener("DOMContentLoaded", () => {
                                     minWidth: 200,
                                 },
                                 {
-                                    title: "Fecha",
-                                    field: "_fecha_matricula",
-                                    width: 120,
-                                    hozAlign: "center",
-                                    formatter(cell) {
-                                        const val = cell.getValue();
-                                        if (!val)
-                                            return '<span style="color:#cbd5e1;">—</span>';
-
-                                        const date = new Date(val);
-                                        if (isNaN(date))
-                                            return '<span style="color:#cbd5e1;">—</span>';
-
-                                        const fecha = date.toLocaleDateString(
-                                            "es-PE",
-                                            {
-                                                day: "2-digit",
-                                                month: "2-digit",
-                                                year: "numeric",
-                                            },
-                                        );
-                                        const hora = date.toLocaleTimeString(
-                                            "es-PE",
-                                            {
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                            },
-                                        );
-
-                                        return `
-            <div style="line-height:1.3; text-align:center;">
-                <div style="font-size:12px;">${fecha}</div>
-                <div style="font-size:10px; color:#94a3b8;">${hora}</div>
-            </div>`;
-                                    },
-                                },
-                                {
                                     title: "Cliente",
                                     field: "cliente",
                                     sorter: function(a, b) {
@@ -781,17 +774,9 @@ document.addEventListener("DOMContentLoaded", () => {
                                     title: "Sucursal",
                                     field: "sucursal",
                                 },
-                                {
-                                    title: "Correo",
-                                    field: "email",
-                                },
-                                {
-                                    title: "Num. Telf.",
-                                    field: "num_tel",
-                                },
                                 { title: "Cargo", field: "cargo" },
                                 {
-                                    title: "Tipo",
+                                    title: "TIPO TRAB",
                                     field: "tipo_trabajador",
                                 },
                                 {

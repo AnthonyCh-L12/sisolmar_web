@@ -1,4 +1,5 @@
 import axios from "axios";
+import ExcelJS from "exceljs";
 
 function _assetUrl(path) {
     const env = typeof APP_ENV !== "undefined" ? APP_ENV : (typeof window !== "undefined" ? window.APP_ENV : undefined);
@@ -309,6 +310,13 @@ export default document.addEventListener("alpine:init", () => {
         pdfUrl: null,
         pdfNombre: null,
         pdfDoc: null,
+
+        // Aviso previo: personal que no desarrolló el examen
+        mostrarModalPendientes: false,
+        pendientes: [],
+        exitosPendientes: [],
+        generandoExcelPendientes: false,
+        pendientesExcelListo: false,
 
         async init() {
             await Promise.all([this.cargarCursos(), this.cargarPersonal()]);
@@ -716,27 +724,63 @@ export default document.addEventListener("alpine:init", () => {
                     ? data.data.resultados
                     : [];
 
+                // Índice DNI -> persona (la API normaliza los DNIs a minúsculas)
+                const normDni = (v) => String(v ?? "").trim().toLowerCase();
+                const personaPorDni = new Map(
+                    personas.map((p) => [normDni(p.dni), p]),
+                );
+
                 const fallidos = [];
                 const exitos = [];
+                const errores = [];
                 for (const resultado of resultados) {
                     if (resultado.success && resultado.data) {
                         exitos.push(resultado.data);
-                    } else {
+                        continue;
+                    }
+                    // "No desarrolló el examen": la API devuelve el DNI consultado.
+                    // Se cruza con el detalle del personal seleccionado para
+                    // recuperar nombre, sucursal, cargo, etc.
+                    if (resultado.dni) {
+                        const dniNorm = normDni(resultado.dni);
+                        const persona = personaPorDni.get(dniNorm);
                         fallidos.push(
-                            resultado.dni || resultado.message || "desconocido",
+                            persona
+                                ? { ...persona, dni: resultado.dni }
+                                : {
+                                      nombre_completo: resultado.dni,
+                                      dni: resultado.dni,
+                                      sucursal: "",
+                                      cargo: "",
+                                      tipo_trabajador: "",
+                                      vigente: null,
+                                  },
+                        );
+                    } else {
+                        errores.push(
+                            resultado.message || "Error desconocido",
                         );
                     }
                 }
 
-                if (exitos.length > 0) {
+                this.exitosPendientes = exitos;
+                this.pendientes = fallidos;
+                this.pendientesExcelListo = false;
+
+                if (fallidos.length > 0) {
+                    // Primero se avisa quiénes no desarrollaron el examen;
+                    // la vista previa se muestra al pulsar "Entendido".
+                    this.mostrarModalPendientes = true;
+                } else if (exitos.length > 0) {
                     await this.generarPreviewPdf(exitos);
                 }
 
-                if (fallidos.length > 0) {
+                if (errores.length > 0) {
                     Swal.fire(
-                        "Reporte parcial",
-                        `${fallidos.length} personal(es) no tienen intentos registrados en este examen.`,
-                        "warning",
+                        "Reporte incompleto",
+                        "No se pudo obtener la información de algunos DNIs: " +
+                            errores.join(", "),
+                        "error",
                     );
                 }
             } catch (e) {
@@ -884,6 +928,227 @@ export default document.addEventListener("alpine:init", () => {
             }
             this.pdfDoc = null;
             this.pdfNombre = null;
+        },
+
+        // ====== AVISO: PERSONAL QUE NO DESARROLLÓ EL EXAMEN ======
+        sanitizarNombreArchivo(str) {
+            return (str || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[\\/:*?"<>|]/g, "")
+                .replace(/\s+/g, "_")
+                .trim();
+        },
+
+        async exportarPendientesExcel() {
+            if (this.generandoExcelPendientes || this.pendientes.length === 0)
+                return;
+
+            this.generandoExcelPendientes = true;
+            try {
+                const workbook = new ExcelJS.Workbook();
+                workbook.creator = "Sisolmar Web";
+                workbook.created = new Date();
+
+                const ws = workbook.addWorksheet("No rindieron");
+
+                const COLS = 7;
+                const borde = {
+                    top: { style: "thin", color: { argb: "FFD1D5DB" } },
+                    left: { style: "thin", color: { argb: "FFD1D5DB" } },
+                    bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
+                    right: { style: "thin", color: { argb: "FFD1D5DB" } },
+                };
+
+                const mergeTitulo = (texto, estilos) => {
+                    const fila = ws.rowCount + 1;
+                    ws.mergeCells(fila, 1, fila, COLS);
+                    const celda = ws.getCell(fila, 1);
+                    Object.assign(celda, estilos);
+                    celda.value = texto;
+                    celda.alignment = {
+                        horizontal: "left",
+                        vertical: "middle",
+                        wrapText: true,
+                        ...(estilos.alignment || {}),
+                    };
+                    return fila;
+                };
+
+                let fila = mergeTitulo(
+                    "PERSONAL QUE NO DESARROLLÓ EL EXAMEN",
+                    {
+                        font: {
+                            bold: true,
+                            size: 14,
+                            color: { argb: "FF92400E" },
+                        },
+                        fill: {
+                            type: "pattern",
+                            pattern: "solid",
+                            fgColor: { argb: "FFFEF3C7" },
+                        },
+                        alignment: { horizontal: "center" },
+                    },
+                );
+                ws.getRow(fila).height = 26;
+
+                const info = this.examenSeleccionadoInfo;
+                if (info) {
+                    fila = mergeTitulo(`Curso: ${info.course_name || "—"}`, {
+                        font: { bold: true, size: 10, color: { argb: "FF374151" } },
+                    });
+                    fila = mergeTitulo(`Examen: ${info.quiz_name || "—"}`, {
+                        font: { size: 10, color: { argb: "FF6B7280" } },
+                    });
+                }
+
+                const fechaGeneracion = new Date().toLocaleString("es-PE", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                });
+                fila = mergeTitulo(
+                    `Generado: ${fechaGeneracion} · Total: ${this.pendientes.length} persona(s)`,
+                    { font: { size: 9, color: { argb: "FF6B7280" } } },
+                );
+
+                // Fila vacía de separación
+                ws.addRow([]);
+
+                // Cabecera de la tabla
+                const cabeceras = [
+                    "N°",
+                    "Apellidos y nombres",
+                    "DNI",
+                    "Sucursal",
+                    "Cargo",
+                    "Tipo de trabajador",
+                    "Vigencia",
+                ];
+                fila = ws.rowCount + 1;
+                cabeceras.forEach((texto, i) => {
+                    const celda = ws.getCell(fila, i + 1);
+                    celda.value = texto;
+                    celda.font = {
+                        bold: true,
+                        size: 10,
+                        color: { argb: "FFFFFFFF" },
+                    };
+                    celda.fill = {
+                        type: "pattern",
+                        pattern: "solid",
+                        fgColor: { argb: "FF374151" },
+                    };
+                    celda.alignment = {
+                        horizontal: "center",
+                        vertical: "middle",
+                        wrapText: true,
+                    };
+                    celda.border = borde;
+                });
+                ws.getRow(fila).height = 24;
+
+                const filaCabecera = fila;
+
+                // Datos
+                this.pendientes.forEach((p, i) => {
+                    fila = ws.rowCount + 1;
+                    const valores = [
+                        i + 1,
+                        (p.nombre_completo || "—").toUpperCase(),
+                        p.dni || "—",
+                        p.sucursal || "—",
+                        p.cargo || "—",
+                        p.tipo_trabajador || "—",
+                        p.vigente === null || p.vigente === undefined
+                            ? "—"
+                            : p.vigente
+                              ? "Vigente"
+                              : "No vigente",
+                    ];
+                    valores.forEach((valor, ci) => {
+                        const celda = ws.getCell(fila, ci + 1);
+                        celda.value = valor;
+                        celda.font = { size: 10 };
+                        celda.border = borde;
+                        celda.alignment = {
+                            horizontal: ci === 0 || ci === 2 ? "center" : "left",
+                            vertical: "middle",
+                        };
+                        if (i % 2 === 1) {
+                            celda.fill = {
+                                type: "pattern",
+                                pattern: "solid",
+                                fgColor: { argb: "FFF9FAFB" },
+                            };
+                        }
+                    });
+                });
+
+                ws.columns = [
+                    { width: 6 },
+                    { width: 42 },
+                    { width: 14 },
+                    { width: 24 },
+                    { width: 28 },
+                    { width: 20 },
+                    { width: 12 },
+                ];
+                ws.autoFilter = {
+                    from: { row: filaCabecera, column: 1 },
+                    to: { row: filaCabecera, column: COLS },
+                };
+                ws.views = [{ state: "frozen", ySplit: filaCabecera }];
+
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], {
+                    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                });
+
+                const hoy = new Date();
+                const dd = String(hoy.getDate()).padStart(2, "0");
+                const mm = String(hoy.getMonth() + 1).padStart(2, "0");
+                const yyyy = hoy.getFullYear();
+                const curso = this.sanitizarNombreArchivo(
+                    info?.course_name || "CURSO",
+                );
+
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `PERSONAL_SIN_EXAMEN_-_${curso}_-_${dd}-${mm}-${yyyy}.xlsx`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+
+                this.pendientesExcelListo = true;
+                setTimeout(() => {
+                    this.pendientesExcelListo = false;
+                }, 2500);
+            } catch (e) {
+                console.error(e);
+                Swal.fire(
+                    "Error",
+                    "No se pudo generar el Excel con el personal pendiente.",
+                    "error",
+                );
+            } finally {
+                this.generandoExcelPendientes = false;
+            }
+        },
+
+        async continuarPreview() {
+            const exitos = this.exitosPendientes || [];
+            this.mostrarModalPendientes = false;
+            this.exitosPendientes = [];
+            this.pendientesExcelListo = false;
+            if (exitos.length > 0) {
+                await this.generarPreviewPdf(exitos);
+            }
         },
     }));
 });

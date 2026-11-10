@@ -487,7 +487,7 @@
 
         {{-- Filtros de cursos --}}
         <div class="flex flex-col gap-3 bg-white rounded-xl p-4 border border-default-200/60 shadow-sm mb-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
                 <div class="flex flex-col gap-1.5">
                     <label class="text-xs font-medium text-default-700">Buscar curso</label>
                     <div class="relative">
@@ -521,6 +521,12 @@
                     <label class="text-xs font-medium text-default-700">Jefatura</label>
                     <select id="filtroJefaturaCurso" class="w-full h-9 px-3 text-sm border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                         <option value="">Cargando jefaturas...</option>
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-default-700">Año</label>
+                    <select id="filtroAnioCurso" class="w-full h-9 px-3 text-sm border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                        <option value="">Cargando años...</option>
                     </select>
                 </div>
                 <div id="filtroClienteCursoContainer" class="flex flex-col gap-1.5" style="display: none;">

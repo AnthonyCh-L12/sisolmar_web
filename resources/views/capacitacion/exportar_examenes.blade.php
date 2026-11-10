@@ -532,6 +532,105 @@
         </div>
     </div>
 
+    {{-- Aviso previo: personal que no desarrolló el examen --}}
+    <div x-show="mostrarModalPendientes" x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        @keydown.escape.window="mostrarModalPendientes && continuarPreview()">
+
+        <div class="absolute inset-0 bg-default-900/60 backdrop-blur-sm"></div>
+
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+            @click.stop>
+            {{-- Header --}}
+            <div class="flex items-start gap-3 px-6 py-4 border-b border-default-200 shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <i class="ti ti-alert-triangle text-xl text-amber-600"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h3 class="text-base font-bold text-default-900 leading-tight">
+                        Personal que no desarrolló el examen
+                    </h3>
+                    <p class="text-xs text-default-500 leading-5 mt-0.5"
+                        x-text="pendientes.length + (pendientes.length === 1
+                            ? ' persona no registra intentos en el examen seleccionado.'
+                            : ' personas no registran intentos en el examen seleccionado.')">
+                    </p>
+                </div>
+            </div>
+
+            {{-- Curso / examen --}}
+            <div class="px-6 pt-4 shrink-0" x-show="examenSeleccionadoInfo">
+                <div class="rounded-xl border border-default-200/60 bg-default-50/60 px-3.5 py-2.5">
+                    <p class="text-[10px] font-bold uppercase tracking-wide text-default-400">Curso</p>
+                    <p class="text-xs font-semibold text-default-800 leading-tight truncate"
+                        x-text="examenSeleccionadoInfo?.course_name || '—'"></p>
+                    <p class="text-[11px] text-default-500 leading-tight truncate mt-0.5"
+                        x-text="examenSeleccionadoInfo?.quiz_name || '—'"></p>
+                </div>
+            </div>
+
+            {{-- Listado --}}
+            <div class="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-6 py-4 space-y-2">
+                <template x-for="(persona, index) in pendientes" :key="(persona.dni || '') + '-' + index">
+                    <div class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-default-200/60 bg-white">
+                        <span class="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 text-[11px] font-bold flex items-center justify-center shrink-0"
+                            x-text="index + 1"></span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-medium text-default-900 leading-tight truncate"
+                                x-text="persona.nombre_completo || '—'"></p>
+                            <p class="text-xs text-default-500 mt-0.5 truncate">
+                                DNI: <span x-text="persona.dni || '—'"></span>
+                                <template x-if="persona.cargo">
+                                    <span><i class="ti ti-point-filled text-[7px] align-middle mx-0.5"></i><span
+                                            x-text="persona.cargo"></span></span>
+                                </template>
+                                <template x-if="persona.sucursal">
+                                    <span><i class="ti ti-point-filled text-[7px] align-middle mx-0.5"></i><span
+                                            x-text="persona.sucursal"></span></span>
+                                </template>
+                            </p>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            {{-- Aviso si no hay vista previa --}}
+            <div class="px-6 pb-3 shrink-0" x-show="exitosPendientes.length === 0">
+                <div class="flex items-start gap-2 rounded-xl bg-amber-500/10 px-3.5 py-2.5">
+                    <i class="ti ti-info-circle text-sm text-amber-600 mt-0.5 shrink-0"></i>
+                    <p class="text-[11px] text-amber-700 leading-5">
+                        Ningún personal seleccionado desarrolló el examen, por lo que no se generará la vista previa del PDF.
+                    </p>
+                </div>
+            </div>
+
+            {{-- Footer --}}
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 px-6 py-4 border-t border-default-200 shrink-0">
+                <button type="button" @click="exportarPendientesExcel()"
+                    :disabled="generandoExcelPendientes"
+                    :class="generandoExcelPendientes ? 'opacity-60 cursor-not-allowed' : 'hover:bg-default-100'"
+                    class="inline-flex items-center justify-center gap-2 px-4 h-10 rounded-xl border border-default-200 text-sm font-semibold text-default-600 transition-colors">
+                    <i class="ti text-base"
+                        :class="generandoExcelPendientes ? 'ti-loader animate-spin' : (pendientesExcelListo ? 'ti-check text-green-600' : 'ti-file-spreadsheet')"></i>
+                    <span x-text="generandoExcelPendientes
+                        ? 'Generando...'
+                        : (pendientesExcelListo ? 'Excel descargado' : 'Exportar Excel')"></span>
+                </button>
+                <button type="button" @click="continuarPreview()"
+                    class="inline-flex items-center justify-center gap-2 px-5 h-10 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold transition-all shadow-md shadow-primary/25 active:scale-[0.98]">
+                    <i class="ti ti-check text-base"></i>
+                    <span>Entendido</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal de vista previa del PDF --}}
     <div x-show="mostrarPreview" x-cloak
         x-transition:enter="transition ease-out duration-200"

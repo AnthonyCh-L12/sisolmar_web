@@ -18,7 +18,20 @@ document.addEventListener("DOMContentLoaded", () => {
         statTotal: document.getElementById("statTotalCursos"),
     };
 
-    const state = { term: "", plan: "", tipo: "", anio: "", desde: "", hasta: "", av: "", estado: "" };
+    // Filtros por defecto: año actual y cursos habilitados.
+    const anioActual = String(new Date().getFullYear());
+    const estadoPorDefecto = "1";
+
+    const state = {
+        term: "",
+        plan: "",
+        tipo: "",
+        anio: anioActual,
+        desde: "",
+        hasta: "",
+        av: "",
+        estado: estadoPorDefecto,
+    };
 
     const esLocale = {
         pagination: {
@@ -31,6 +44,9 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         data: { loading: "Cargando...", error: "Error al cargar los datos" },
     };
+
+    // Reflejar el filtro por defecto de estado en el combo.
+    if (elements.filtroEstado) elements.filtroEstado.value = estadoPorDefecto;
 
     const estilosTipo = {
         INDUCCIÓN: "bg-sky-500/10 text-sky-600",
@@ -311,13 +327,17 @@ document.addEventListener("DOMContentLoaded", () => {
             elements.filtroTipo.value = actual;
         }
         if (elements.filtroAnio) {
-            const actual = elements.filtroAnio.value;
-            const anios = [...new Set(rows.map(anioDe).filter(Boolean))].sort().reverse();
+            const anios = [...new Set([...rows.map(anioDe), anioActual].filter(Boolean))]
+                .sort()
+                .reverse();
             elements.filtroAnio.innerHTML =
                 `<option value="">Todos los años</option>` +
                 anios.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
-            if (actual && anios.includes(actual)) elements.filtroAnio.value = actual;
+            if (anios.includes(state.anio)) elements.filtroAnio.value = state.anio;
         }
+
+        // Aplicar los filtros por defecto apenas se cargan los datos.
+        aplicarFiltros();
     });
 
     function aplicarFiltros() {

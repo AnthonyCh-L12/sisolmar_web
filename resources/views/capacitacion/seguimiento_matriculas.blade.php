@@ -556,6 +556,10 @@
                             class="w-full sm:w-56 h-10 px-3 text-sm text-default-700 bg-white border border-default-200 rounded-lg shadow-sm outline-none transition hover:border-default-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10">
                             <option value="">Todos los tipos</option>
                         </select>
+                        <select id="filtroAnioCursos"
+                            class="w-full sm:w-40 h-10 px-3 text-sm text-default-700 bg-white border border-default-200 rounded-lg shadow-sm outline-none transition hover:border-default-300 focus:border-primary/50 focus:ring-2 focus:ring-primary/10">
+                            <option value="">Todos los años</option>
+                        </select>
                     </div>
                 </div>
                 <div id="tblCursosSeguimiento" class="w-full"></div>

@@ -157,6 +157,8 @@ class PlanesCapacitacionNewController extends Controller
             $cursos = CursoNew::where('habilitado', 1)
                 ->where('SW_CURS_PLAN_CAPAC_COD', 5)
                 ->whereNotNull('SW_CURS_SIST_GESTION_COD')
+                // Solo cursos creados en el año actual (por fecha_creacion).
+                ->whereYear('fecha_creacion', $anio)
                 ->get();
 
             $programaciones = $this->programacionesPorCurso(

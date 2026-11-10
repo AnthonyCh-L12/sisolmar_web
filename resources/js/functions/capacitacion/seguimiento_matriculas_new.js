@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
         memoTipo: "",
         cursoResponsable: "",
         cursoTipo: "",
+        cursoAnio: "",
     };
 
     const elements = {
@@ -26,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "filtroResponsableCursos",
         ),
         filtroTipoCursos: document.getElementById("filtroTipoCursos"),
+        filtroAnioCursos: document.getElementById("filtroAnioCursos"),
         searchPersonal: document.getElementById("buscarPersonalSeguimiento"),
         searchMemos: document.getElementById("buscarMemosEnviados"),
         filtroClienteMemos: document.getElementById("filtroClienteMemos"),
@@ -224,6 +226,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 hour12: true,
             }),
         };
+    }
+
+    function anioDeFecha(value) {
+        if (!value) return "";
+        const d = new Date(value);
+        if (!Number.isNaN(d.getTime())) return String(d.getFullYear());
+        const m = String(value).match(/(\d{4})/);
+        return m ? m[1] : "";
     }
 
     function setRowHoverEffect(
@@ -510,22 +520,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     },
                 },
                 {
-                    title: "Matriculados",
-                    field: "total_matriculados",
-                    width: 130,
-                    hozAlign: "center",
-                    headerSort: true,
-                    formatter(cell) {
-                        const val = cell.getValue() ?? 0;
-                        return `
-                        <div style="display:flex; align-items:center; justify-content:center; gap:5px;">
-                            <i class="ti ti-users" style="font-size:13px; color:#6366f1;"></i>
-                            <span style="font-weight:600; color:#111827;">${val}</span>
-                        </div>
-                    `;
-                    },
-                },
-                {
                     title: "Creación",
                     field: "fecha_creacion",
                     width: 150,
@@ -654,6 +648,25 @@ document.addEventListener("DOMContentLoaded", () => {
                         .join("");
                 selectTipo.value = actualTipo;
             }
+
+            const anios = [
+                ...new Set(
+                    data.map((r) => anioDeFecha(r.fecha_creacion)).filter(Boolean),
+                ),
+            ]
+                .sort()
+                .reverse();
+
+            const selectAnio = elements.filtroAnioCursos;
+            if (selectAnio) {
+                selectAnio.innerHTML =
+                    `<option value="">Todos los años</option>` +
+                    anios.map((a) => `<option value="${a}">${a}</option>`).join("");
+                selectAnio.value = anios.includes(state.cursoAnio)
+                    ? state.cursoAnio
+                    : "";
+                state.cursoAnio = selectAnio.value;
+            }
         });
 
         function aplicarFiltrosCursos() {
@@ -662,12 +675,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 .toLowerCase();
             const resp = state.cursoResponsable;
             const tipo = state.cursoTipo;
+            const anio = state.cursoAnio;
 
-            if (term || resp || tipo) {
+            if (term || resp || tipo || anio) {
                 table.setFilter((data) => {
                     if (resp && (data.responsable || "") !== resp)
                         return false;
                     if (tipo && (data.tipo_curso || "") !== tipo)
+                        return false;
+                    if (anio && anioDeFecha(data.fecha_creacion) !== anio)
                         return false;
                     if (term) {
                         const nombre = (data.nombre || "").toLowerCase();
@@ -702,6 +718,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 "change",
                 function () {
                     state.cursoTipo = this.value;
+                    aplicarFiltrosCursos();
+                },
+            );
+        }
+
+        if (elements.filtroAnioCursos) {
+            elements.filtroAnioCursos.addEventListener(
+                "change",
+                function () {
+                    state.cursoAnio = this.value;
                     aplicarFiltrosCursos();
                 },
             );

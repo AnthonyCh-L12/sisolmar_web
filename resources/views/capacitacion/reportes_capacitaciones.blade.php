@@ -145,7 +145,8 @@
                         </div>
                     </div>
 
-                    <!-- Historial button -->
+                    <!-- Historial button (oculto temporalmente) -->
+                    {{--
                     <div class="mt-5">
                         <button @click="abrirModalHistorial()"
                             class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-semibold shadow-md shadow-indigo-500/20 hover:shadow-lg hover:shadow-indigo-500/30 hover:from-indigo-600 hover:to-purple-600 transition-all cursor-pointer">
@@ -153,6 +154,7 @@
                             Ver historial de reportes generados
                         </button>
                     </div>
+                    --}}
                 </div>
 
                 <!-- Right side: decorative icon -->

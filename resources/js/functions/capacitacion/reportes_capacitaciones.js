@@ -1438,14 +1438,15 @@ export default document.addEventListener("alpine:init", () => {
                     formData.append("tipo_archivo", "xlsx");
                 }
 
-                await axios.post(
-                    `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
-                    formData,
-                );
+                // Registro en historial deshabilitado temporalmente.
+                // await axios.post(
+                //     `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
+                //     formData,
+                // );
 
-                window.dispatchEvent(
-                    new CustomEvent("historial-reportes-actualizado"),
-                );
+                // window.dispatchEvent(
+                //     new CustomEvent("historial-reportes-actualizado"),
+                // );
             } catch (error) {
                 console.error(
                     "Error al registrar reporte en historial:",
@@ -2550,14 +2551,15 @@ export default document.addEventListener("alpine:init", () => {
                     formData.append("tipo_archivo", "xlsx");
                 }
 
-                await axios.post(
-                    `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
-                    formData,
-                );
+                // Registro en historial deshabilitado temporalmente.
+                // await axios.post(
+                //     `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
+                //     formData,
+                // );
 
-                window.dispatchEvent(
-                    new CustomEvent("historial-reportes-actualizado"),
-                );
+                // window.dispatchEvent(
+                //     new CustomEvent("historial-reportes-actualizado"),
+                // );
             } catch (error) {
                 console.error(
                     "Error al registrar reporte en historial:",
@@ -4112,13 +4114,14 @@ export default document.addEventListener("alpine:init", () => {
                     const formData = new FormData();
                     formData.append("nombre_archivo", nombreArchivo);
                     formData.append("archivo_pdf", pdfBlob, nombreArchivo);
-                    await axios.post(
-                        `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
-                        formData,
-                    );
-                    window.dispatchEvent(
-                        new CustomEvent("historial-reportes-actualizado"),
-                    );
+                    // Registro en historial deshabilitado temporalmente.
+                    // await axios.post(
+                    //     `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
+                    //     formData,
+                    // );
+                    // window.dispatchEvent(
+                    //     new CustomEvent("historial-reportes-actualizado"),
+                    // );
                 } catch (error) {
                     console.error("Error al guardar en historial:", error);
                 }
@@ -4157,14 +4160,15 @@ export default document.addEventListener("alpine:init", () => {
                     );
                 }
 
-                await axios.post(
-                    `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
-                    formData,
-                );
+                // Registro en historial deshabilitado temporalmente.
+                // await axios.post(
+                //     `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
+                //     formData,
+                // );
 
-                window.dispatchEvent(
-                    new CustomEvent("historial-reportes-actualizado"),
-                );
+                // window.dispatchEvent(
+                //     new CustomEvent("historial-reportes-actualizado"),
+                // );
             } catch (error) {
                 console.error(
                     "Error al registrar reporte en historial:",
@@ -5089,13 +5093,14 @@ export default document.addEventListener("alpine:init", () => {
                     const formData = new FormData();
                     formData.append("nombre_archivo", nombreArchivo);
                     formData.append("archivo_pdf", pdfBlob, nombreArchivo);
-                    await axios.post(
-                        `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
-                        formData,
-                    );
-                    window.dispatchEvent(
-                        new CustomEvent("historial-reportes-actualizado"),
-                    );
+                    // Registro en historial deshabilitado temporalmente.
+                    // await axios.post(
+                    //     `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
+                    //     formData,
+                    // );
+                    // window.dispatchEvent(
+                    //     new CustomEvent("historial-reportes-actualizado"),
+                    // );
                 } catch (error) {
                     console.error("Error al guardar en historial:", error);
                 }
@@ -5257,13 +5262,14 @@ export default document.addEventListener("alpine:init", () => {
                     const formData = new FormData();
                     formData.append("nombre_archivo", nombreArchivo);
                     formData.append("archivo_excel", blob, nombreArchivo);
-                    await axios.post(
-                        `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
-                        formData,
-                    );
-                    window.dispatchEvent(
-                        new CustomEvent("historial-reportes-actualizado"),
-                    );
+                    // Registro en historial deshabilitado temporalmente.
+                    // await axios.post(
+                    //     `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
+                    //     formData,
+                    // );
+                    // window.dispatchEvent(
+                    //     new CustomEvent("historial-reportes-actualizado"),
+                    // );
                 } catch (error) {
                     console.error("Error al guardar en historial:", error);
                 }
@@ -6471,14 +6477,15 @@ export default document.addEventListener("alpine:init", () => {
                     formData.append("tipo_archivo", "xlsx");
                 }
 
-                await axios.post(
-                    `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
-                    formData,
-                );
+                // Registro en historial deshabilitado temporalmente.
+                // await axios.post(
+                //     `${VITE_URL_APP}/api/capacitacion/registrar-reporte`,
+                //     formData,
+                // );
 
-                window.dispatchEvent(
-                    new CustomEvent("historial-reportes-actualizado"),
-                );
+                // window.dispatchEvent(
+                //     new CustomEvent("historial-reportes-actualizado"),
+                // );
             } catch (error) {
                 console.error(
                     "Error al registrar reporte en historial:",
