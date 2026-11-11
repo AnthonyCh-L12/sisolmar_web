@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
+use App\Services\MoodleCursoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -72,7 +73,7 @@ class SeguimientoMatriculasNewController extends Controller
                      WHERE [habilitado] = 1
                        AND [estado_periodo] = 'VIGENTE'"
                 )
-            )->pluck('cod_curso')->map(fn ($v) => (int) $v)->flip();
+            )->pluck('cod_curso')->map(fn($v) => (int) $v)->flip();
 
             $moodleCursos = collect(
                 DB::connection('mysql_grupoihb')->select(
@@ -82,7 +83,7 @@ class SeguimientoMatriculasNewController extends Controller
             );
 
             $result = $moodleCursos
-                ->filter(fn ($curso) => isset($cursosHabilitados[$curso->course_id]))
+                ->filter(fn($curso) => isset($cursosHabilitados[$curso->course_id]))
                 ->map(function ($curso) use ($cursosHabilitados, $cursosConProgramacionVigente) {
                     $cursoHabilitado = $cursosHabilitados[$curso->course_id];
 
@@ -129,11 +130,12 @@ class SeguimientoMatriculasNewController extends Controller
         try {
             $codigoCurso = $request->course_id;
 
-            $cursoBdLocal = DB::table('sw_cursos_new')
-                ->where('SW_CURS_COD', $codigoCurso)
-                ->first();
+            $cursoSistema = DB::selectOne(
+                'SELECT * FROM sw_cursos_new WHERE SW_CURS_COD = ?',
+                [$codigoCurso]
+            );
 
-            if (!$cursoBdLocal) {
+            if (! $cursoSistema) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Curso no encontrado.',
@@ -142,88 +144,109 @@ class SeguimientoMatriculasNewController extends Controller
 
             $programaciones = DB::select(
                 'SELECT * FROM sw_cursos_programacion WHERE cod_curso = ?',
-                [$cursoBdLocal->CODIGO]
+                [$cursoSistema->CODIGO]
             );
 
-            $programacionVigente = collect($programaciones)
-                ->firstWhere('estado_periodo', 'VIGENTE');
+            $programacionVigente = collect($programaciones)->firstWhere('estado_periodo', 'VIGENTE');
+            $programacionPendiente = collect($programaciones)->firstWhere('estado_periodo', 'PENDIENTE');
 
-            $programacionPendiente = collect($programaciones)
-                ->firstWhere('estado_periodo', 'PENDIENTE');
+            $estadisticas = [
+                'total' => 0,
+                'aprobados' => 0,
+                'desaprobados' => 0,
+                'sin_acceder' => 0,
+                'en_curso' => 0,
+            ];
 
-            $estadisticas = collect();
-            if (!empty($cursoBdLocal->SW_CURS_AV_COD)) {
-                $estadisticas = collect(
-                    DB::connection('mysql_grupoihb')->select(
-                        'CALL grupoihb_see.SP_OBTENER_MATRICULADOS_CON_ESTADO(?, ?)',
-                        [$cursoBdLocal->SW_CURS_AV_COD, 0]
-                    )
-                )->groupBy(fn ($m) => strtoupper($m->estado))
-                    ->map(fn ($grupo) => $grupo->count());
+            if ((int) $cursoSistema->SW_CURS_AV_COD > 0) {
+                $estadisticas = $this->resumenParticipantes((int) $cursoSistema->SW_CURS_AV_COD);
             }
 
             $sistemaGestion = null;
-            if ($cursoBdLocal->SW_CURS_SIST_GESTION_COD) {
+            if ($cursoSistema->SW_CURS_SIST_GESTION_COD) {
                 $sistema = DB::connection('sqlsrv')->selectOne(
-                        'SELECT nombre FROM sw_cursos_sistema WHERE codigo = ?',
-                        [$cursoBdLocal->SW_CURS_SIST_GESTION_COD]
-                    );
-
+                    'SELECT nombre FROM sw_cursos_sistema WHERE codigo = ?',
+                    [$cursoSistema->SW_CURS_SIST_GESTION_COD]
+                );
                 $sistemaGestion = $sistema->nombre ?? null;
             }
 
             $areaResponsable = null;
-            if ($cursoBdLocal->SW_CURS_AREA_COD) {
-                $area = DB::table('sw_cursos_area')
-                    ->select('nombre')
-                    ->where('codigo', $cursoBdLocal->SW_CURS_AREA_COD)
-                    ->first();
-                $areaResponsable = $area->nombre ?? null;
+            if ($cursoSistema->SW_CURS_AREA_COD) {
+                $areaResponsable = DB::table('sw_cursos_area')
+                    ->where('codigo', $cursoSistema->SW_CURS_AREA_COD)
+                    ->value('nombre');
             }
 
             $nombreResponsable = null;
-            if ($cursoBdLocal->SW_CURS_RESP_COD) {
-                $resp = DB::connection('sqlsrv')->selectOne(
+            if ($cursoSistema->SW_CURS_RESP_COD) {
+                $responsable = DB::connection('sqlsrv')->selectOne(
                     "SELECT LTRIM(RTRIM(APEL_1 + ' ' + ISNULL(APEL_2, '') + ' ' + NOMB_1 + ' ' + ISNULL(NOMB_2, ''))) as nombre
-                     FROM si_solm.dbo.PERSONAL
-                     WHERE CODI_PERS = ?",
-                    [$cursoBdLocal->SW_CURS_RESP_COD]
+                 FROM si_solm.dbo.PERSONAL
+                 WHERE CODI_PERS = ?",
+                    [str_pad((string) $cursoSistema->SW_CURS_RESP_COD, 5, '0', STR_PAD_LEFT)]
                 );
-                $nombreResponsable = $resp->nombre ?? null;
+                $nombreResponsable = $responsable->nombre ?? null;
             }
 
             return response()->json([
-                'success' => true,
-                'nombre' => $cursoBdLocal->SW_CURS_NOMBRE ?? 'Sin nombre',
-                'descripcion' => $cursoBdLocal->SW_CURS_DESCRIPCION ?? 'Sin descripción.',
-                'codigo' => $cursoBdLocal->SW_CURS_COD ?? null,
-                'codigo_interno' => $cursoBdLocal->CODIGO ?? null,
-                'codigo_moodle' => $cursoBdLocal->SW_CURS_AV_COD ?? null,
-                'fecha_creacion' => $cursoBdLocal->fecha_creacion ?? null,
-                'sistema_gestion' => $sistemaGestion,
-                'area_responsable' => $areaResponsable,
-                'responsable' => $nombreResponsable,
-                'programacion_actual' => $programacionVigente ?? null,
-                'programacion_pendiente' => $programacionPendiente ?? null,
-                'estadisticas' => [
-                    'aprobados' => $estadisticas->get('APROBADO', 0),
-                    'desaprobados' => $estadisticas->get('DESAPROBADO', 0),
-                    'en_curso' => $estadisticas->get('EN CURSO', 0),
-                    'sin_acceder' => $estadisticas->get('SIN ACCEDER', 0),
-                ],
+                'success'                => true,
+                'nombre'                 => $cursoSistema->SW_CURS_NOMBRE ?? 'Sin nombre',
+                'descripcion'            => $cursoSistema->SW_CURS_DESCRIPCION ?? 'Sin descripción.',
+                'codigo'                 => $cursoSistema->SW_CURS_COD ?? null,
+                'codigo_interno'         => $cursoSistema->CODIGO ?? null,
+                'codigo_moodle'          => $cursoSistema->SW_CURS_AV_COD ?? null,
+                'fecha_creacion'         => $cursoSistema->fecha_creacion ?? null,
+                'sistema_gestion'        => $sistemaGestion,
+                'area_responsable'       => $areaResponsable,
+                'responsable'            => $nombreResponsable,
+                'programacion_actual'    => $programacionVigente,
+                'programacion_pendiente' => $programacionPendiente,
+                'estadisticas'           => $estadisticas,
             ]);
         } catch (\Exception $e) {
-            Log::error('Error en obtenerDetalleCursoNew', [
+            Log::error('Error en NewCapacController@obtenerDetalleCursoNew', [
                 'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
+                'line'  => $e->getLine(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Error al obtener el detalle del curso.',
             ], 500);
         }
+    }
+
+    /**
+     * Conteo de participantes de un curso de Moodle por estado.
+     * Con $soloVigentes solo cuenta al personal vigente según SP_OBTENER_PERSONAL_BETA.
+     */
+    private function resumenParticipantes(int $courseId, bool $soloVigentes = true): array
+    {
+        $participantes = collect(
+            app(MoodleCursoService::class)->obtenerEstadoParticipantes($courseId)
+        );
+
+        if ($soloVigentes) {
+            $dnisVigentes = collect(
+                DB::connection('sqlsrv')->select('EXEC SP_OBTENER_PERSONAL_BETA @VIGENTE = 1')
+            )
+                ->map(fn($p) => trim((string) ($p->NRO_DOC ?? '')))
+                ->filter()
+                ->flip();
+
+            $participantes = $participantes->filter(fn(array $p) => $dnisVigentes->has($p['dni']));
+        }
+
+        $conteo = $participantes->countBy('estado');
+
+        return [
+            'total'        => $participantes->count(),
+            'aprobados'    => $conteo->get('aprobado', 0),
+            'desaprobados' => $conteo->get('desaprobado', 0),
+            'sin_acceder'  => $conteo->get('sin_acceder', 0),
+            'en_curso'     => $conteo->get('en_curso', 0),
+        ];
     }
 
     /**
@@ -272,10 +295,10 @@ class SeguimientoMatriculasNewController extends Controller
 
             $totales = [
                 'Total' => count($resultado),
-                'aprobado' => count(array_filter($resultado, fn ($c) => $c['estado'] === 'Aprobado')),
-                'desaprobado' => count(array_filter($resultado, fn ($c) => $c['estado'] === 'Desaprobado')),
-                'en_curso' => count(array_filter($resultado, fn ($c) => $c['estado'] === 'En curso')),
-                'sin_acceder' => count(array_filter($resultado, fn ($c) => $c['estado'] === 'Sin acceder')),
+                'aprobado' => count(array_filter($resultado, fn($c) => $c['estado'] === 'Aprobado')),
+                'desaprobado' => count(array_filter($resultado, fn($c) => $c['estado'] === 'Desaprobado')),
+                'en_curso' => count(array_filter($resultado, fn($c) => $c['estado'] === 'En curso')),
+                'sin_acceder' => count(array_filter($resultado, fn($c) => $c['estado'] === 'Sin acceder')),
             ];
 
             return response()->json([

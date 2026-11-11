@@ -222,6 +222,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-cursos-matriculas-new', [NewCapacController::class, 'obtenerCursosMatriculas']);
         Route::get('/obtener-curso-new/{codigoCurso}', [NewCapacController::class, 'obtenerCurso']);
         Route::get('/obtener-participantes-inscritos-new/{SW_CURS_AV_COD}', [NewCapacController::class, 'obtenerParticipantesInscritos']);
+        Route::get('/obtener-participantes-no-inscritos-new/{SW_CURS_AV_COD}', [NewCapacController::class, 'obtenerPersonalNoMatriculado']);
+        Route::get('/obtener-participantes-resumen-new/{SW_CURS_AV_COD}', [NewCapacController::class, 'obtenerResumenParticipantes']);
         Route::get('/obtener-ultimo-codigo-curso-new', [NewCapacController::class, 'ultimoCodigoCurso']);
         Route::get('/obtener-dirigidos-new', [NewCapacController::class, 'dirigidos']);
 
@@ -377,19 +379,17 @@ Route::middleware(['auth'])->group(function () {
             Route::get('get-sistema-prev/', [DjController::class, 'getSistemaPrev']);
             Route::get('get-paises/', [DjController::class, 'getPaises']);
         });
-
     }); // fin prefix('api')
 
     Route::get('/reportes', [FileController::class, 'ViewReportes'])->name('reportes');
     // ─── RUTAS DE VISTAS (catchall al final) ─────────────────────────────────
     Route::group(['prefix' => '/', 'where' => ['first' => '^(?!api|\.well-known).*']], function () {
         Route::get('', [RoutingController::class, 'index'])->name('root');
-        Route::get('/home', fn () => view('index'))->name('home');
+        Route::get('/home', fn() => view('index'))->name('home');
         Route::get('{first}/{second}/{third}', [RoutingController::class, 'thirdLevel'])->name('third');
         Route::get('{first}/{second}', [RoutingController::class, 'secondLevel'])->name('second');
         Route::get('{any}', [RoutingController::class, 'root'])->name('any');
     });
-
 }); // fin middleware auth
 
 // ─── TEST EMAILS ─────────────────────────────────────────────────────────────
@@ -417,4 +417,4 @@ Route::get('/debug-permisos', function () {
     ]);
 })->middleware('auth');
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

@@ -5,8 +5,7 @@
     class="fixed inset-0 z-[130] flex items-center justify-center p-4"
     x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
-    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-    style="background: rgba(36,39,70,0.45);">
+    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" style="background: rgba(36,39,70,0.45);">
 
     <div class="relative flex flex-col shadow-2xl shadow-primary/10 rounded-2xl overflow-hidden w-full max-w-7xl border border-default-200 bg-white transition-all duration-300 max-h-[92vh]"
         x-transition:enter="transition ease-out duration-300"
@@ -21,11 +20,13 @@
             class="absolute inset-0 z-30 bg-white flex flex-col items-center justify-center text-center px-8">
             <div class="w-12 h-12 rounded-full border-4 border-slate-200 border-t-slate-700 animate-spin"></div>
             <p class="mt-5 text-base font-bold text-default-900">Cargando participantes...</p>
-            <p class="mt-2 text-xs leading-5 text-default-400 max-w-md">Estamos consultando el aula virtual para traer a los participantes inscritos en este curso.</p>
+            <p class="mt-2 text-xs leading-5 text-default-400 max-w-md">Estamos consultando el aula virtual para traer a
+                los participantes inscritos en este curso.</p>
         </div>
 
         <!-- Header -->
-        <div class="flex justify-between items-start py-5 px-6 border-b border-default-100 shrink-0 bg-gradient-to-r from-white to-default-50/30">
+        <div
+            class="flex justify-between items-start py-5 px-6 border-b border-default-100 shrink-0 bg-gradient-to-r from-white to-default-50/30">
             <div>
                 <h3 class="text-xl font-bold text-default-900">Participantes inscritos</h3>
                 <p class="text-sm text-default-500 mt-1">Personal inscrito en el aula virtual (Moodle)</p>
@@ -85,10 +86,8 @@
                 <p class="text-[11px] font-semibold text-default-400 uppercase tracking-widest mb-2">Filtros</p>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div class="relative">
-                        <input type="text" id="txtBuscarParticipanteMoodle"
-                            placeholder="Buscar por nombre o DNI..."
+                        <input type="text" id="txtBuscarParticipanteMoodle" placeholder="Buscar por nombre o DNI..."
                             class="w-full h-9 pl-8 pr-8 text-xs border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                        <i class="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2 text-default-400 text-sm"></i>
                         <button type="button" id="btnLimpiarBusquedaParticipanteMoodle"
                             class="absolute right-2.5 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700 transition cursor-pointer hidden">
                             <i class="ti ti-x text-sm"></i>
@@ -115,7 +114,8 @@
         </div>
 
         <!-- Footer -->
-        <div class="flex justify-end items-center gap-3 px-6 py-4 border-t border-default-100 shrink-0 bg-default-50/50">
+        <div
+            class="flex justify-end items-center gap-3 px-6 py-4 border-t border-default-100 shrink-0 bg-default-50/50">
             <button type="button" @click="cerrar()"
                 class="h-9 px-4 inline-flex items-center justify-center gap-1.5 bg-white border border-default-200 text-default-700 text-sm font-medium rounded-lg shadow-sm hover:bg-default-50 transition cursor-pointer">
                 Cerrar

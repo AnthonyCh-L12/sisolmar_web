@@ -98,6 +98,67 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    /**
+     * Normaliza un valor para compararlo/filtrarlo:
+     * colapsa espacios repetidos y elimina espacios al inicio/fin.
+     * Evita diferencias como "ASISTENTE  DE OPERACIONES" vs
+     * "ASISTENTE DE OPERACIONES" o valores con espacios sobrantes.
+     */
+    function normalizarTexto(valor) {
+        return String(valor ?? "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function claveFiltro(valor) {
+        return normalizarTexto(valor).toLowerCase();
+    }
+
+    /**
+     * Construye las opciones únicas de un campo, agrupando valores que solo
+     * difieren en espacios o mayúsculas/minúsculas.
+     */
+    function construirOpcionesFiltro(data, field) {
+        const mapa = new Map();
+
+        (data || []).forEach((item) => {
+            const texto = normalizarTexto(item?.[field]);
+            if (!texto) return;
+
+            const clave = texto.toLowerCase();
+            const existente = mapa.get(clave);
+            if (existente) {
+                existente.count += 1;
+            } else {
+                mapa.set(clave, { value: clave, text: texto, count: 1 });
+            }
+        });
+
+        return [...mapa.values()].sort((a, b) =>
+            a.text.localeCompare(b.text, "es"),
+        );
+    }
+
+    function fillSelectConOpciones(id, opciones, label) {
+        const select = document.getElementById(id);
+        if (!select) return;
+
+        select.innerHTML = "";
+        if (label) {
+            const def = document.createElement("option");
+            def.value = "";
+            def.textContent = label;
+            select.appendChild(def);
+        }
+
+        opciones.forEach(({ value, text, count }) => {
+            const opt = document.createElement("option");
+            opt.value = value;
+            opt.textContent = `${text} (${count})`;
+            select.appendChild(opt);
+        });
+    }
+
     let _cursosFullData = [];
 
     function recargarListadoCursos() {
@@ -129,9 +190,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         fillSelect("filtroTipoCurso", unique("Tipo"));
         fillSelect("filtroAreaCurso", unique("Area"), "Todas las áreas");
-        fillSelect("filtroSistemaCurso", unique("Sistema"), "Todos los sistemas");
-        fillSelect("filtroJefaturaCurso", unique("Responsable"), "Todas las jefaturas");
-        fillSelect("filtroClienteCurso", unique("Cliente"), "Todos los clientes");
+        fillSelect(
+            "filtroSistemaCurso",
+            unique("Sistema"),
+            "Todos los sistemas",
+        );
+        fillSelect(
+            "filtroJefaturaCurso",
+            unique("Responsable"),
+            "Todas las jefaturas",
+        );
+        fillSelect(
+            "filtroClienteCurso",
+            unique("Cliente"),
+            "Todos los clientes",
+        );
         fillSelect("filtroAnioCurso", anios, "Todos los años");
 
         if (selectAnio && anioActual && anios.includes(anioActual)) {
@@ -141,7 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function repopulateSecondaryFilters(tipo) {
         const filtered = tipo
-            ? _cursosFullData.filter(d => d.Tipo === tipo)
+            ? _cursosFullData.filter((d) => d.Tipo === tipo)
             : _cursosFullData;
         const unique = (field) =>
             [...new Set(filtered.map((d) => d[field]).filter(Boolean))].sort();
@@ -152,9 +225,21 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("filtroClienteCurso").value = "";
 
         fillSelect("filtroAreaCurso", unique("Area"), "Todas las áreas");
-        fillSelect("filtroSistemaCurso", unique("Sistema"), "Todos los sistemas");
-        fillSelect("filtroJefaturaCurso", unique("Responsable"), "Todas las jefaturas");
-        fillSelect("filtroClienteCurso", unique("Cliente"), "Todos los clientes");
+        fillSelect(
+            "filtroSistemaCurso",
+            unique("Sistema"),
+            "Todos los sistemas",
+        );
+        fillSelect(
+            "filtroJefaturaCurso",
+            unique("Responsable"),
+            "Todas las jefaturas",
+        );
+        fillSelect(
+            "filtroClienteCurso",
+            unique("Cliente"),
+            "Todos los clientes",
+        );
     }
 
     function applyFilters(table) {
@@ -187,8 +272,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function toggleSecondaryFilters(tipo) {
-        const sistemaContainer = document.getElementById("filtroSistemaCursoContainer");
-        const clienteContainer = document.getElementById("filtroClienteCursoContainer");
+        const sistemaContainer = document.getElementById(
+            "filtroSistemaCursoContainer",
+        );
+        const clienteContainer = document.getElementById(
+            "filtroClienteCursoContainer",
+        );
 
         if (!sistemaContainer || !clienteContainer) return;
 
@@ -220,7 +309,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         const busquedaEl = document.getElementById("txtBuscarCurso");
         if (busquedaEl) busquedaEl.value = "";
-        document.getElementById("btnLimpiarBusquedaCurso")?.classList.add("hidden");
+        document
+            .getElementById("btnLimpiarBusquedaCurso")
+            ?.classList.add("hidden");
         const tipoEl = document.getElementById("filtroTipoCurso");
         if (tipoEl) {
             tipoEl.value = "PCE";
@@ -328,8 +419,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     headerSort: false,
                     formatter(cell) {
                         const sinVigente = !cell.getData()?.Vigente;
-                        const bloqueado = sinVigente ? 'disabled title="El curso no tiene una programación vigente"' : '';
-                        const estiloBloqueado = sinVigente ? 'opacity:.45; cursor:not-allowed;' : 'cursor:pointer;';
+                        const bloqueado = sinVigente
+                            ? 'disabled title="El curso no tiene una programación vigente"'
+                            : "";
+                        const estiloBloqueado = sinVigente
+                            ? "opacity:.45; cursor:not-allowed;"
+                            : "cursor:pointer;";
                         return `
                         <div style="display:flex; gap:6px; justify-content:center;">
                             <button class="btn-matricular-curso" ${bloqueado} style="
@@ -370,8 +465,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     `;
                     },
                     cellClick: async function (e, cell) {
-                        const btnMat = e.target?.closest?.('.btn-matricular-curso');
-                        const btnDes = e.target?.closest?.('.btn-desmatricular-curso');
+                        const btnMat = e.target?.closest?.(
+                            ".btn-matricular-curso",
+                        );
+                        const btnDes = e.target?.closest?.(
+                            ".btn-desmatricular-curso",
+                        );
                         if (!btnMat && !btnDes) return;
                         e.stopPropagation();
                         const data = cell.getRow().getData();
@@ -381,9 +480,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         // Desmatricular abre el modal de participantes inscritos en Moodle
                         if (btnDes) {
-                            const modalParticipantesEl = document.getElementById(
-                                "modal-participantes-moodle",
-                            );
+                            const modalParticipantesEl =
+                                document.getElementById(
+                                    "modal-participantes-moodle",
+                                );
                             const componenteParticipantes =
                                 modalParticipantesEl?._x_dataStack?.[0];
 
@@ -398,44 +498,20 @@ document.addEventListener("DOMContentLoaded", () => {
                             return;
                         }
 
-                        window._activeTab = 'por-matricular';
-
+                        // Matricular abre el nuevo modal basado en el estado real de Moodle
                         const modalEl = document.getElementById(
-                            "modal-lista-matriculados",
+                            "modal-personal-no-matriculado",
                         );
                         const alpineComponent = modalEl?._x_dataStack?.[0];
 
-                        if (!alpineComponent?.mostrar) {
+                        if (!alpineComponent?.abrir) {
                             console.warn(
-                                "No se encontró el componente Alpine del modal",
+                                "No se encontró el componente Alpine del modal de personal no matriculado",
                             );
                             return;
                         }
 
-                        // Abrir el modal de inmediato con loader animado
-                        alpineComponent.mostrar(data);
-
-                        // Resolver la programación vigente primero
-                        let progVigente = null;
-                        try {
-                            const progResp = await axios.get(`${VITE_URL_APP}/api/cursos/obtener-prog-actual/${data.LocalId}`);
-                            progVigente = progResp.data?.success ? progResp.data?.data : null;
-                        } catch (err) {
-                            console.error(err);
-                            alpineComponent.cerrar();
-                            await Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo verificar la programación del curso.', confirmButtonColor: '#6366f1' });
-                            return;
-                        }
-
-                        if (!progVigente || String(progVigente.estado_periodo || '').toUpperCase() !== 'VIGENTE') {
-                            alpineComponent.cerrar();
-                            await Swal.fire({ icon: 'warning', title: 'Sin programación vigente', text: 'El curso no tiene una programación vigente. Cree una programación antes de gestionar matrículas.', confirmButtonColor: '#6366f1' });
-                            return;
-                        }
-
-                        if (window.cargarDatosModalMatriculados) {
-                            window.cargarDatosModalMatriculados(alpineComponent.cursoId, alpineComponent);
-                        }
+                        alpineComponent.abrir(data);
                     },
                 },
             ],
@@ -464,7 +540,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 ?.addEventListener("change", () => applyFilters(table));
         });
 
-        document.getElementById("filtroTipoCurso")
+        document
+            .getElementById("filtroTipoCurso")
             ?.addEventListener("change", function () {
                 toggleSecondaryFilters(this.value);
                 repopulateSecondaryFilters(this.value);
@@ -476,11 +553,16 @@ document.addEventListener("DOMContentLoaded", () => {
             ?.addEventListener("click", () => clearFilters(table));
 
         const buscarCursoEl = document.getElementById("txtBuscarCurso");
-        const btnLimpiarBusquedaCurso = document.getElementById("btnLimpiarBusquedaCurso");
+        const btnLimpiarBusquedaCurso = document.getElementById(
+            "btnLimpiarBusquedaCurso",
+        );
         if (buscarCursoEl) {
             let debounceTimer;
             buscarCursoEl.addEventListener("input", function () {
-                btnLimpiarBusquedaCurso?.classList.toggle("hidden", !this.value);
+                btnLimpiarBusquedaCurso?.classList.toggle(
+                    "hidden",
+                    !this.value,
+                );
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => applyFilters(table), 200);
             });
@@ -497,77 +579,109 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function formatDate(dateStr) {
-        if (!dateStr) return '??';
-        const d = new Date(dateStr.includes(' ') ? dateStr.replace(' ', 'T') : dateStr);
-        if (isNaN(d.getTime())) return '??';
-        return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        if (!dateStr) return "??";
+        const d = new Date(
+            dateStr.includes(" ") ? dateStr.replace(" ", "T") : dateStr,
+        );
+        if (isNaN(d.getTime())) return "??";
+        return d.toLocaleDateString("es-PE", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        });
     }
 
     function updateMatricularButton() {
-        const btn = document.getElementById('btnGuardarMatriculas');
+        const btn = document.getElementById("btnGuardarMatriculas");
         if (!btn) return;
-        if ((window._activeTab || 'por-matricular') === 'matriculados') {
-            btn.innerHTML = '<i class="ti ti-user-plus"></i> Matricular personal (0)';
+        if ((window._activeTab || "por-matricular") === "matriculados") {
+            btn.innerHTML =
+                '<i class="ti ti-user-plus"></i> Matricular personal (0)';
             btn.disabled = true;
-            btn.style.display = 'none';
+            btn.style.display = "none";
             return;
         }
-        btn.style.display = '';
+        btn.style.display = "";
         const table = window.tabulatorPersonalMatriculado;
         if (!table) {
-            btn.innerHTML = '<i class="ti ti-user-plus"></i> Matricular personal (0)';
+            btn.innerHTML =
+                '<i class="ti ti-user-plus"></i> Matricular personal (0)';
             btn.disabled = true;
             return;
         }
         const data = table.getData() || [];
         let count = 0;
-        data.forEach(d => {
+        data.forEach((d) => {
             if (d._seleccionado && !d._matriculado) count++;
         });
         btn.innerHTML = `<i class="ti ti-user-plus"></i> Matricular personal (${count})`;
-        const progVigente = window._programacionVigente?.codigo || '';
+        const progVigente = window._programacionVigente?.codigo || "";
         btn.disabled = count === 0 || !progVigente;
     }
 
-    window.limpiarModalMatriculados = function() {
-        if (typeof window._detenerTextoLoader === 'function') window._detenerTextoLoader();
+    window.limpiarModalMatriculados = function () {
+        if (typeof window._detenerTextoLoader === "function")
+            window._detenerTextoLoader();
         if (window.tabulatorPersonalMatriculado) {
             window.tabulatorPersonalMatriculado.destroy();
             window.tabulatorPersonalMatriculado = null;
         }
         window._matriculadosData = [];
-        window._searchTerm = '';
-        window._estadoFilter = '';
-        window._activeTab = 'por-matricular';
-        if (typeof window.setTabMatricula === 'function') window.setTabMatricula('por-matricular');
-        const txtBuscar = document.getElementById('txtBuscarPersonal');
-        if (txtBuscar) { txtBuscar.value = ''; }
-        const btnLimpiar = document.getElementById('btnLimpiarBusqueda');
-        if (btnLimpiar) { btnLimpiar.style.display = 'none'; }
+        window._searchTerm = "";
+        window._estadoFilter = "";
+        window._activeTab = "por-matricular";
+        if (typeof window.setTabMatricula === "function")
+            window.setTabMatricula("por-matricular");
+        const txtBuscar = document.getElementById("txtBuscarPersonal");
+        if (txtBuscar) {
+            txtBuscar.value = "";
+        }
+        const btnLimpiar = document.getElementById("btnLimpiarBusqueda");
+        if (btnLimpiar) {
+            btnLimpiar.style.display = "none";
+        }
         window._programacionVigente = null;
-        const txtProg = document.getElementById('txtProgramacionVigente');
-        if (txtProg) txtProg.textContent = '—';
-        ['slcFiltroCliente', 'slcFiltroSucursal', 'slcFiltroCargo', 'slcFiltroTipoTrabajador'].forEach(id => {
+        const txtProg = document.getElementById("txtProgramacionVigente");
+        if (txtProg) txtProg.textContent = "—";
+        [
+            "slcFiltroCliente",
+            "slcFiltroSucursal",
+            "slcFiltroCargo",
+            "slcFiltroTipoTrabajador",
+        ].forEach((id) => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '<option value="">' + (id.includes('Cliente') ? 'Todos' : id.includes('Sucursal') ? 'Todas' : id.includes('Cargo') ? 'Todos' : 'Todos') + '</option>';
+            if (el)
+                el.innerHTML =
+                    '<option value="">' +
+                    (id.includes("Cliente")
+                        ? "Todos"
+                        : id.includes("Sucursal")
+                          ? "Todas"
+                          : id.includes("Cargo")
+                            ? "Todos"
+                            : "Todos") +
+                    "</option>";
         });
-        const cntInfo = document.getElementById('txtConteoPersonal');
-        if (cntInfo) cntInfo.textContent = '';
-        const btn = document.getElementById('btnGuardarMatriculas');
+        const cntInfo = document.getElementById("txtConteoPersonal");
+        if (cntInfo) cntInfo.textContent = "";
+        const btn = document.getElementById("btnGuardarMatriculas");
         if (btn) {
-            btn.innerHTML = '<i class="ti ti-user-plus"></i> Matricular personal (0)';
+            btn.innerHTML =
+                '<i class="ti ti-user-plus"></i> Matricular personal (0)';
             btn.disabled = true;
         }
-    }
+    };
 
     function actualizarContadores() {
         const table = window.tabulatorPersonalMatriculado;
         const data = table ? table.getData() || [] : [];
-        const modo = window._activeTab || 'por-matricular';
-        const el = document.getElementById('txtConteoPersonal');
-        if (el) el.textContent = modo === 'matriculados'
-            ? `${data.length} persona(s) matriculada(s)`
-            : `${data.length} persona(s) disponible(s) para matricular`;
+        const modo = window._activeTab || "por-matricular";
+        const el = document.getElementById("txtConteoPersonal");
+        if (el)
+            el.textContent =
+                modo === "matriculados"
+                    ? `${data.length} persona(s) matriculada(s)`
+                    : `${data.length} persona(s) disponible(s) para matricular`;
     }
 
     function getRowsFiltradosVisibles() {
@@ -578,12 +692,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function actualizarBotonSeleccionarFiltrados() {
-        const btn = document.getElementById('btnSeleccionarFiltrados');
+        const btn = document.getElementById("btnSeleccionarFiltrados");
         if (!btn) return;
 
         const rows = getRowsFiltradosVisibles();
         const count = rows.length;
-        const pendientes = rows.filter(r => !r.getData()._matriculado && !r.getData()._seleccionado);
+        const pendientes = rows.filter(
+            (r) => !r.getData()._matriculado && !r.getData()._seleccionado,
+        );
         const todosSeleccionados = pendientes.length === 0 && count > 0;
         if (todosSeleccionados) {
             btn.innerHTML = `<i class="ti ti-checks text-sm"></i><span>Deseleccionar filtrados (${count})</span>`;
@@ -595,41 +711,51 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.disabled = count === 0;
     }
 
-    window._activeTab = window._activeTab || 'por-matricular';
+    window._activeTab = window._activeTab || "por-matricular";
 
     function refreshTabsUI() {
-        const modo = window._activeTab || 'por-matricular';
-        const badge = document.getElementById('badgeModoMatricula');
-        const txt = document.getElementById('txtModoMatricula');
+        const modo = window._activeTab || "por-matricular";
+        const badge = document.getElementById("badgeModoMatricula");
+        const txt = document.getElementById("txtModoMatricula");
         if (badge && txt) {
-            const esMat = modo === 'matriculados';
-            txt.textContent = esMat ? 'Matriculados' : 'Por matricular';
-            badge.className = 'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold border ' +
-                (esMat ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-amber-50 border-amber-200 text-amber-700');
-            const icon = badge.querySelector('i');
-            if (icon) icon.className = esMat ? 'ti ti-users text-sm' : 'ti ti-user-plus text-sm';
+            const esMat = modo === "matriculados";
+            txt.textContent = esMat ? "Matriculados" : "Por matricular";
+            badge.className =
+                "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold border " +
+                (esMat
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-amber-50 border-amber-200 text-amber-700");
+            const icon = badge.querySelector("i");
+            if (icon)
+                icon.className = esMat
+                    ? "ti ti-users text-sm"
+                    : "ti ti-user-plus text-sm";
         }
-        const btnSel = document.getElementById('btnSeleccionarFiltrados');
-        if (btnSel) btnSel.style.display = modo === 'por-matricular' ? '' : 'none';
-        const lblNotif = document.getElementById('lblNotificarMatricula');
-        if (lblNotif) lblNotif.style.display = modo === 'por-matricular' ? '' : 'none';
+        const btnSel = document.getElementById("btnSeleccionarFiltrados");
+        if (btnSel)
+            btnSel.style.display = modo === "por-matricular" ? "" : "none";
+        const lblNotif = document.getElementById("lblNotificarMatricula");
+        if (lblNotif)
+            lblNotif.style.display = modo === "por-matricular" ? "" : "none";
     }
 
     window.setTabMatricula = function (tab) {
         window._activeTab = tab;
-        window._estadoFilter = '';
+        window._estadoFilter = "";
         refreshTabsUI();
         const table = window.tabulatorPersonalMatriculado;
         if (table) {
             try {
-                const col = table.getColumn('_seleccionado');
+                const col = table.getColumn("_seleccionado");
                 if (col) {
-                    if (tab === 'por-matricular') col.show();
+                    if (tab === "por-matricular") col.show();
                     else col.hide();
                 }
-            } catch (e) { /* columna aún no lista */ }
+            } catch (e) {
+                /* columna aún no lista */
+            }
         }
-        if (table && typeof window._aplicarFiltrosMatricula === 'function') {
+        if (table && typeof window._aplicarFiltrosMatricula === "function") {
             window._aplicarFiltrosMatricula();
         }
         updateMatricularButton();
@@ -638,12 +764,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window._iniciarTextoLoader = function (comp) {
         window._detenerTextoLoader();
-        const base = 'Cargando información';
+        const base = "Cargando información";
         let n = 3;
-        if (comp) comp.loadingTitle = base + '.'.repeat(n);
+        if (comp) comp.loadingTitle = base + ".".repeat(n);
         window._loaderDotsTimer = setInterval(() => {
             n = n === 1 ? 3 : n - 1;
-            if (comp) comp.loadingTitle = base + '.'.repeat(n);
+            if (comp) comp.loadingTitle = base + ".".repeat(n);
         }, 500);
     };
 
@@ -671,10 +797,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 alpineComponent.total = 0;
             }
             await Swal.fire({
-                icon: 'warning',
-                title: 'Curso sin aula virtual',
-                text: 'El curso no está vinculado al aula virtual, por lo que no tiene participantes inscritos en Moodle.',
-                confirmButtonColor: '#6366f1',
+                icon: "warning",
+                title: "Curso sin aula virtual",
+                text: "El curso no está vinculado al aula virtual, por lo que no tiene participantes inscritos en Moodle.",
+                confirmButtonColor: "#6366f1",
             });
             return;
         }
@@ -729,9 +855,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = resParticipantes.value;
             const participantes = res.data?.matriculados || [];
             if (alpineComponent) {
-                alpineComponent.total = Number(
-                    res.data?.total ?? participantes.length,
-                ) || 0;
+                alpineComponent.total =
+                    Number(res.data?.total ?? participantes.length) || 0;
             }
 
             window.tabulatorParticipantesMoodle = new Tabulator(
@@ -747,9 +872,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     paginationCounter: "rows",
                     langs: { "es-es": esLocale },
                     locale: "es-es",
-                    initialSort: [
-                        { column: "nombre_completo", dir: "asc" },
-                    ],
+                    initialSort: [{ column: "nombre_completo", dir: "asc" }],
                     rowFormatter(row) {
                         setRowHoverEffect(row);
                     },
@@ -926,68 +1049,136 @@ document.addEventListener("DOMContentLoaded", () => {
                 },
             );
 
-            const unique = (field) =>
-                [
-                    ...new Set(
-                        participantes
-                            .map((p) => String(p[field] || "").trim())
-                            .filter(Boolean),
-                    ),
-                ].sort((a, b) => a.localeCompare(b, "es"));
+            const opcionesBaseParticipantes = {
+                cargo: construirOpcionesFiltro(participantes, "cargo"),
+                tipo_trabajador: construirOpcionesFiltro(
+                    participantes,
+                    "tipo_trabajador",
+                ),
+            };
 
-            fillSelect(
-                "slcFiltroCargoMoodle",
-                unique("cargo"),
-                "Todos los cargos",
-            );
-            fillSelect(
-                "slcFiltroTipoTrabajadorMoodle",
-                unique("tipo_trabajador"),
-                "Todos los tipos de trabajador",
-            );
+            /**
+             * Repuebla los filtros de cargo/tipo de forma dependiente:
+             * el tipo de trabajador se limita a los tipos del cargo elegido
+             * y el cargo se limita a los cargos del tipo elegido.
+             */
+            const refrescarOpcionesFiltrosParticipantes = () => {
+                const selCargo = document.getElementById(
+                    "slcFiltroCargoMoodle",
+                );
+                const selTipo = document.getElementById(
+                    "slcFiltroTipoTrabajadorMoodle",
+                );
+
+                let cargoKey = claveFiltro(selCargo?.value || "");
+                let tipoKey = claveFiltro(selTipo?.value || "");
+
+                if (
+                    cargoKey &&
+                    !opcionesBaseParticipantes.cargo.some(
+                        (o) => o.value === cargoKey,
+                    )
+                ) {
+                    cargoKey = "";
+                }
+                if (
+                    tipoKey &&
+                    !opcionesBaseParticipantes.tipo_trabajador.some(
+                        (o) => o.value === tipoKey,
+                    )
+                ) {
+                    tipoKey = "";
+                }
+
+                if (cargoKey && tipoKey) {
+                    const tiposDelCargo = new Set(
+                        participantes
+                            .filter((d) => claveFiltro(d.cargo) === cargoKey)
+                            .map((d) => claveFiltro(d.tipo_trabajador)),
+                    );
+                    if (!tiposDelCargo.has(tipoKey)) tipoKey = "";
+                }
+
+                if (cargoKey && tipoKey) {
+                    const cargosDelTipo = new Set(
+                        participantes
+                            .filter(
+                                (d) =>
+                                    claveFiltro(d.tipo_trabajador) === tipoKey,
+                            )
+                            .map((d) => claveFiltro(d.cargo)),
+                    );
+                    if (!cargosDelTipo.has(cargoKey)) cargoKey = "";
+                }
+
+                const dataCargos = tipoKey
+                    ? participantes.filter(
+                          (d) => claveFiltro(d.tipo_trabajador) === tipoKey,
+                      )
+                    : participantes;
+                const dataTipos = cargoKey
+                    ? participantes.filter(
+                          (d) => claveFiltro(d.cargo) === cargoKey,
+                      )
+                    : participantes;
+
+                fillSelectConOpciones(
+                    "slcFiltroCargoMoodle",
+                    construirOpcionesFiltro(dataCargos, "cargo"),
+                    "Todos los cargos",
+                );
+                fillSelectConOpciones(
+                    "slcFiltroTipoTrabajadorMoodle",
+                    construirOpcionesFiltro(dataTipos, "tipo_trabajador"),
+                    "Todos los tipos de trabajador",
+                );
+
+                if (selCargo) selCargo.value = cargoKey;
+                if (selTipo) selTipo.value = tipoKey;
+            };
 
             const aplicarFiltrosParticipantes = () => {
                 const table = window.tabulatorParticipantesMoodle;
                 if (!table) return;
 
-                const term = (
+                const term = claveFiltro(
                     document.getElementById("txtBuscarParticipanteMoodle")
-                        ?.value || ""
-                )
-                    .toLowerCase()
-                    .trim();
-                const cargo =
+                        ?.value || "",
+                );
+                const cargoKey = claveFiltro(
                     document.getElementById("slcFiltroCargoMoodle")?.value ||
-                    "";
-                const tipo =
-                    document.getElementById(
-                        "slcFiltroTipoTrabajadorMoodle",
-                    )?.value || "";
-
-                const filters = [];
-                if (cargo)
-                    filters.push({ field: "cargo", type: "=", value: cargo });
-                if (tipo)
-                    filters.push({
-                        field: "tipo_trabajador",
-                        type: "=",
-                        value: tipo,
-                    });
+                        "",
+                );
+                const tipoKey = claveFiltro(
+                    document.getElementById("slcFiltroTipoTrabajadorMoodle")
+                        ?.value || "",
+                );
 
                 table.clearFilter();
-                if (filters.length) table.setFilter(filters);
-                if (term) {
-                    table.addFilter((data) => {
-                        const nombre = String(
-                            data.nombre_completo || "",
-                        ).toLowerCase();
-                        const dni = String(data.dni || "").toLowerCase();
-                        return nombre.includes(term) || dni.includes(term);
-                    });
-                }
+                table.addFilter((data) => {
+                    if (cargoKey && claveFiltro(data.cargo) !== cargoKey) {
+                        return false;
+                    }
+                    if (
+                        tipoKey &&
+                        claveFiltro(data.tipo_trabajador) !== tipoKey
+                    ) {
+                        return false;
+                    }
+                    if (term) {
+                        const nombre = claveFiltro(data.nombre_completo);
+                        const dni = claveFiltro(data.dni);
+                        if (!nombre.includes(term) && !dni.includes(term)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
             };
             window._aplicarFiltrosParticipantesMoodle =
                 aplicarFiltrosParticipantes;
+
+            refrescarOpcionesFiltrosParticipantes();
 
             const buscarEl = document.getElementById(
                 "txtBuscarParticipanteMoodle",
@@ -1013,7 +1204,12 @@ document.addEventListener("DOMContentLoaded", () => {
             ["slcFiltroCargoMoodle", "slcFiltroTipoTrabajadorMoodle"].forEach(
                 (id) => {
                     const el = document.getElementById(id);
-                    if (el) el.onchange = aplicarFiltrosParticipantes;
+                    if (el) {
+                        el.onchange = function () {
+                            refrescarOpcionesFiltrosParticipantes();
+                            aplicarFiltrosParticipantes();
+                        };
+                    }
                 },
             );
         } catch (error) {
@@ -1029,70 +1225,132 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    window.cargarDatosModalMatriculados = async function(cursoId, alpineComponent) {
+    window.cargarDatosModalMatriculados = async function (
+        cursoId,
+        alpineComponent,
+    ) {
         if (!cursoId) return;
 
         try {
-            const res = await axios.get(`${VITE_URL_APP}/api/obtener-datos-matricula/${cursoId}`);
+            const res = await axios.get(
+                `${VITE_URL_APP}/api/obtener-datos-matricula/${cursoId}`,
+            );
 
-            const programaciones = res.data.programaciones || res.data.Programaciones || [];
+            const programaciones =
+                res.data.programaciones || res.data.Programaciones || [];
             const personalData = res.data.personal || [];
-            const matriculadosData = res.data.matriculados || res.data.Matriculados || [];
+            const matriculadosData =
+                res.data.matriculados || res.data.Matriculados || [];
 
             // Ambos flujos operan siempre sobre la programación vigente
-            const progVigente = (programaciones || []).find(p =>
-                String(p.estado_periodo || p.estado || '').toUpperCase() === 'VIGENTE'
-            ) || null;
-            window._programacionVigente = progVigente ? {
-                codigo: String(progVigente.codigo_programacion || progVigente.cod_programacion || progVigente.codigo || '').trim(),
-                fecha_inicio: progVigente.fecha_inicio,
-                fecha_final: progVigente.fecha_final,
-                estado: progVigente.estado_periodo || progVigente.estado || 'VIGENTE',
-            } : null;
+            const progVigente =
+                (programaciones || []).find(
+                    (p) =>
+                        String(
+                            p.estado_periodo || p.estado || "",
+                        ).toUpperCase() === "VIGENTE",
+                ) || null;
+            window._programacionVigente = progVigente
+                ? {
+                      codigo: String(
+                          progVigente.codigo_programacion ||
+                              progVigente.cod_programacion ||
+                              progVigente.codigo ||
+                              "",
+                      ).trim(),
+                      fecha_inicio: progVigente.fecha_inicio,
+                      fecha_final: progVigente.fecha_final,
+                      estado:
+                          progVigente.estado_periodo ||
+                          progVigente.estado ||
+                          "VIGENTE",
+                  }
+                : null;
 
-            const txtProg = document.getElementById('txtProgramacionVigente');
+            const txtProg = document.getElementById("txtProgramacionVigente");
             if (txtProg) {
                 txtProg.textContent = window._programacionVigente
                     ? `Programación ${window._programacionVigente.codigo} | ${formatDate(window._programacionVigente.fecha_inicio)} - ${formatDate(window._programacionVigente.fecha_final)} (${window._programacionVigente.estado})`
-                    : 'Sin programación vigente';
+                    : "Sin programación vigente";
             }
             window._matriculadosData = matriculadosData;
 
             const responsableCodigo = alpineComponent?.codResponsable;
-            const modoModal = window._activeTab || 'por-matricular';
-            window._personalBase = personalData
-                .filter(p => String(p.codigo) !== String(responsableCodigo));
+            const modoModal = window._activeTab || "por-matricular";
+            window._personalBase = personalData.filter(
+                (p) => String(p.codigo) !== String(responsableCodigo),
+            );
 
             // Solo la población del modo: sin matricular (matricular) o matriculados (desmatricular)
             const construirFilas = () => {
-                const codProg = window._programacionVigente?.codigo || '';
+                const codProg = window._programacionVigente?.codigo || "";
                 const filtrados = codProg
-                    ? (window._matriculadosData || []).filter(m => String(m.cod_programacion || m.Cod_Programacion || '').trim() === codProg)
+                    ? (window._matriculadosData || []).filter(
+                          (m) =>
+                              String(
+                                  m.cod_programacion ||
+                                      m.Cod_Programacion ||
+                                      "",
+                              ).trim() === codProg,
+                      )
                     : [];
                 return (window._personalBase || [])
-                    .map(p => {
+                    .map((p) => {
                         const personalId = String(p.codigo || p.dni || p.id);
-                        const match = filtrados.find(m => String(m.cod_personal || m.Id_Personal || m.id || m.Id) === personalId);
+                        const match = filtrados.find(
+                            (m) =>
+                                String(
+                                    m.cod_personal ||
+                                        m.Id_Personal ||
+                                        m.id ||
+                                        m.Id,
+                                ) === personalId,
+                        );
                         const yaMatriculado = !!match;
                         return {
                             ...p,
                             _matriculado: yaMatriculado,
                             _seleccionado: false,
-                            _fecha_matricula: match ? match.fecha_matricula || match.Fecha_Matricula || null : null,
-                            _estado: match ? (match.estado || match.Estado || 'MATRICULADO') : null
+                            _fecha_matricula: match
+                                ? match.fecha_matricula ||
+                                  match.Fecha_Matricula ||
+                                  null
+                                : null,
+                            _estado: match
+                                ? match.estado || match.Estado || "MATRICULADO"
+                                : null,
                         };
                     })
-                    .filter(r => modoModal === 'matriculados' ? r._matriculado : !r._matriculado);
+                    .filter((r) =>
+                        modoModal === "matriculados"
+                            ? r._matriculado
+                            : !r._matriculado,
+                    );
             };
 
             const tableData = construirFilas();
             window._reconstruirFilasPersonal = construirFilas;
 
-            const unique = (field) => [...new Set(tableData.map(d => d[field]).filter(Boolean))].sort();
-            fillSelect("slcFiltroCliente", unique("cliente"), "Todos los clientes");
-            fillSelect("slcFiltroSucursal", unique("sucursal"), "Todas las sucursales");
+            const unique = (field) =>
+                [
+                    ...new Set(tableData.map((d) => d[field]).filter(Boolean)),
+                ].sort();
+            fillSelect(
+                "slcFiltroCliente",
+                unique("cliente"),
+                "Todos los clientes",
+            );
+            fillSelect(
+                "slcFiltroSucursal",
+                unique("sucursal"),
+                "Todas las sucursales",
+            );
             fillSelect("slcFiltroCargo", unique("cargo"), "Todos los cargos");
-            fillSelect("slcFiltroTipoTrabajador", unique("tipo_trabajador"), "Todos los tipos");
+            fillSelect(
+                "slcFiltroTipoTrabajador",
+                unique("tipo_trabajador"),
+                "Todos los tipos",
+            );
 
             if (window.tabulatorPersonalMatriculado) {
                 window.tabulatorPersonalMatriculado.destroy();
@@ -1152,7 +1410,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 {
                                     title: "Cliente",
                                     field: "cliente",
-                                    sorter: function(a, b) {
+                                    sorter: function (a, b) {
                                         const va = a || "Sin cliente";
                                         const vb = b || "Sin cliente";
                                         return va.localeCompare(vb, "es");
@@ -1177,11 +1435,18 @@ document.addEventListener("DOMContentLoaded", () => {
                                     title: "Estado",
                                     field: "_estado",
                                     hozAlign: "center",
-                                    sorter: function(a, b) {
+                                    sorter: function (a, b) {
                                         const va = a || "—";
                                         const vb = b || "—";
-                                        const order = { "—": 0, "SUSPENDIDO": 1, "MATRICULADO": 2, "FINALIZADO": 3 };
-                                        return (order[va] || 0) - (order[vb] || 0);
+                                        const order = {
+                                            "—": 0,
+                                            SUSPENDIDO: 1,
+                                            MATRICULADO: 2,
+                                            FINALIZADO: 3,
+                                        };
+                                        return (
+                                            (order[va] || 0) - (order[vb] || 0)
+                                        );
                                     },
                                     formatter(cell) {
                                         const val = cell.getValue();
@@ -1217,50 +1482,125 @@ document.addEventListener("DOMContentLoaded", () => {
                                     cellClick(e, cell) {
                                         const rowData = cell.getRow().getData();
                                         if (!rowData._matriculado) return;
-                                        if (rowData._estado === 'FINALIZADO') {
-                                            Swal.fire({ icon: 'info', title: 'Matrícula finalizada', text: 'No se puede desmatricular un curso que ya ha finalizado.', confirmButtonText: 'Entendido' });
+                                        if (rowData._estado === "FINALIZADO") {
+                                            Swal.fire({
+                                                icon: "info",
+                                                title: "Matrícula finalizada",
+                                                text: "No se puede desmatricular un curso que ya ha finalizado.",
+                                                confirmButtonText: "Entendido",
+                                            });
                                             return;
                                         }
                                         e.stopPropagation();
-                                        const nombre = rowData.nombre_completo || 'este usuario';
+                                        const nombre =
+                                            rowData.nombre_completo ||
+                                            "este usuario";
                                         Swal.fire({
-                                            icon: 'question',
-                                            title: '¿Desmatricular?',
+                                            icon: "question",
+                                            title: "¿Desmatricular?",
                                             text: `¿Está seguro de desmatricular a ${nombre}?`,
                                             showCancelButton: true,
-                                            confirmButtonText: 'Sí, desmatricular',
-                                            cancelButtonText: 'Cancelar',
-                                            confirmButtonColor: '#ef4444',
-                                            cancelButtonColor: '#6366f1',
+                                            confirmButtonText:
+                                                "Sí, desmatricular",
+                                            cancelButtonText: "Cancelar",
+                                            confirmButtonColor: "#ef4444",
+                                            cancelButtonColor: "#6366f1",
                                             reverseButtons: true,
                                         }).then(async (result) => {
                                             if (!result.isConfirmed) return;
-                                            const codPersonal = String(rowData.codigo || rowData.dni || rowData.id);
+                                            const codPersonal = String(
+                                                rowData.codigo ||
+                                                    rowData.dni ||
+                                                    rowData.id,
+                                            );
                                             try {
-                                                Swal.fire({ title: 'Desmatriculando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                                                const resp = await axios.post(`${VITE_URL_APP}/api/capacitacion/desmatricular-usuario-new`, { codPersonal, cursoId });
+                                                Swal.fire({
+                                                    title: "Desmatriculando...",
+                                                    allowOutsideClick: false,
+                                                    didOpen: () =>
+                                                        Swal.showLoading(),
+                                                });
+                                                const resp = await axios.post(
+                                                    `${VITE_URL_APP}/api/capacitacion/desmatricular-usuario-new`,
+                                                    { codPersonal, cursoId },
+                                                );
                                                 Swal.close();
                                                 if (resp.data.success) {
-                                                    const progActual = window._programacionVigente?.codigo || '';
-                                                    if (Array.isArray(window._matriculadosData)) {
-                                                        window._matriculadosData = window._matriculadosData.filter(m =>
-                                                            !(String(m.cod_personal || m.Id_Personal || m.id || m.Id) === codPersonal &&
-                                                              String(m.cod_programacion || m.Cod_Programacion || '').trim() === String(progActual).trim())
-                                                        );
+                                                    const progActual =
+                                                        window
+                                                            ._programacionVigente
+                                                            ?.codigo || "";
+                                                    if (
+                                                        Array.isArray(
+                                                            window._matriculadosData,
+                                                        )
+                                                    ) {
+                                                        window._matriculadosData =
+                                                            window._matriculadosData.filter(
+                                                                (m) =>
+                                                                    !(
+                                                                        String(
+                                                                            m.cod_personal ||
+                                                                                m.Id_Personal ||
+                                                                                m.id ||
+                                                                                m.Id,
+                                                                        ) ===
+                                                                            codPersonal &&
+                                                                        String(
+                                                                            m.cod_programacion ||
+                                                                                m.Cod_Programacion ||
+                                                                                "",
+                                                                        ).trim() ===
+                                                                            String(
+                                                                                progActual,
+                                                                            ).trim()
+                                                                    ),
+                                                            );
                                                     }
                                                     cell.getRow().delete();
-                                                    await Swal.fire({ icon: 'success', title: 'Desmatriculado', text: resp.data.message || 'El personal fue desmatriculado correctamente.', confirmButtonColor: '#6366f1', timer: 2000, showConfirmButton: false });
+                                                    await Swal.fire({
+                                                        icon: "success",
+                                                        title: "Desmatriculado",
+                                                        text:
+                                                            resp.data.message ||
+                                                            "El personal fue desmatriculado correctamente.",
+                                                        confirmButtonColor:
+                                                            "#6366f1",
+                                                        timer: 2000,
+                                                        showConfirmButton: false,
+                                                    });
                                                     updateMatricularButton();
                                                     actualizarContadores();
-                                                    if (typeof window._aplicarFiltrosMatricula === 'function') window._aplicarFiltrosMatricula();
+                                                    if (
+                                                        typeof window._aplicarFiltrosMatricula ===
+                                                        "function"
+                                                    )
+                                                        window._aplicarFiltrosMatricula();
                                                     actualizarBotonSeleccionarFiltrados();
                                                     recargarListadoCursos();
                                                 } else {
-                                                    await Swal.fire({ icon: 'error', title: 'Error', text: resp.data.message || 'Error desconocido', confirmButtonColor: '#6366f1' });
+                                                    await Swal.fire({
+                                                        icon: "error",
+                                                        title: "Error",
+                                                        text:
+                                                            resp.data.message ||
+                                                            "Error desconocido",
+                                                        confirmButtonColor:
+                                                            "#6366f1",
+                                                    });
                                                 }
                                             } catch (err) {
                                                 Swal.close();
-                                                await Swal.fire({ icon: 'error', title: 'Error', text: err.response?.data?.message || 'Error al desmatricular', confirmButtonColor: '#6366f1' });
+                                                await Swal.fire({
+                                                    icon: "error",
+                                                    title: "Error",
+                                                    text:
+                                                        err.response?.data
+                                                            ?.message ||
+                                                        "Error al desmatricular",
+                                                    confirmButtonColor:
+                                                        "#6366f1",
+                                                });
                                             }
                                         });
                                     },
@@ -1269,187 +1609,942 @@ document.addEventListener("DOMContentLoaded", () => {
                         },
                     );
 
-                    window.tabulatorPersonalMatriculado.on("tableBuilt", function() {
-                        const headerCheckbox = document.querySelector('.checkbox-select-all');
+                    window.tabulatorPersonalMatriculado.on(
+                        "tableBuilt",
+                        function () {
+                            const headerCheckbox = document.querySelector(
+                                ".checkbox-select-all",
+                            );
 
-                        // Reset header checkbox al cambiar de página
-                        window.tabulatorPersonalMatriculado.on("pageLoaded", function() {
-                            if (headerCheckbox) headerCheckbox.checked = false;
-                        });
+                            // Reset header checkbox al cambiar de página
+                            window.tabulatorPersonalMatriculado.on(
+                                "pageLoaded",
+                                function () {
+                                    if (headerCheckbox)
+                                        headerCheckbox.checked = false;
+                                },
+                            );
 
-                        if (headerCheckbox) {
-                            headerCheckbox.addEventListener('change', function(e) {
-                                const isChecked = e.target.checked;
-                                const rows = window.tabulatorPersonalMatriculado.getRows();
-                                rows.forEach(row => {
-                                    const el = row.getElement();
-                                    if (el && el.style.display === 'none') return;
-                                    const d = row.getData();
-                                    if (!d._matriculado) {
-                                        row.update({ _seleccionado: isChecked });
-                                    }
-                                });
-                                updateMatricularButton();
-                                actualizarContadores();
-                            });
-                        }
-                        
-                        function aplicarFiltrosCombinados() {
-                            const cli = document.getElementById("slcFiltroCliente")?.value;
-                            const suc = document.getElementById("slcFiltroSucursal")?.value;
-                            const car = document.getElementById("slcFiltroCargo")?.value;
-                            const tip = document.getElementById("slcFiltroTipoTrabajador")?.value;
-                            const term = window._searchTerm || '';
-
-                            // El dataset ya viene filtrado por modo (ver construirFilas); aquí solo filtros secundarios + búsqueda
-                            const filters = [];
-                            if (cli) filters.push({ field: "cliente", type: "=", value: cli });
-                            if (suc) filters.push({ field: "sucursal", type: "=", value: suc });
-                            if (car) filters.push({ field: "cargo", type: "=", value: car });
-                            if (tip) filters.push({ field: "tipo_trabajador", type: "=", value: tip });
-
-                            window.tabulatorPersonalMatriculado.clearFilter();
-                            if (filters.length) window.tabulatorPersonalMatriculado.setFilter(filters);
-
-                            if (term) {
-                                window.tabulatorPersonalMatriculado.addFilter(data => {
-                                    const nombre = (data.nombre_completo || '').toLowerCase();
-                                    const codigo = String(data.codigo || '');
-                                    const dni = String(data.dni || '');
-                                    return nombre.includes(term) || codigo.includes(term) || dni.includes(term);
-                                });
+                            if (headerCheckbox) {
+                                headerCheckbox.addEventListener(
+                                    "change",
+                                    function (e) {
+                                        const isChecked = e.target.checked;
+                                        const rows =
+                                            window.tabulatorPersonalMatriculado.getRows();
+                                        rows.forEach((row) => {
+                                            const el = row.getElement();
+                                            if (
+                                                el &&
+                                                el.style.display === "none"
+                                            )
+                                                return;
+                                            const d = row.getData();
+                                            if (!d._matriculado) {
+                                                row.update({
+                                                    _seleccionado: isChecked,
+                                                });
+                                            }
+                                        });
+                                        updateMatricularButton();
+                                        actualizarContadores();
+                                    },
+                                );
                             }
 
-                            actualizarBotonSeleccionarFiltrados();
-                        }
-                        window._aplicarFiltrosMatricula = aplicarFiltrosCombinados;
+                            function aplicarFiltrosCombinados() {
+                                const cli =
+                                    document.getElementById(
+                                        "slcFiltroCliente",
+                                    )?.value;
+                                const suc =
+                                    document.getElementById(
+                                        "slcFiltroSucursal",
+                                    )?.value;
+                                const car =
+                                    document.getElementById(
+                                        "slcFiltroCargo",
+                                    )?.value;
+                                const tip = document.getElementById(
+                                    "slcFiltroTipoTrabajador",
+                                )?.value;
+                                const term = window._searchTerm || "";
 
-                        const txtBuscar = document.getElementById('txtBuscarPersonal');
-                        const btnLimpiarBusqueda = document.getElementById('btnLimpiarBusqueda');
-                        if (txtBuscar) {
-                            txtBuscar.addEventListener('input', function() {
-                                window._searchTerm = this.value.toLowerCase().trim();
-                                if (btnLimpiarBusqueda) btnLimpiarBusqueda.style.display = this.value ? '' : 'none';
-                                aplicarFiltrosCombinados();
-                            });
-                        }
-                        if (btnLimpiarBusqueda) {
-                            btnLimpiarBusqueda.addEventListener('click', function() {
-                                txtBuscar.value = '';
-                                window._searchTerm = '';
-                                this.style.display = 'none';
-                                aplicarFiltrosCombinados();
-                            });
-                        }
+                                // El dataset ya viene filtrado por modo (ver construirFilas); aquí solo filtros secundarios + búsqueda
+                                const filters = [];
+                                if (cli)
+                                    filters.push({
+                                        field: "cliente",
+                                        type: "=",
+                                        value: cli,
+                                    });
+                                if (suc)
+                                    filters.push({
+                                        field: "sucursal",
+                                        type: "=",
+                                        value: suc,
+                                    });
+                                if (car)
+                                    filters.push({
+                                        field: "cargo",
+                                        type: "=",
+                                        value: car,
+                                    });
+                                if (tip)
+                                    filters.push({
+                                        field: "tipo_trabajador",
+                                        type: "=",
+                                        value: tip,
+                                    });
 
-                        // Sin tabs: el modo lo define el botón de origen (Matricular / Desmatricular) y filtra el dataset
+                                window.tabulatorPersonalMatriculado.clearFilter();
+                                if (filters.length)
+                                    window.tabulatorPersonalMatriculado.setFilter(
+                                        filters,
+                                    );
 
-                        ["slcFiltroCliente", "slcFiltroSucursal", "slcFiltroCargo", "slcFiltroTipoTrabajador"].forEach(id => {
-                            document.getElementById(id)?.addEventListener('change', aplicarFiltrosCombinados);
-                        });
-
-                        // Sin selector: siempre se opera sobre la programación vigente fija
-
-                        const btnSeleccionarFiltrados = document.getElementById('btnSeleccionarFiltrados');
-                        if (btnSeleccionarFiltrados) {
-                            btnSeleccionarFiltrados.onclick = function() {
-                                const rows = getRowsFiltradosVisibles();
-
-                                if (!rows.length) {
-                                    Swal.fire({ icon: 'warning', title: 'Sin resultados', text: 'No hay personal filtrado para seleccionar', confirmButtonColor: '#6366f1' });
-                                    return;
-                                }
-
-                                const seleccionar = btnSeleccionarFiltrados.dataset.mode !== "deselect";
-
-                                rows.forEach((row) => {
-                                    const d = row.getData();
-                                    if (!d._matriculado) {
-                                        row.update({ _seleccionado: seleccionar });
-                                    }
-                                });
-
-                                updateMatricularButton();
-                                actualizarContadores();
-                                actualizarBotonSeleccionarFiltrados();
-                            };
-                        }
-
-                        // Botón guardar matrícula
-                        const btnGuardar = document.getElementById('btnGuardarMatriculas');
-                        if (btnGuardar) {
-                            btnGuardar.onclick = async function() {
-                                const modalEl = document.getElementById('modal-lista-matriculados');
-                                const alpineComponent = modalEl?._x_dataStack?.[0];
-                                const cId = alpineComponent?.cursoId;
-                                const progId = window._programacionVigente?.codigo || '';
-
-                                if (!progId) {
-                                    Swal.fire({ icon: 'warning', title: 'Atención', text: 'El curso no tiene una programación vigente', confirmButtonColor: '#6366f1' });
-                                    return;
-                                }
-
-                                const allData = window.tabulatorPersonalMatriculado?.getData() || [];
-                                const personalIds = allData.filter(d => d._seleccionado && !d._matriculado).map(d => String(d.codigo || d.dni || d.id)).filter(Boolean);
-
-                                if (!personalIds.length) {
-                                    Swal.fire({ icon: 'warning', title: 'Atención', text: 'Seleccione al menos un personal sin matricular', confirmButtonColor: '#6366f1' });
-                                    return;
-                                }
-
-                                const notificar = !!alpineComponent?.notificarCorreo;
-                                const correo = String(alpineComponent?.correoNotificacion || '').trim();
-
-                                if (notificar && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
-                                    Swal.fire({ icon: 'warning', title: 'Atención', text: 'Ingresa un correo válido para enviar el aviso.', confirmButtonColor: '#6366f1' });
-                                    return;
-                                }
-
-                                // Cerrar modal inmediatamente
-                                if (alpineComponent?.cerrar) alpineComponent.cerrar();
-
-                                Swal.fire({ title: 'Matriculando personal...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-                                try {
-                                    const resp = await axios.post(
-                                        `${VITE_URL_APP}/api/capacitacion/save-matricula-new`,
-                                        {
-                                            cursoId: String(cId),
-                                            programacionId: String(progId),
-                                            personalIds,
-                                            notificar_email: notificar,
-                                            correo_notificacion: notificar ? correo : null,
+                                if (term) {
+                                    window.tabulatorPersonalMatriculado.addFilter(
+                                        (data) => {
+                                            const nombre = (
+                                                data.nombre_completo || ""
+                                            ).toLowerCase();
+                                            const codigo = String(
+                                                data.codigo || "",
+                                            );
+                                            const dni = String(data.dni || "");
+                                            return (
+                                                nombre.includes(term) ||
+                                                codigo.includes(term) ||
+                                                dni.includes(term)
+                                            );
                                         },
                                     );
-                                    Swal.close();
-                                    if (resp.data.success) {
-                                        await Swal.fire({ icon: 'success', title: '¡Solicitud enviada!', text: 'La matriculación fue enviada a procesamiento.' + (notificar ? ` Si son más de 10 personas, se enviará el resumen a ${correo} al finalizar.` : ''), confirmButtonColor: '#6366f1' });
-                                        recargarListadoCursos();
-                                    } else {
-                                        await Swal.fire({ icon: 'error', title: 'Error', text: resp.data.message || 'Error desconocido', confirmButtonColor: '#6366f1' });
-                                    }
-                                } catch (err) {
-                                    Swal.close();
-                                    console.error(err);
-                                    await Swal.fire({ icon: 'error', title: 'Error', text: 'Error al guardar la matrícula', confirmButtonColor: '#6366f1' });
                                 }
-                            };
-                        }
 
-                        window.setTabMatricula(window._activeTab || 'por-matricular');
-                        actualizarContadores();
-                        if (typeof window._detenerTextoLoader === 'function') window._detenerTextoLoader();
-                        if (alpineComponent) alpineComponent.isLoading = false;
-                    });
+                                actualizarBotonSeleccionarFiltrados();
+                            }
+                            window._aplicarFiltrosMatricula =
+                                aplicarFiltrosCombinados;
+
+                            const txtBuscar =
+                                document.getElementById("txtBuscarPersonal");
+                            const btnLimpiarBusqueda =
+                                document.getElementById("btnLimpiarBusqueda");
+                            if (txtBuscar) {
+                                txtBuscar.addEventListener(
+                                    "input",
+                                    function () {
+                                        window._searchTerm = this.value
+                                            .toLowerCase()
+                                            .trim();
+                                        if (btnLimpiarBusqueda)
+                                            btnLimpiarBusqueda.style.display =
+                                                this.value ? "" : "none";
+                                        aplicarFiltrosCombinados();
+                                    },
+                                );
+                            }
+                            if (btnLimpiarBusqueda) {
+                                btnLimpiarBusqueda.addEventListener(
+                                    "click",
+                                    function () {
+                                        txtBuscar.value = "";
+                                        window._searchTerm = "";
+                                        this.style.display = "none";
+                                        aplicarFiltrosCombinados();
+                                    },
+                                );
+                            }
+
+                            // Sin tabs: el modo lo define el botón de origen (Matricular / Desmatricular) y filtra el dataset
+
+                            [
+                                "slcFiltroCliente",
+                                "slcFiltroSucursal",
+                                "slcFiltroCargo",
+                                "slcFiltroTipoTrabajador",
+                            ].forEach((id) => {
+                                document
+                                    .getElementById(id)
+                                    ?.addEventListener(
+                                        "change",
+                                        aplicarFiltrosCombinados,
+                                    );
+                            });
+
+                            // Sin selector: siempre se opera sobre la programación vigente fija
+
+                            const btnSeleccionarFiltrados =
+                                document.getElementById(
+                                    "btnSeleccionarFiltrados",
+                                );
+                            if (btnSeleccionarFiltrados) {
+                                btnSeleccionarFiltrados.onclick = function () {
+                                    const rows = getRowsFiltradosVisibles();
+
+                                    if (!rows.length) {
+                                        Swal.fire({
+                                            icon: "warning",
+                                            title: "Sin resultados",
+                                            text: "No hay personal filtrado para seleccionar",
+                                            confirmButtonColor: "#6366f1",
+                                        });
+                                        return;
+                                    }
+
+                                    const seleccionar =
+                                        btnSeleccionarFiltrados.dataset.mode !==
+                                        "deselect";
+
+                                    rows.forEach((row) => {
+                                        const d = row.getData();
+                                        if (!d._matriculado) {
+                                            row.update({
+                                                _seleccionado: seleccionar,
+                                            });
+                                        }
+                                    });
+
+                                    updateMatricularButton();
+                                    actualizarContadores();
+                                    actualizarBotonSeleccionarFiltrados();
+                                };
+                            }
+
+                            // Botón guardar matrícula
+                            const btnGuardar = document.getElementById(
+                                "btnGuardarMatriculas",
+                            );
+                            if (btnGuardar) {
+                                btnGuardar.onclick = async function () {
+                                    const modalEl = document.getElementById(
+                                        "modal-lista-matriculados",
+                                    );
+                                    const alpineComponent =
+                                        modalEl?._x_dataStack?.[0];
+                                    const cId = alpineComponent?.cursoId;
+                                    const progId =
+                                        window._programacionVigente?.codigo ||
+                                        "";
+
+                                    if (!progId) {
+                                        Swal.fire({
+                                            icon: "warning",
+                                            title: "Atención",
+                                            text: "El curso no tiene una programación vigente",
+                                            confirmButtonColor: "#6366f1",
+                                        });
+                                        return;
+                                    }
+
+                                    const allData =
+                                        window.tabulatorPersonalMatriculado?.getData() ||
+                                        [];
+                                    const personalIds = allData
+                                        .filter(
+                                            (d) =>
+                                                d._seleccionado &&
+                                                !d._matriculado,
+                                        )
+                                        .map((d) =>
+                                            String(d.codigo || d.dni || d.id),
+                                        )
+                                        .filter(Boolean);
+
+                                    if (!personalIds.length) {
+                                        Swal.fire({
+                                            icon: "warning",
+                                            title: "Atención",
+                                            text: "Seleccione al menos un personal sin matricular",
+                                            confirmButtonColor: "#6366f1",
+                                        });
+                                        return;
+                                    }
+
+                                    const notificar =
+                                        !!alpineComponent?.notificarCorreo;
+                                    const correo = String(
+                                        alpineComponent?.correoNotificacion ||
+                                            "",
+                                    ).trim();
+
+                                    if (
+                                        notificar &&
+                                        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+                                            correo,
+                                        )
+                                    ) {
+                                        Swal.fire({
+                                            icon: "warning",
+                                            title: "Atención",
+                                            text: "Ingresa un correo válido para enviar el aviso.",
+                                            confirmButtonColor: "#6366f1",
+                                        });
+                                        return;
+                                    }
+
+                                    // Cerrar modal inmediatamente
+                                    if (alpineComponent?.cerrar)
+                                        alpineComponent.cerrar();
+
+                                    Swal.fire({
+                                        title: "Matriculando personal...",
+                                        allowOutsideClick: false,
+                                        didOpen: () => Swal.showLoading(),
+                                    });
+
+                                    try {
+                                        const resp = await axios.post(
+                                            `${VITE_URL_APP}/api/capacitacion/save-matricula-new`,
+                                            {
+                                                cursoId: String(cId),
+                                                programacionId: String(progId),
+                                                personalIds,
+                                                notificar_email: notificar,
+                                                correo_notificacion: notificar
+                                                    ? correo
+                                                    : null,
+                                            },
+                                        );
+                                        Swal.close();
+                                        if (resp.data.success) {
+                                            await Swal.fire({
+                                                icon: "success",
+                                                title: "¡Solicitud enviada!",
+                                                text:
+                                                    "La matriculación fue enviada a procesamiento." +
+                                                    (notificar
+                                                        ? ` Si son más de 10 personas, se enviará el resumen a ${correo} al finalizar.`
+                                                        : ""),
+                                                confirmButtonColor: "#6366f1",
+                                            });
+                                            recargarListadoCursos();
+                                        } else {
+                                            await Swal.fire({
+                                                icon: "error",
+                                                title: "Error",
+                                                text:
+                                                    resp.data.message ||
+                                                    "Error desconocido",
+                                                confirmButtonColor: "#6366f1",
+                                            });
+                                        }
+                                    } catch (err) {
+                                        Swal.close();
+                                        console.error(err);
+                                        await Swal.fire({
+                                            icon: "error",
+                                            title: "Error",
+                                            text: "Error al guardar la matrícula",
+                                            confirmButtonColor: "#6366f1",
+                                        });
+                                    }
+                                };
+                            }
+
+                            window.setTabMatricula(
+                                window._activeTab || "por-matricular",
+                            );
+                            actualizarContadores();
+                            if (
+                                typeof window._detenerTextoLoader === "function"
+                            )
+                                window._detenerTextoLoader();
+                            if (alpineComponent)
+                                alpineComponent.isLoading = false;
+                        },
+                    );
 
                     resolve();
                 }, 300);
             });
-
         } catch (error) {
             console.error("Error cargando datos del modal", error);
-            if (typeof window._detenerTextoLoader === 'function') window._detenerTextoLoader();
+            if (typeof window._detenerTextoLoader === "function")
+                window._detenerTextoLoader();
             if (alpineComponent) alpineComponent.isLoading = false;
+        }
+    };
+
+    window.limpiarModalPersonalNoMatriculado = function () {
+        if (window.tabulatorPersonalNoMatriculado) {
+            window.tabulatorPersonalNoMatriculado.destroy();
+            window.tabulatorPersonalNoMatriculado = null;
+        }
+    };
+
+    window.cargarPersonalNoMatriculado = async function (alpineComponent) {
+        const cursoMoodleId = alpineComponent?.cursoMoodleId;
+        window.limpiarModalPersonalNoMatriculado();
+
+        if (!cursoMoodleId || Number(cursoMoodleId) <= 0) {
+            if (alpineComponent) {
+                alpineComponent.isLoading = false;
+                alpineComponent.totalPendientes = 0;
+                alpineComponent.totalInscritos = 0;
+                alpineComponent.error =
+                    "El curso no está vinculado al aula virtual, por lo que no se puede consultar el personal pendiente.";
+            }
+            return;
+        }
+
+        try {
+            const [resPersonal, resProgramacion] = await Promise.allSettled([
+                axios.get(
+                    `${VITE_URL_APP}/api/obtener-participantes-no-inscritos-new/${cursoMoodleId}`,
+                ),
+                alpineComponent?.localId
+                    ? axios.get(
+                          `${VITE_URL_APP}/api/cursos/obtener-prog-actual/${alpineComponent.localId}`,
+                      )
+                    : Promise.resolve(null),
+            ]);
+
+            // Si el usuario cerró el modal mientras se consultaba, no continuar.
+            if (alpineComponent && !alpineComponent.open) return;
+
+            const fechaTexto = (value) => {
+                if (!value) return "—";
+                const d = new Date(
+                    String(value).includes(" ")
+                        ? String(value).replace(" ", "T")
+                        : value,
+                );
+                return Number.isNaN(d.getTime())
+                    ? "—"
+                    : d.toLocaleDateString("es-PE", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                      });
+            };
+
+            if (alpineComponent) {
+                if (
+                    resProgramacion.status === "fulfilled" &&
+                    resProgramacion.value?.data?.success
+                ) {
+                    const prog = resProgramacion.value.data.data || {};
+                    const estado = String(
+                        prog.estado_periodo || prog.estado || "",
+                    ).toUpperCase();
+                    alpineComponent.programacionId = String(
+                        prog.codigo_programacion ||
+                            prog.cod_programacion ||
+                            prog.codigo ||
+                            "",
+                    ).trim();
+                    alpineComponent.esVigente = estado === "VIGENTE";
+                    alpineComponent.programacionTexto = `${fechaTexto(prog.fecha_inicio)} - ${fechaTexto(prog.fecha_final)} (${estado || "—"})`;
+                } else {
+                    alpineComponent.programacionId = "";
+                    alpineComponent.esVigente = false;
+                    alpineComponent.programacionTexto =
+                        "Sin programación vigente";
+                }
+            }
+
+            if (resPersonal.status !== "fulfilled") {
+                throw resPersonal.reason;
+            }
+
+            const res = resPersonal.value;
+            if (!res.data?.success) {
+                throw new Error(
+                    res.data?.message ||
+                        "No se pudo obtener el personal pendiente.",
+                );
+            }
+
+            const personal = res.data.personal || [];
+            if (alpineComponent) {
+                alpineComponent.totalPendientes = personal.length;
+                alpineComponent.totalInscritos =
+                    Number(res.data.total_inscritos ?? 0) || 0;
+            }
+
+            const opcionesBasePersonal = {
+                cargo: construirOpcionesFiltro(personal, "cargo"),
+                tipo_trabajador: construirOpcionesFiltro(
+                    personal,
+                    "tipo_trabajador",
+                ),
+            };
+
+            /**
+             * Filtros dependientes: el tipo de trabajador se limita a los
+             * tipos presentes en el cargo elegido y el cargo a los cargos
+             * presentes en el tipo elegido.
+             */
+            const refrescarOpcionesFiltros = () => {
+                const selCargo = document.getElementById(
+                    "slcFiltroCargoNoMatriculado",
+                );
+                const selTipo = document.getElementById(
+                    "slcFiltroTipoNoMatriculado",
+                );
+
+                let cargoKey = claveFiltro(selCargo?.value || "");
+                let tipoKey = claveFiltro(selTipo?.value || "");
+
+                if (
+                    cargoKey &&
+                    !opcionesBasePersonal.cargo.some(
+                        (o) => o.value === cargoKey,
+                    )
+                ) {
+                    cargoKey = "";
+                }
+                if (
+                    tipoKey &&
+                    !opcionesBasePersonal.tipo_trabajador.some(
+                        (o) => o.value === tipoKey,
+                    )
+                ) {
+                    tipoKey = "";
+                }
+
+                if (cargoKey && tipoKey) {
+                    const tiposDelCargo = new Set(
+                        personal
+                            .filter((d) => claveFiltro(d.cargo) === cargoKey)
+                            .map((d) => claveFiltro(d.tipo_trabajador)),
+                    );
+                    if (!tiposDelCargo.has(tipoKey)) tipoKey = "";
+                }
+
+                if (cargoKey && tipoKey) {
+                    const cargosDelTipo = new Set(
+                        personal
+                            .filter(
+                                (d) =>
+                                    claveFiltro(d.tipo_trabajador) === tipoKey,
+                            )
+                            .map((d) => claveFiltro(d.cargo)),
+                    );
+                    if (!cargosDelTipo.has(cargoKey)) cargoKey = "";
+                }
+
+                const dataCargos = tipoKey
+                    ? personal.filter(
+                          (d) => claveFiltro(d.tipo_trabajador) === tipoKey,
+                      )
+                    : personal;
+                const dataTipos = cargoKey
+                    ? personal.filter((d) => claveFiltro(d.cargo) === cargoKey)
+                    : personal;
+
+                fillSelectConOpciones(
+                    "slcFiltroCargoNoMatriculado",
+                    construirOpcionesFiltro(dataCargos, "cargo"),
+                    "Todos los cargos",
+                );
+                fillSelectConOpciones(
+                    "slcFiltroTipoNoMatriculado",
+                    construirOpcionesFiltro(dataTipos, "tipo_trabajador"),
+                    "Todos los tipos de trabajador",
+                );
+
+                if (selCargo) selCargo.value = cargoKey;
+                if (selTipo) selTipo.value = tipoKey;
+            };
+
+            const tableData = personal.map((p) => ({
+                ...p,
+                _seleccionado: false,
+            }));
+
+            const sincronizarSeleccion = () => {
+                if (!alpineComponent) return;
+                const ids = [
+                    ...new Set(
+                        (window.tabulatorPersonalNoMatriculado?.getData() || [])
+                            .filter((d) => d._seleccionado)
+                            .map((d) => String(d.codigo || d.dni || d.id))
+                            .filter(Boolean),
+                    ),
+                ];
+                alpineComponent.seleccionados.splice(
+                    0,
+                    alpineComponent.seleccionados.length,
+                    ...ids,
+                );
+            };
+
+            const actualizarBotonSeleccionarTodos = () => {
+                const btn = document.getElementById(
+                    "btnSeleccionarTodosNoMatriculado",
+                );
+                if (!btn) return;
+                const rows =
+                    window.tabulatorPersonalNoMatriculado?.getRows("active") ||
+                    [];
+                const pendientes = rows.filter(
+                    (r) => !r.getData()._seleccionado,
+                );
+                const todos = rows.length > 0 && pendientes.length === 0;
+                btn.dataset.mode = todos ? "deselect" : "select";
+                btn.innerHTML = `<i class="ti ti-checks text-sm"></i><span>${todos ? `Deseleccionar filtrados (${rows.length})` : `Seleccionar filtrados (${rows.length})`}</span>`;
+            };
+
+            const aplicarFiltros = () => {
+                const table = window.tabulatorPersonalNoMatriculado;
+                if (!table) return;
+
+                const term = claveFiltro(
+                    document.getElementById("txtBuscarPersonalNoMatriculado")
+                        ?.value || "",
+                );
+                const cargoKey = claveFiltro(
+                    document.getElementById("slcFiltroCargoNoMatriculado")
+                        ?.value || "",
+                );
+                const tipoKey = claveFiltro(
+                    document.getElementById("slcFiltroTipoNoMatriculado")
+                        ?.value || "",
+                );
+
+                table.clearFilter();
+                table.addFilter((data) => {
+                    if (cargoKey && claveFiltro(data.cargo) !== cargoKey) {
+                        return false;
+                    }
+                    if (
+                        tipoKey &&
+                        claveFiltro(data.tipo_trabajador) !== tipoKey
+                    ) {
+                        return false;
+                    }
+                    if (term) {
+                        const nombre = claveFiltro(data.nombre_completo);
+                        const dni = claveFiltro(data.dni);
+                        const codigo = claveFiltro(data.codigo);
+                        if (
+                            !nombre.includes(term) &&
+                            !dni.includes(term) &&
+                            !codigo.includes(term)
+                        ) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+
+                actualizarBotonSeleccionarTodos();
+            };
+            window._aplicarFiltrosPersonalNoMatriculado = aplicarFiltros;
+
+            window.tabulatorPersonalNoMatriculado = new Tabulator(
+                "#tblPersonalNoMatriculado",
+                {
+                    data: tableData,
+                    placeholder:
+                        '<div style="padding:28px 16px; text-align:center; color:#94a3b8; font-size:13px; font-weight:600;">No hay personal pendiente de matrícula en este curso.</div>',
+                    layout: "fitDataFill",
+                    pagination: "local",
+                    paginationSize: 10,
+                    paginationSizeSelector: [10, 20, 50, 100],
+                    paginationCounter: "rows",
+                    langs: { "es-es": esLocale },
+                    locale: "es-es",
+                    initialSort: [{ column: "nombre_completo", dir: "asc" }],
+                    rowFormatter(row) {
+                        setRowHoverEffect(row);
+                    },
+                    columns: [
+                        {
+                            title: "<input type='checkbox' class='checkbox-select-all-no-matriculado' title='Seleccionar todos' aria-label='Seleccionar todos'>",
+                            field: "_seleccionado",
+                            width: 50,
+                            hozAlign: "center",
+                            headerSort: false,
+                            formatter(cell) {
+                                const isChecked = cell.getValue();
+                                return `<div style="position:relative; display:inline-block; width:16px; height:16px;">
+                                    <input type="checkbox" class="checkbox-personal-no-matriculado-row" style="width:100%; height:100%; cursor:pointer;" ${isChecked ? "checked" : ""}>
+                                </div>`;
+                            },
+                            cellClick(e, cell) {
+                                e.preventDefault();
+                                cell.setValue(!cell.getValue());
+                                sincronizarSeleccion();
+                                actualizarBotonSeleccionarTodos();
+                            },
+                        },
+                        {
+                            title: "Nombres",
+                            field: "nombre_completo",
+                            minWidth: 240,
+                            formatter(cell) {
+                                const val = cell.getValue();
+                                if (!val) return "—";
+                                const initials = getInitials(val);
+                                return `
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <div style="width:28px; height:28px; border-radius:50%; background:#e0e7ff; color:#4338ca; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${initials}</div>
+                                        <span style="font-size:13px; color:#374151;">${val}</span>
+                                    </div>
+                                `;
+                            },
+                        },
+                        {
+                            title: "DNI",
+                            field: "dni",
+                            width: 110,
+                            hozAlign: "center",
+                        },
+                        {
+                            title: "Cliente",
+                            field: "cliente",
+                            minWidth: 160,
+                            formatter(cell) {
+                                return (
+                                    cell.getValue() ||
+                                    '<span style="color:#94a3b8;">Sin cliente</span>'
+                                );
+                            },
+                        },
+                        { title: "Sucursal", field: "sucursal", minWidth: 150 },
+                        { title: "Cargo", field: "cargo", minWidth: 170 },
+                        {
+                            title: "Tipo de trabajador",
+                            field: "tipo_trabajador",
+                            minWidth: 150,
+                        },
+                    ],
+                },
+            );
+
+            window.tabulatorPersonalNoMatriculado.on("tableBuilt", function () {
+                const headerCheckbox = document.querySelector(
+                    ".checkbox-select-all-no-matriculado",
+                );
+                if (headerCheckbox) {
+                    headerCheckbox.addEventListener("change", function (e) {
+                        const isChecked = e.target.checked;
+                        (
+                            window.tabulatorPersonalNoMatriculado?.getRows(
+                                "active",
+                            ) || []
+                        ).forEach((row) => {
+                            row.update({ _seleccionado: isChecked });
+                        });
+                        sincronizarSeleccion();
+                        actualizarBotonSeleccionarTodos();
+                    });
+                }
+
+                window.tabulatorPersonalNoMatriculado.on(
+                    "pageLoaded",
+                    function () {
+                        const cb = document.querySelector(
+                            ".checkbox-select-all-no-matriculado",
+                        );
+                        if (cb) cb.checked = false;
+                    },
+                );
+
+                const buscarEl = document.getElementById(
+                    "txtBuscarPersonalNoMatriculado",
+                );
+                if (buscarEl) {
+                    buscarEl.oninput = aplicarFiltros;
+                }
+
+                refrescarOpcionesFiltros();
+
+                [
+                    "slcFiltroCargoNoMatriculado",
+                    "slcFiltroTipoNoMatriculado",
+                ].forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.onchange = function () {
+                            refrescarOpcionesFiltros();
+                            aplicarFiltros();
+                        };
+                    }
+                });
+
+                const btnSeleccionarTodos = document.getElementById(
+                    "btnSeleccionarTodosNoMatriculado",
+                );
+                if (btnSeleccionarTodos) {
+                    btnSeleccionarTodos.onclick = function () {
+                        const rows =
+                            window.tabulatorPersonalNoMatriculado?.getRows(
+                                "active",
+                            ) || [];
+                        if (!rows.length) {
+                            Swal.fire({
+                                icon: "warning",
+                                title: "Sin resultados",
+                                text: "No hay personal filtrado para seleccionar.",
+                                confirmButtonColor: "#6366f1",
+                            });
+                            return;
+                        }
+                        const seleccionar =
+                            btnSeleccionarTodos.dataset.mode !== "deselect";
+                        rows.forEach((row) =>
+                            row.update({ _seleccionado: seleccionar }),
+                        );
+                        sincronizarSeleccion();
+                        actualizarBotonSeleccionarTodos();
+                    };
+                }
+
+                const btnLimpiarSeleccion = document.getElementById(
+                    "btnLimpiarSeleccionNoMatriculado",
+                );
+                if (btnLimpiarSeleccion) {
+                    btnLimpiarSeleccion.onclick = function () {
+                        (
+                            window.tabulatorPersonalNoMatriculado?.getRows() ||
+                            []
+                        ).forEach((row) =>
+                            row.update({ _seleccionado: false }),
+                        );
+                        sincronizarSeleccion();
+                        actualizarBotonSeleccionarTodos();
+                    };
+                }
+
+                actualizarBotonSeleccionarTodos();
+                if (alpineComponent) alpineComponent.isLoading = false;
+            });
+
+            if (alpineComponent) alpineComponent.isLoading = false;
+        } catch (error) {
+            console.error("Error cargando personal no matriculado", error);
+            if (alpineComponent) {
+                alpineComponent.error =
+                    error?.response?.data?.message ||
+                    "No se pudo cargar el personal pendiente de matrícula.";
+                alpineComponent.totalPendientes = 0;
+                alpineComponent.totalInscritos = 0;
+            }
+        } finally {
+            if (alpineComponent) alpineComponent.isLoading = false;
+        }
+    };
+
+    window.matricularPersonalNoMatriculado = async function (alpineComponent) {
+        if (!alpineComponent || alpineComponent.guardando) return;
+
+        if (!alpineComponent.esVigente || !alpineComponent.programacionId) {
+            await Swal.fire({
+                icon: "warning",
+                title: "Sin programación vigente",
+                text: "El curso no tiene una programación VIGENTE. No se puede matricular personal.",
+                confirmButtonColor: "#6366f1",
+            });
+            return;
+        }
+
+        const personalIds = [
+            ...new Set(
+                (alpineComponent.seleccionados || [])
+                    .map((id) => String(id))
+                    .filter(Boolean),
+            ),
+        ];
+
+        if (!personalIds.length) {
+            await Swal.fire({
+                icon: "warning",
+                title: "Atención",
+                text: "Seleccione al menos una persona para matricular.",
+                confirmButtonColor: "#6366f1",
+            });
+            return;
+        }
+
+        const notificar = !!alpineComponent.notificarCorreo;
+        const correo = String(alpineComponent.correoNotificacion || "").trim();
+
+        if (notificar && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+            await Swal.fire({
+                icon: "warning",
+                title: "Atención",
+                text: "Ingresa un correo válido para enviar el aviso.",
+                confirmButtonColor: "#6366f1",
+            });
+            return;
+        }
+
+        alpineComponent.guardando = true;
+
+        const confirmacion = await Swal.fire({
+            icon: "question",
+            title: "¿Matricular personal?",
+            text: `Se enviarán ${personalIds.length} persona(s) a matrícula en el curso.`,
+            showCancelButton: true,
+            confirmButtonText: "Sí, matricular",
+            cancelButtonText: "Cancelar",
+            confirmButtonColor: "#6366f1",
+            cancelButtonColor: "#94a3b8",
+            reverseButtons: true,
+        });
+        if (!confirmacion.isConfirmed) {
+            alpineComponent.guardando = false;
+            return;
+        }
+
+        Swal.fire({
+            title: "Matriculando personal...",
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading(),
+        });
+
+        try {
+            const resp = await axios.post(
+                `${VITE_URL_APP}/api/capacitacion/save-matricula-new`,
+                {
+                    cursoId: String(alpineComponent.localId),
+                    programacionId: String(alpineComponent.programacionId),
+                    personalIds,
+                    notificar_email: notificar,
+                    correo_notificacion: notificar ? correo : null,
+                },
+            );
+            Swal.close();
+
+            if (resp.data?.success) {
+                alpineComponent.cerrar();
+                await Swal.fire({
+                    icon: "success",
+                    title: "¡Solicitud enviada!",
+                    text:
+                        "La matriculación fue enviada a procesamiento." +
+                        (notificar
+                            ? ` Si son más de 10 personas, se enviará el resumen a ${correo} al finalizar.`
+                            : ""),
+                    confirmButtonColor: "#6366f1",
+                });
+                recargarListadoCursos();
+            } else {
+                await Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: resp.data?.message || "Error desconocido",
+                    confirmButtonColor: "#6366f1",
+                });
+            }
+        } catch (err) {
+            Swal.close();
+            console.error(err);
+            await Swal.fire({
+                icon: "error",
+                title: "Error",
+                text:
+                    err.response?.data?.message ||
+                    "Error al guardar la matrícula",
+                confirmButtonColor: "#6366f1",
+            });
+        } finally {
+            alpineComponent.guardando = false;
         }
     };
 

@@ -718,6 +718,7 @@
 </div>
 
 @include('capacitacion.partials.modal_participantes_moodle')
+@include('capacitacion.partials.modal_personal_no_matriculado')
 
 <script>
     window.modalListaMatriculados = function() {

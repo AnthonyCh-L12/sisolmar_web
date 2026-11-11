@@ -45,7 +45,7 @@ class NewCapacController extends Controller
                 ->vigentes()
                 ->whereIn('cod_curso', $cursos->pluck('CODIGO')->all())
                 ->pluck('cod_curso')
-                ->map(fn ($v) => (int) $v)
+                ->map(fn($v) => (int) $v)
                 ->flip();
 
             $cursos = $cursos
@@ -139,7 +139,7 @@ class NewCapacController extends Controller
                 ->vigentes()
                 ->whereIn('cod_curso', $cursos->pluck('CODIGO')->all())
                 ->pluck('cod_curso')
-                ->map(fn ($v) => (int) $v)
+                ->map(fn($v) => (int) $v)
                 ->flip();
 
             $cursos = $cursos
@@ -264,7 +264,7 @@ class NewCapacController extends Controller
                 ->values();
 
             $estados = $programaciones
-                ->map(fn ($p) => strtoupper((string) ($p['estado_periodo'] ?? '')))
+                ->map(fn($p) => strtoupper((string) ($p['estado_periodo'] ?? '')))
                 ->all();
 
             $sucursales = [];
@@ -407,7 +407,7 @@ class NewCapacController extends Controller
 
     /**
      * Obtiene los participantes inscritos en un curso del Aula Virtual (Moodle),
-     * completando los datos del personal desde la tabla si_solm.dbo.PERSONAL.
+     * completando los datos del personal vigente desde SP_OBTENER_PERSONAL_BETA.
      */
     public function obtenerParticipantesInscritos(string $SW_CURS_AV_COD): JsonResponse
     {
@@ -424,36 +424,40 @@ class NewCapacController extends Controller
             $participantes = app(MoodleCursoService::class)->obtenerParticipantesInscritos($courseId);
 
             $rawPersonal = DB::connection('sqlsrv')
-                ->select('EXEC SP_OBTENER_PERSONAL_BETA @VIGENTE = NULL');
+                ->select('EXEC SP_OBTENER_PERSONAL_BETA @VIGENTE = 1');
 
-            $personal = collect($rawPersonal)->keyBy(fn ($p) => trim((string) ($p->NRO_DOC ?? '')));
+            $personal = collect($rawPersonal)->keyBy(fn($p) => trim((string) ($p->NRO_DOC ?? '')));
 
-            $lista = collect($participantes)->map(function (array $part) use ($personal) {
-                $dni = trim((string) ($part['dni'] ?? ''));
-                $p   = $personal->get($dni);
-                $fmt = fn ($ts) => (int) $ts > 0
-                ? \Carbon\Carbon::createFromTimestamp((int) $ts, 'America/Lima')->format('Y-m-d H:i:s')
+            $fmt = fn($ts) => (int) $ts > 0
+                ? Carbon::createFromTimestamp((int) $ts, 'America/Lima')->format('Y-m-d H:i:s')
                 : null;
 
-                return [
-                    'dni'             => $dni,
-                    'nombre_completo' => $p ? trim($p->NOMBRE_COMPLETO ?? '') : ($part['fullname'] ?? null),
-                    'cargo'           => $p ? trim($p->CARGO ?? '') : null,
-                    'tipo_trabajador' => $p ? trim($p->TIPO_TRABAJADOR ?? '') : null,
-                    'cliente'         => $p->CLIENTE ?? null,
-                    'sucursal'        => $p ? trim($p->SUCURSAL ?? '') : null,
-                    'codigo'          => $p ? trim($p->CODIGO_PERSONAL ?? '') : null,
-                    'email'           => $p ? trim($p->CORREO ?? '') : ($part['email'] ?? null),
-                    'num_tel'         => $p ? trim($p->TELEFONO ?? '') : null,
-                    'fecha_inicio' => $fmt($part['timestart'] ?? 0),
-                    'fecha_fin'    => $fmt($part['timeend'] ?? 0),
-                ];
-            })->values();
+            $lista = collect($participantes)
+                ->filter(fn(array $part) => $personal->has(trim((string) ($part['dni'] ?? ''))))
+                ->map(function (array $part) use ($personal, $fmt) {
+                    $dni = trim((string) ($part['dni'] ?? ''));
+                    $p   = $personal->get($dni);
+
+                    return [
+                        'dni'             => $dni,
+                        'nombre_completo' => trim($p->NOMBRE_COMPLETO ?? ''),
+                        'cargo'           => trim($p->CARGO ?? ''),
+                        'tipo_trabajador' => trim($p->TIPO_TRABAJADOR ?? ''),
+                        'cliente'         => $p->CLIENTE ?? null,
+                        'sucursal'        => trim($p->SUCURSAL ?? ''),
+                        'codigo'          => trim($p->CODIGO_PERSONAL ?? ''),
+                        'email'           => trim($p->CORREO ?? ''),
+                        'num_tel'         => trim($p->TELEFONO ?? ''),
+                        'fecha_inicio'    => $fmt($part['timestart'] ?? 0),
+                        'fecha_fin'       => $fmt($part['timeend'] ?? 0),
+                    ];
+                })
+                ->values();
 
             return response()->json([
-                'success'          => true,
-                'total'            => $lista->count(),
-                'matriculados'    => $lista,
+                'success'      => true,
+                'total'        => $lista->count(),
+                'matriculados' => $lista,
             ]);
         } catch (\Exception $e) {
             Log::error('Error en NewCapacController@obtenerParticipantesInscritos', [
@@ -465,6 +469,123 @@ class NewCapacController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al obtener los participantes inscritos.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtiene el personal vigente que todavía no está inscrito en el curso
+     * del Aula Virtual (Moodle). La exclusión es por DNI/username contra Moodle.
+     */
+    public function obtenerPersonalNoMatriculado(string $SW_CURS_AV_COD): JsonResponse
+    {
+        $courseId = (int) $SW_CURS_AV_COD;
+
+        try {
+            if ($courseId <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso indicado no es valido.',
+                ], 422);
+            }
+
+            $normalizarDni = fn($valor) => strtoupper(preg_replace('/\s+/', '', (string) $valor));
+
+            $dnisInscritos = collect(app(MoodleCursoService::class)->obtenerUsernamesInscritos($courseId))
+                ->map($normalizarDni)
+                ->filter()
+                ->flip();
+
+            $rawPersonal = DB::connection('sqlsrv')
+                ->select('EXEC SP_OBTENER_PERSONAL_BETA @VIGENTE = 1');
+
+            $personal = collect($rawPersonal)
+                ->map(fn($p) => [
+                    'dni'             => $normalizarDni($p->NRO_DOC ?? ''),
+                    'nombre_completo' => trim($p->NOMBRE_COMPLETO ?? ''),
+                    'cargo'           => trim($p->CARGO ?? ''),
+                    'tipo_trabajador' => trim($p->TIPO_TRABAJADOR ?? ''),
+                    'cliente'         => $p->CLIENTE ?? null,
+                    'sucursal'        => trim($p->SUCURSAL ?? ''),
+                    'codigo'          => trim($p->CODIGO_PERSONAL ?? ''),
+                    'email'           => trim($p->CORREO ?? ''),
+                    'num_tel'         => trim($p->TELEFONO ?? ''),
+                ])
+                ->filter(fn(array $p) => $p['dni'] !== '')
+                ->reject(fn(array $p) => $dnisInscritos->has($p['dni']))
+                ->unique('dni')
+                ->sortBy(fn(array $p) => mb_strtolower($p['nombre_completo']))
+                ->values();
+
+            return response()->json([
+                'success'          => true,
+                'total_inscritos'  => $dnisInscritos->count(),
+                'total'            => $personal->count(),
+                'personal'         => $personal,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@obtenerPersonalNoMatriculado', [
+                'courseId' => $courseId,
+                'error'    => $e->getMessage(),
+                'line'     => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener el personal no matriculado.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Resumen de participantes vigentes (según SP_OBTENER_PERSONAL_BETA)
+     * inscritos en un curso: total, aprobados, desaprobados, sin acceder y en curso.
+     */
+    public function obtenerResumenParticipantes(string $SW_CURS_AV_COD): JsonResponse
+    {
+        $courseId = (int) $SW_CURS_AV_COD;
+
+        try {
+            if ($courseId <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso indicado no es valido.',
+                ], 422);
+            }
+
+            $participantes = app(MoodleCursoService::class)->obtenerEstadoParticipantes($courseId);
+
+            $rawPersonal = DB::connection('sqlsrv')
+                ->select('EXEC SP_OBTENER_PERSONAL_BETA @VIGENTE = 1');
+
+            $dnisVigentes = collect($rawPersonal)
+                ->map(fn($p) => trim((string) ($p->NRO_DOC ?? '')))
+                ->filter()
+                ->flip();
+
+            $conteo = collect($participantes)
+                ->filter(fn(array $part) => $dnisVigentes->has($part['dni']))
+                ->countBy('estado');
+
+            return response()->json([
+                'success'          => true,
+                'moodle_course_id' => $courseId,
+                'total'            => $conteo->sum(),
+                'aprobados'        => $conteo->get('aprobado', 0),
+                'desaprobados'     => $conteo->get('desaprobado', 0),
+                'sin_acceder'      => $conteo->get('sin_acceder', 0),
+                'en_curso'         => $conteo->get('en_curso', 0),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@obtenerResumenParticipantes', [
+                'courseId' => $courseId,
+                'error'    => $e->getMessage(),
+                'line'     => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener el resumen de participantes.',
             ], 500);
         }
     }
@@ -504,7 +625,7 @@ class NewCapacController extends Controller
     {
         return $this->listarCatalogo(
             'obtenerDirigidosNew',
-            fn () => DB::table('sw_cursos_dirigido')
+            fn() => DB::table('sw_cursos_dirigido')
                 ->select('codigo', 'nombre')
                 ->where('habilitado', 1)
                 ->orderBy('nombre')
@@ -517,7 +638,7 @@ class NewCapacController extends Controller
     {
         return $this->listarCatalogo(
             'obtenerAreasNew',
-            fn () => DB::table('sw_cursos_area')
+            fn() => DB::table('sw_cursos_area')
                 ->select('codigo', 'codigo_moodle as codMoodle', 'nombre')
                 ->where('habilitado', 1)
                 ->orderBy('nombre')
@@ -530,7 +651,7 @@ class NewCapacController extends Controller
     {
         return $this->listarCatalogo(
             'obtenerSistemasNew',
-            fn () => DB::table('sw_cursos_sistema')
+            fn() => DB::table('sw_cursos_sistema')
                 ->select('codigo', 'nombre', 'descripcion')
                 ->where('habilitado', 1)
                 ->orderBy('nombre')
@@ -543,7 +664,7 @@ class NewCapacController extends Controller
     {
         return $this->listarCatalogo(
             'obtenerPlanesNew',
-            fn () => DB::table('sw_cursos_plan')
+            fn() => DB::table('sw_cursos_plan')
                 ->select('codigo', 'nombre', 'descripcion')
                 ->where('habilitado', 1)
                 ->orderBy('nombre')
@@ -556,7 +677,7 @@ class NewCapacController extends Controller
     {
         return $this->listarCatalogo(
             'obtenerTiposCursoNew',
-            fn () => DB::table('sw_cursos_tipo')
+            fn() => DB::table('sw_cursos_tipo')
                 ->select('codigo', 'descripcion')
                 ->where('habilitado', 1)
                 ->orderBy('descripcion')
@@ -661,7 +782,7 @@ class NewCapacController extends Controller
                 'line' => $e->getLine(),
             ]);
 
-            return response()->json(['success' => false, 'message' => 'Error al actualizar: '.$e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Error al actualizar: ' . $e->getMessage()], 500);
         }
     }
 
@@ -784,7 +905,7 @@ class NewCapacController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error al guardar: '.$e->getMessage(),
+                'message' => 'Error al guardar: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -925,13 +1046,17 @@ class NewCapacController extends Controller
 
             $warnings = [];
 
-            if ($request->hasFile('image_portada')
-                && ! $moodle->subirPortada($courseId, $request->file('image_portada'))) {
+            if (
+                $request->hasFile('image_portada')
+                && ! $moodle->subirPortada($courseId, $request->file('image_portada'))
+            ) {
                 $warnings[] = 'El curso se creó, pero no se pudo subir la portada.';
             }
 
-            if ($request->hasFile('image_afiche')
-                && ! $moodle->subirAfiche($courseId, $request->file('image_afiche'))) {
+            if (
+                $request->hasFile('image_afiche')
+                && ! $moodle->subirAfiche($courseId, $request->file('image_afiche'))
+            ) {
                 $warnings[] = 'El curso se creó, pero no se pudo subir el afiche.';
             }
 
@@ -945,7 +1070,7 @@ class NewCapacController extends Controller
 
             $mensaje = 'Curso subido al AV correctamente.';
             if (! empty($warnings)) {
-                $mensaje .= ' '.implode(' ', $warnings);
+                $mensaje .= ' ' . implode(' ', $warnings);
             }
 
             return response()->json([
@@ -1068,7 +1193,7 @@ class NewCapacController extends Controller
                 ->where('estado_periodo', 'PENDIENTE')
                 ->first();
 
-            $toSqlDate = fn (Carbon $d) => DB::raw("CONVERT(datetime, '{$d->format('Y-m-d H:i:s')}', 120)");
+            $toSqlDate = fn(Carbon $d) => DB::raw("CONVERT(datetime, '{$d->format('Y-m-d H:i:s')}', 120)");
 
             if ($pendiente) {
                 DB::table('sw_cursos_programacion')
@@ -1151,10 +1276,10 @@ class NewCapacController extends Controller
                 $mensaje .= ' La matrícula deberá realizarse manualmente (dirigido a Otros).';
             }
             if ($notificarEmail) {
-                $mensaje .= ' El resumen se enviará a '.$correoNotificacion.'.';
+                $mensaje .= ' El resumen se enviará a ' . $correoNotificacion . '.';
             }
             if (! empty($warnings)) {
-                $mensaje .= ' '.implode(' ', $warnings);
+                $mensaje .= ' ' . implode(' ', $warnings);
             }
 
             return response()->json([
@@ -1176,7 +1301,7 @@ class NewCapacController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error al aperturar el curso: '.$e->getMessage(),
+                'message' => 'Error al aperturar el curso: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -1201,7 +1326,7 @@ class NewCapacController extends Controller
                 $correoNotificacion
             ))->onQueue('training');
 
-            return $curso->CODIGO.'_'.$codigoProgramacion;
+            return $curso->CODIGO . '_' . $codigoProgramacion;
         } catch (\Throwable $e) {
             Log::error('Error al encolar matrícula del curso nuevo', [
                 'curso_id' => $curso->CODIGO,
@@ -1292,7 +1417,7 @@ class NewCapacController extends Controller
         }
 
         $personalIds = collect($request->input('personalIds', []))
-            ->map(fn ($id) => trim((string) $id))
+            ->map(fn($id) => trim((string) $id))
             ->filter()
             ->values()
             ->all();
@@ -1323,7 +1448,7 @@ class NewCapacController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'La matriculacion fue enviada a procesamiento.',
-            'job_id' => $curso->CODIGO.'_'.$codigoProgramacion,
+            'job_id' => $curso->CODIGO . '_' . $codigoProgramacion,
         ]);
     }
 
@@ -1591,7 +1716,7 @@ class NewCapacController extends Controller
                 ->where('codigo_programacion', $programacion->codigo_programacion)
                 ->update([
                     'fecha_final' => DB::raw("CONVERT(datetime, '{$nuevaFechaFin->format('Y-m-d H:i:s')}', 120)"),
-                    'fecha_modificacion' => DB::raw("CONVERT(datetime, '".now()->format('Y-m-d H:i:s')."', 120)"),
+                    'fecha_modificacion' => DB::raw("CONVERT(datetime, '" . now()->format('Y-m-d H:i:s') . "', 120)"),
                 ]);
 
             $warnings = [];
@@ -1620,7 +1745,7 @@ class NewCapacController extends Controller
 
             $mensaje = 'Curso aplazado correctamente.';
             if (! empty($warnings)) {
-                $mensaje .= ' '.implode(' ', $warnings);
+                $mensaje .= ' ' . implode(' ', $warnings);
             }
 
             return response()->json([
@@ -1640,7 +1765,7 @@ class NewCapacController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error al aplazar el curso: '.$e->getMessage(),
+                'message' => 'Error al aplazar el curso: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -1651,20 +1776,30 @@ class NewCapacController extends Controller
      */
     public function actualizarFechasProgramacion(Request $request): JsonResponse
     {
+        // 1) Normalizar strings ANTES de validar y consultar.
+        //    Evita que "1112 " y "1112" se traten como el mismo valor en SQL Server
+        //    y distintas en Postgres/MySQL (donde el trailing space sí importa).
+        $request->merge([
+            'cod_curso'           => trim((string) $request->input('cod_curso')),
+            'codigo_programacion' => trim((string) $request->input('codigo_programacion')),
+        ]);
+
         try {
             $request->validate([
-                'cod_curso' => 'required|integer|min:1',
-                'codigo_programacion' => 'required',
-                'fecha_inicio' => 'required|date_format:Y-m-d',
-                'fecha_final' => 'required|date_format:Y-m-d|after_or_equal:fecha_inicio',
+                'cod_curso'            => 'required|integer|min:1',
+                'codigo_programacion'  => 'required|string',
+                'fecha_inicio'         => 'required|date_format:Y-m-d',
+                // 2) `after` exige estrictamente > fecha_inicio.
+                //    Eliminamos el chequeo manual de lessThanOrEqualTo (redundante).
+                'fecha_final'          => 'required|date_format:Y-m-d|after:fecha_inicio',
                 'actualizar_matriculas' => 'sometimes|boolean',
-                'actualizar_curso_av' => 'sometimes|boolean',
+                'actualizar_curso_av'  => 'sometimes|boolean',
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Errores de validación.',
-                'errors' => $e->errors(),
+                'errors'  => $e->errors(),
             ], 422);
         }
 
@@ -1678,7 +1813,6 @@ class NewCapacController extends Controller
 
             if (! $curso) {
                 DB::rollBack();
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Curso no encontrado o no habilitado.',
@@ -1694,7 +1828,6 @@ class NewCapacController extends Controller
 
             if (! $programacion) {
                 DB::rollBack();
-
                 return response()->json([
                     'success' => false,
                     'message' => 'El curso no tiene la programación vigente indicada.',
@@ -1702,49 +1835,65 @@ class NewCapacController extends Controller
             }
 
             $fechaInicio = Carbon::parse($request->input('fecha_inicio'))->startOfDay();
-            $fechaFinal = Carbon::parse($request->input('fecha_final'))->endOfDay();
-
-            if ($fechaFinal->lessThanOrEqualTo($fechaInicio)) {
-                DB::rollBack();
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'La fecha de fin debe ser posterior a la fecha de inicio.',
-                ], 422);
-            }
+            $fechaFinal  = Carbon::parse($request->input('fecha_final'))->endOfDay();
 
             $nuevoPeriodo = $fechaInicio->format('Y-m');
 
-            $existe = CursoProgramacion::query()
-                ->where('cod_curso', $curso->CODIGO)
+            // 3) El conflicto debe excluir programaciones CERRADAS (habilitado=1 + estado_periodo=CERRADO).
+            //    Alineamos el filtro con el `find`: habilitados + vigentes + VIGENTE.
+            $conflicto = CursoProgramacion::query()
+                ->habilitados()
+                ->delCurso($curso->CODIGO)
+                ->vigentes()
+                ->where('estado_periodo', 'VIGENTE')
                 ->where('periodo', $nuevoPeriodo)
                 ->where('tipo', $programacion->tipo)
-                ->where('habilitado', 1)
                 ->where('codigo_programacion', '!=', $programacion->codigo_programacion)
-                ->exists();
+                ->first();
 
-            if ($existe) {
+            // 4) Devolvemos el código en conflicto para no volver a ciegas.
+            if ($conflicto) {
                 DB::rollBack();
+
+                Log::warning('Conflicto al actualizar fechas de programación', [
+                    'cod_curso'            => $curso->CODIGO,
+                    'periodo_nuevo'        => $nuevoPeriodo,
+                    'tipo'                 => $programacion->tipo,
+                    'codigo_editado'       => trim((string) $programacion->codigo_programacion),
+                    'codigo_en_conflicto'  => trim((string) $conflicto->codigo_programacion),
+                    'inicio_conflicto'     => optional($conflicto->fecha_inicio)->format('Y-m-d H:i:s'),
+                    'fin_conflicto'        => optional($conflicto->fecha_final)->format('Y-m-d H:i:s'),
+                    'estado_conflicto'     => $conflicto->estado_periodo ?? null,
+                ]);
 
                 return response()->json([
                     'success' => false,
-                    'message' => "Ya existe otra programación {$programacion->tipo} para este curso en el periodo {$nuevoPeriodo}.",
+                    'message' => "Ya existe otra programación {$programacion->tipo} vigente para este curso en el periodo {$nuevoPeriodo} (código {$conflicto->codigo_programacion}).",
+                    'conflicto' => [
+                        'codigo_programacion' => trim((string) $conflicto->codigo_programacion),
+                        'fecha_inicio'        => optional($conflicto->fecha_inicio)->format('Y-m-d'),
+                        'fecha_final'         => optional($conflicto->fecha_final)->format('Y-m-d'),
+                        'estado_periodo'      => $conflicto->estado_periodo ?? null,
+                    ],
                 ], 409);
             }
 
+            // 5) Update acotado por codigo_programacion + cod_curso.
+            //    Evita tocar filas hermanas si hubiera duplicados por datos sucios.
             DB::table('sw_cursos_programacion')
                 ->where('codigo_programacion', $programacion->codigo_programacion)
+                ->where('cod_curso', $curso->CODIGO)
                 ->update([
-                    'fecha_inicio' => DB::raw("CONVERT(datetime, '{$fechaInicio->format('Y-m-d H:i:s')}', 120)"),
-                    'fecha_final' => DB::raw("CONVERT(datetime, '{$fechaFinal->format('Y-m-d H:i:s')}', 120)"),
-                    'periodo' => $nuevoPeriodo,
-                    'fecha_modificacion' => DB::raw("CONVERT(datetime, '".now()->format('Y-m-d H:i:s')."', 120)"),
+                    'fecha_inicio'       => DB::raw("CONVERT(datetime, '{$fechaInicio->format('Y-m-d H:i:s')}', 120)"),
+                    'fecha_final'        => DB::raw("CONVERT(datetime, '{$fechaFinal->format('Y-m-d H:i:s')}', 120)"),
+                    'periodo'            => $nuevoPeriodo,
+                    'fecha_modificacion' => DB::raw("CONVERT(datetime, '" . now()->format('Y-m-d H:i:s') . "', 120)"),
                 ]);
 
             $warnings = [];
-            $moodleCourseId = (int) $curso->SW_CURS_AV_COD;
-            $actualizarCursoAv = $request->boolean('actualizar_curso_av');
-            $actualizarMatriculas = $request->boolean('actualizar_matriculas');
+            $moodleCourseId         = (int) $curso->SW_CURS_AV_COD;
+            $actualizarCursoAv      = $request->boolean('actualizar_curso_av');
+            $actualizarMatriculas   = $request->boolean('actualizar_matriculas');
 
             if (($actualizarCursoAv || $actualizarMatriculas) && $moodleCourseId <= 0) {
                 $warnings[] = 'El curso no tiene un aula virtual asociada; no se pudo sincronizar Moodle.';
@@ -1772,33 +1921,33 @@ class NewCapacController extends Controller
 
             $mensaje = 'Fechas de la programación actualizadas correctamente.';
             if (! empty($warnings)) {
-                $mensaje .= ' '.implode(' ', $warnings);
+                $mensaje .= ' ' . implode(' ', $warnings);
             }
 
             return response()->json([
-                'success' => true,
-                'message' => $mensaje,
+                'success'  => true,
+                'message'  => $mensaje,
                 'warnings' => $warnings,
-                'data' => [
+                'data'     => [
                     'fecha_inicio' => $fechaInicio->format('Y-m-d'),
-                    'fecha_final' => $fechaFinal->format('Y-m-d'),
-                    'periodo' => $nuevoPeriodo,
+                    'fecha_final'  => $fechaFinal->format('Y-m-d'),
+                    'periodo'      => $nuevoPeriodo,
                 ],
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
 
             Log::error('Error en NewCapacController@actualizarFechasProgramacion', [
-                'cod_curso' => $request->input('cod_curso'),
-                'codigo_programacion' => $request->input('codigo_programacion'),
-                'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
+                'cod_curso'            => $request->input('cod_curso'),
+                'codigo_programacion'  => $request->input('codigo_programacion'),
+                'error'                => $e->getMessage(),
+                'line'                 => $e->getLine(),
+                'file'                 => $e->getFile(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error al actualizar las fechas: '.$e->getMessage(),
+                'message' => 'Error al actualizar las fechas: ' . $e->getMessage(),
             ], 500);
         }
     }

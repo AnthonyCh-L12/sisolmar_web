@@ -91,7 +91,7 @@ class MoodleCursoService
                 : Http::withoutVerifying()->asForm();
 
             $response = $http->post(
-                config('services.moodle.url').'/webservice/rest/server.php',
+                config('services.moodle.url') . '/webservice/rest/server.php',
                 [
                     'wstoken' => config('services.moodle.ws_token'),
                     'wsfunction' => 'core_course_update_courses',
@@ -249,6 +249,9 @@ class MoodleCursoService
      * Devuelve los usernames (DNI) de los usuarios matriculados en un curso
      * de Moodle. Se usa para excluirlos del personal aún no matriculado.
      *
+     * El username es el DNI con el que MatriculaMasivaJob crea al usuario en
+     * Moodle; si por alguna razón estuviera vacío se usa el idnumber.
+     *
      * @return array<int, string>
      */
     public function obtenerUsernamesInscritos(int $courseId): array
@@ -275,14 +278,172 @@ class MoodleCursoService
 
         return $rows
             ->map(function ($row) {
-                return trim((string) (($row->idnumber ?? '') !== ''
-                    ? $row->idnumber
-                    : ($row->username ?? '')));
+                return trim((string) (($row->username ?? '') !== ''
+                    ? $row->username
+                    : ($row->idnumber ?? '')));
             })
             ->filter()
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Resumen de participantes activos de un curso: total, aprobados,
+     * desaprobados, sin acceder y en curso.
+     */
+    public function obtenerResumenParticipantes(int $courseId): array
+    {
+        $resumen = [
+            'total'        => 0,
+            'aprobados'    => 0,
+            'desaprobados' => 0,
+            'sin_acceder'  => 0,
+            'en_curso'     => 0,
+        ];
+
+        if ($courseId <= 0) {
+            return $resumen;
+        }
+
+        $courseCtxId = (int) DB::connection('mysql_grupoihb')
+            ->table('mdl_context')
+            ->where('contextlevel', 50)
+            ->where('instanceid', $courseId)
+            ->value('id');
+
+        if ($courseCtxId <= 0) {
+            return $resumen;
+        }
+
+        $rows = DB::connection('mysql_grupoihb')
+            ->table('mdl_user_enrolments as ue')
+            ->join('mdl_enrol as e', 'e.id', '=', 'ue.enrolid')
+            ->join('mdl_user as u', 'u.id', '=', 'ue.userid')
+            ->join('mdl_role_assignments as ra', function ($join) use ($courseCtxId) {
+                $join->on('ra.userid', '=', 'ue.userid')
+                    ->where('ra.contextid', $courseCtxId)
+                    ->where('ra.roleid', 5);
+            })
+            ->leftJoin('mdl_user_lastaccess as la', function ($join) use ($courseId) {
+                $join->on('la.userid', '=', 'u.id')
+                    ->where('la.courseid', $courseId);
+            })
+            ->leftJoin('mdl_grade_items as gi', function ($join) use ($courseId) {
+                $join->where('gi.courseid', $courseId)
+                    ->where('gi.itemtype', 'mod')
+                    ->where('gi.itemmodule', 'quiz');
+            })
+            ->leftJoin('mdl_grade_grades as gg', function ($join) {
+                $join->on('gg.itemid', '=', 'gi.id')
+                    ->on('gg.userid', '=', 'u.id');
+            })
+            ->where('e.courseid', $courseId)
+            ->where('ue.status', 0)
+            ->where('e.status', 0)
+            ->where('u.suspended', 0)
+            ->where('u.deleted', 0)
+            ->groupBy('u.id')
+            ->select([
+                'u.id',
+                DB::raw('MAX(gg.finalgrade) as nota'),
+                DB::raw('MAX(gi.gradepass) as nota_minima'),
+                DB::raw('MAX(la.timeaccess) as ultimo_acceso'),
+            ])
+            ->get();
+
+        foreach ($rows as $row) {
+            $resumen['total']++;
+
+            if ($row->nota !== null) {
+                if ((float) $row->nota >= (float) $row->nota_minima) {
+                    $resumen['aprobados']++;
+                } else {
+                    $resumen['desaprobados']++;
+                }
+            } elseif ((int) $row->ultimo_acceso > 0) {
+                $resumen['en_curso']++;
+            } else {
+                $resumen['sin_acceder']++;
+            }
+        }
+
+        return $resumen;
+    }
+
+    /**
+     * Devuelve el estado de cada participante activo del curso:
+     * aprobado, desaprobado, en_curso o sin_acceder.
+     *
+     * @return array<int, array{dni: string, estado: string}>
+     */
+    public function obtenerEstadoParticipantes(int $courseId): array
+    {
+        if ($courseId <= 0) {
+            return [];
+        }
+
+        $courseCtxId = (int) DB::connection('mysql_grupoihb')
+            ->table('mdl_context')
+            ->where('contextlevel', 50)
+            ->where('instanceid', $courseId)
+            ->value('id');
+
+        if ($courseCtxId <= 0) {
+            return [];
+        }
+
+        $rows = DB::connection('mysql_grupoihb')
+            ->table('mdl_user_enrolments as ue')
+            ->join('mdl_enrol as e', 'e.id', '=', 'ue.enrolid')
+            ->join('mdl_user as u', 'u.id', '=', 'ue.userid')
+            ->join('mdl_role_assignments as ra', function ($join) use ($courseCtxId) {
+                $join->on('ra.userid', '=', 'ue.userid')
+                    ->where('ra.contextid', $courseCtxId)
+                    ->where('ra.roleid', 5);
+            })
+            ->leftJoin('mdl_user_lastaccess as la', function ($join) use ($courseId) {
+                $join->on('la.userid', '=', 'u.id')
+                    ->where('la.courseid', $courseId);
+            })
+            ->leftJoin('mdl_grade_items as gi', function ($join) use ($courseId) {
+                $join->where('gi.courseid', $courseId)
+                    ->where('gi.itemtype', 'mod')
+                    ->where('gi.itemmodule', 'quiz');
+            })
+            ->leftJoin('mdl_grade_grades as gg', function ($join) {
+                $join->on('gg.itemid', '=', 'gi.id')
+                    ->on('gg.userid', '=', 'u.id');
+            })
+            ->where('e.courseid', $courseId)
+            ->where('ue.status', 0)
+            ->where('e.status', 0)
+            ->where('u.suspended', 0)
+            ->where('u.deleted', 0)
+            ->groupBy('u.id')
+            ->groupBy('u.id', 'u.username', 'u.idnumber')
+            ->select([
+                'u.username',
+                'u.idnumber',
+                DB::raw('MAX(gg.finalgrade) as nota'),
+                DB::raw('MAX(gi.gradepass) as nota_minima'),
+                DB::raw('MAX(la.timeaccess) as ultimo_acceso'),
+            ])
+            ->get();
+
+        return $rows->map(function ($row) {
+            $dni = trim((string) (($row->idnumber ?? '') !== '' ? $row->idnumber : ($row->username ?? '')));
+
+            if ($row->nota !== null) {
+                $estado = (float) $row->nota >= (float) $row->nota_minima ? 'aprobado' : 'desaprobado';
+            } elseif ((int) $row->ultimo_acceso > 0) {
+                $estado = 'en_curso';
+            } else {
+                $estado = 'sin_acceder';
+            }
+
+            return ['dni' => $dni, 'estado' => $estado];
+        })->values()->all();
     }
 
     /**
@@ -323,7 +484,7 @@ class MoodleCursoService
                 : Http::withoutVerifying()->asForm();
 
             $response = $http->post(
-                config('services.moodle.url').'/webservice/rest/server.php',
+                config('services.moodle.url') . '/webservice/rest/server.php',
                 [
                     'wstoken' => config('services.moodle.ws_token'),
                     'wsfunction' => 'core_course_update_courses',
@@ -510,7 +671,7 @@ class MoodleCursoService
                     'timemodified' => time(),
                 ]);
 
-            $modalId = 'afiche-modal-'.$courseId;
+            $modalId = 'afiche-modal-' . $courseId;
 
             $htmlAfiche = "
                 <!-- Modal afiche -->
@@ -634,7 +795,7 @@ class MoodleCursoService
             $preguntasTransformadas = $this->transformarPreguntas($preguntas);
             $jsonPreguntas = json_encode($preguntasTransformadas, JSON_UNESCAPED_UNICODE);
 
-            Log::info('JSON SP_INSERTAR_PREGUNTAS_R => '.$jsonPreguntas);
+            Log::info('JSON SP_INSERTAR_PREGUNTAS_R => ' . $jsonPreguntas);
 
             DB::connection('mysql_grupoihb')->statement(
                 'CALL SP_INSERTAR_PREGUNTAS_R(?, ?, @res_preguntas)',
@@ -673,10 +834,10 @@ class MoodleCursoService
         }
 
         $basicas = array_values(
-            array_filter($preguntas, fn ($p) => ($p['tipo'] ?? '') === 'A')
+            array_filter($preguntas, fn($p) => ($p['tipo'] ?? '') === 'A')
         );
         $complementarias = array_values(
-            array_filter($preguntas, fn ($p) => ($p['tipo'] ?? '') === 'B')
+            array_filter($preguntas, fn($p) => ($p['tipo'] ?? '') === 'B')
         );
 
         shuffle($basicas);
@@ -696,7 +857,7 @@ class MoodleCursoService
                 array_values(
                     array_filter(
                         $preguntas,
-                        fn ($p) => ! in_array($p['tipo'] ?? '', ['A', 'B'], true)
+                        fn($p) => ! in_array($p['tipo'] ?? '', ['A', 'B'], true)
                     )
                 )
             );
@@ -754,7 +915,7 @@ class MoodleCursoService
             : Http::withoutVerifying()->asForm();
 
         $response = $http->post(
-            config('services.moodle.url').'/webservice/rest/server.php',
+            config('services.moodle.url') . '/webservice/rest/server.php',
             [
                 'wstoken' => config('services.moodle.ws_token'),
                 'wsfunction' => 'core_files_upload',
@@ -811,10 +972,10 @@ class MoodleCursoService
         }
 
         $firstname = trim(
-            ($personal->NOMB_1 ?? '').' '.($personal->NOMB_2 ?? '')
+            ($personal->NOMB_1 ?? '') . ' ' . ($personal->NOMB_2 ?? '')
         );
         $lastname = trim(
-            ($personal->APEL_1 ?? '').' '.($personal->APEL_2 ?? '')
+            ($personal->APEL_1 ?? '') . ' ' . ($personal->APEL_2 ?? '')
         );
 
         $email = ! empty(trim($personal->PERS_EMAIL ?? ''))
