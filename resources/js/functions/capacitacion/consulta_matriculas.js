@@ -680,9 +680,53 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         try {
-            const res = await axios.get(
-                `${VITE_URL_APP}/api/obtener-participantes-inscritos-new/${cursoMoodleId}`,
-            );
+            const [resParticipantes, resProgramacion] =
+                await Promise.allSettled([
+                    axios.get(
+                        `${VITE_URL_APP}/api/obtener-participantes-inscritos-new/${cursoMoodleId}`,
+                    ),
+                    alpineComponent?.localId
+                        ? axios.get(
+                              `${VITE_URL_APP}/api/cursos/obtener-prog-actual/${alpineComponent.localId}`,
+                          )
+                        : Promise.resolve(null),
+                ]);
+
+            if (
+                resProgramacion.status === "fulfilled" &&
+                resProgramacion.value?.data?.success &&
+                alpineComponent
+            ) {
+                const prog = resProgramacion.value.data.data || {};
+                const fechaTexto = (value) => {
+                    if (!value) return "—";
+                    const d = new Date(
+                        String(value).includes(" ")
+                            ? String(value).replace(" ", "T")
+                            : value,
+                    );
+                    return Number.isNaN(d.getTime())
+                        ? "—"
+                        : d.toLocaleDateString("es-PE", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                          });
+                };
+                const estado = prog.estado_periodo || prog.estado || "—";
+                alpineComponent.codigoProgramacion =
+                    prog.codigo_programacion ||
+                    prog.cod_programacion ||
+                    prog.codigo ||
+                    "—";
+                alpineComponent.programacionTexto = `${fechaTexto(prog.fecha_inicio)} - ${fechaTexto(prog.fecha_final)} (${estado})`;
+            }
+
+            if (resParticipantes.status !== "fulfilled") {
+                throw resParticipantes.reason;
+            }
+
+            const res = resParticipantes.value;
             const participantes = res.data?.matriculados || [];
             if (alpineComponent) {
                 alpineComponent.total = Number(
@@ -773,7 +817,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             hozAlign: "center",
                             headerHozAlign: "center",
                             headerSort: false,
-                            width: 150,
+                            width: 165,
                             formatter() {
                                 return `
                                     <button class="btn-desmatricular-participante" style="
@@ -879,6 +923,97 @@ document.addEventListener("DOMContentLoaded", () => {
                             },
                         },
                     ],
+                },
+            );
+
+            const unique = (field) =>
+                [
+                    ...new Set(
+                        participantes
+                            .map((p) => String(p[field] || "").trim())
+                            .filter(Boolean),
+                    ),
+                ].sort((a, b) => a.localeCompare(b, "es"));
+
+            fillSelect(
+                "slcFiltroCargoMoodle",
+                unique("cargo"),
+                "Todos los cargos",
+            );
+            fillSelect(
+                "slcFiltroTipoTrabajadorMoodle",
+                unique("tipo_trabajador"),
+                "Todos los tipos de trabajador",
+            );
+
+            const aplicarFiltrosParticipantes = () => {
+                const table = window.tabulatorParticipantesMoodle;
+                if (!table) return;
+
+                const term = (
+                    document.getElementById("txtBuscarParticipanteMoodle")
+                        ?.value || ""
+                )
+                    .toLowerCase()
+                    .trim();
+                const cargo =
+                    document.getElementById("slcFiltroCargoMoodle")?.value ||
+                    "";
+                const tipo =
+                    document.getElementById(
+                        "slcFiltroTipoTrabajadorMoodle",
+                    )?.value || "";
+
+                const filters = [];
+                if (cargo)
+                    filters.push({ field: "cargo", type: "=", value: cargo });
+                if (tipo)
+                    filters.push({
+                        field: "tipo_trabajador",
+                        type: "=",
+                        value: tipo,
+                    });
+
+                table.clearFilter();
+                if (filters.length) table.setFilter(filters);
+                if (term) {
+                    table.addFilter((data) => {
+                        const nombre = String(
+                            data.nombre_completo || "",
+                        ).toLowerCase();
+                        const dni = String(data.dni || "").toLowerCase();
+                        return nombre.includes(term) || dni.includes(term);
+                    });
+                }
+            };
+            window._aplicarFiltrosParticipantesMoodle =
+                aplicarFiltrosParticipantes;
+
+            const buscarEl = document.getElementById(
+                "txtBuscarParticipanteMoodle",
+            );
+            const btnLimpiarEl = document.getElementById(
+                "btnLimpiarBusquedaParticipanteMoodle",
+            );
+            if (buscarEl) {
+                buscarEl.oninput = function () {
+                    if (btnLimpiarEl)
+                        btnLimpiarEl.style.display = this.value ? "" : "none";
+                    aplicarFiltrosParticipantes();
+                };
+            }
+            if (btnLimpiarEl) {
+                btnLimpiarEl.onclick = function () {
+                    if (buscarEl) buscarEl.value = "";
+                    this.style.display = "none";
+                    aplicarFiltrosParticipantes();
+                    buscarEl?.focus();
+                };
+            }
+            ["slcFiltroCargoMoodle", "slcFiltroTipoTrabajadorMoodle"].forEach(
+                (id) => {
+                    const el = document.getElementById(id);
+                    if (el) el.onchange = aplicarFiltrosParticipantes;
                 },
             );
         } catch (error) {
