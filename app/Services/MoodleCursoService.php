@@ -246,6 +246,46 @@ class MoodleCursoService
     }
 
     /**
+     * Devuelve los usernames (DNI) de los usuarios matriculados en un curso
+     * de Moodle. Se usa para excluirlos del personal aún no matriculado.
+     *
+     * @return array<int, string>
+     */
+    public function obtenerUsernamesInscritos(int $courseId): array
+    {
+        if ($courseId <= 0) {
+            return [];
+        }
+
+        $rows = DB::connection('mysql_grupoihb')
+            ->table('mdl_user_enrolments as ue')
+            ->join('mdl_enrol as e', 'e.id', '=', 'ue.enrolid')
+            ->join('mdl_user as u', 'u.id', '=', 'ue.userid')
+            ->where('e.courseid', $courseId)
+            ->where('ue.status', 0)
+            ->where('e.status', 0)
+            ->where('u.suspended', 0)
+            ->where('u.deleted', 0)
+            ->select([
+                'u.username',
+                'u.idnumber',
+            ])
+            ->distinct()
+            ->get();
+
+        return $rows
+            ->map(function ($row) {
+                return trim((string) (($row->idnumber ?? '') !== ''
+                    ? $row->idnumber
+                    : ($row->username ?? '')));
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * Sube la imagen de portada del curso a Moodle.
      *
      * Devuelve true si la imagen se envió o si no había imagen; false si
