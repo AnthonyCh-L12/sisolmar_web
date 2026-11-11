@@ -404,6 +404,70 @@ class NewCapacController extends Controller
         return str_pad((string) $codigo, 2, '0', STR_PAD_LEFT);
     }
 
+    /**
+     * Obtiene los participantes inscritos en un curso del Aula Virtual (Moodle),
+     * completando los datos del personal desde la tabla si_solm.dbo.PERSONAL.
+     */
+    public function obtenerParticipantesInscritos(string $SW_CURS_AV_COD): JsonResponse
+    {
+        $courseId = (int) $SW_CURS_AV_COD;
+
+        try {
+            if ($courseId <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso indicado no es valido.',
+                ], 422);
+            }
+
+            $participantes = app(MoodleCursoService::class)->obtenerParticipantesInscritos($courseId);
+
+            $rawPersonal = DB::connection('sqlsrv')
+                ->select('EXEC SP_OBTENER_PERSONAL_BETA @VIGENTE = NULL');
+
+            $personal = collect($rawPersonal)->keyBy(fn ($p) => trim((string) ($p->NRO_DOC ?? '')));
+
+            $lista = collect($participantes)->map(function (array $part) use ($personal) {
+                $dni = trim((string) ($part['dni'] ?? ''));
+                $p   = $personal->get($dni);
+                $fmt = fn ($ts) => (int) $ts > 0
+                ? \Carbon\Carbon::createFromTimestamp((int) $ts, 'America/Lima')->format('Y-m-d H:i:s')
+                : null;
+
+                return [
+                    'dni'             => $dni,
+                    'nombre_completo' => $p ? trim($p->NOMBRE_COMPLETO ?? '') : ($part['fullname'] ?? null),
+                    'cargo'           => $p ? trim($p->CARGO ?? '') : null,
+                    'tipo_trabajador' => $p ? trim($p->TIPO_TRABAJADOR ?? '') : null,
+                    'cliente'         => $p->CLIENTE ?? null,
+                    'sucursal'        => $p ? trim($p->SUCURSAL ?? '') : null,
+                    'codigo'          => $p ? trim($p->CODIGO_PERSONAL ?? '') : null,
+                    'email'           => $p ? trim($p->CORREO ?? '') : ($part['email'] ?? null),
+                    'num_tel'         => $p ? trim($p->TELEFONO ?? '') : null,
+                    'fecha_inicio' => $fmt($part['timestart'] ?? 0),
+                    'fecha_fin'    => $fmt($part['timeend'] ?? 0),
+                ];
+            })->values();
+
+            return response()->json([
+                'success'          => true,
+                'total'            => $lista->count(),
+                'matriculados'    => $lista,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@obtenerParticipantesInscritos', [
+                'courseId' => $courseId,
+                'error'    => $e->getMessage(),
+                'line'     => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener los participantes inscritos.',
+            ], 500);
+        }
+    }
+
     public function ultimoCodigoCurso(): JsonResponse
     {
         try {

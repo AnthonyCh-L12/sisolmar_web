@@ -221,6 +221,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-cursos-new', [NewCapacController::class, 'obtenerCursos']);
         Route::get('/obtener-cursos-matriculas-new', [NewCapacController::class, 'obtenerCursosMatriculas']);
         Route::get('/obtener-curso-new/{codigoCurso}', [NewCapacController::class, 'obtenerCurso']);
+        Route::get('/obtener-participantes-inscritos-new/{SW_CURS_AV_COD}', [NewCapacController::class, 'obtenerParticipantesInscritos']);
         Route::get('/obtener-ultimo-codigo-curso-new', [NewCapacController::class, 'ultimoCodigoCurso']);
         Route::get('/obtener-dirigidos-new', [NewCapacController::class, 'dirigidos']);
 

@@ -171,6 +171,81 @@ class MoodleCursoService
     }
 
     /**
+     * Devuelve los participantes inscritos en un curso de Moodle.
+     *
+     * Consulta el estado de las inscripciones directamente en Moodle
+     * (mdl_user_enrolments con status 0 = activo) para el curso indicado,
+     * uniendo el rol de estudiante (5) en el contexto del curso (contextlevel 50).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function obtenerParticipantesInscritos(int $courseId): array
+    {
+        if ($courseId <= 0) {
+            return [];
+        }
+
+        $courseCtxId = (int) DB::connection('mysql_grupoihb')
+            ->table('mdl_context')
+            ->where('contextlevel', 50)
+            ->where('instanceid', $courseId)
+            ->value('id');
+
+        if ($courseCtxId <= 0) {
+            return [];
+        }
+
+        $rows = DB::connection('mysql_grupoihb')
+            ->table('mdl_user_enrolments as ue')
+            ->join('mdl_enrol as e', 'e.id', '=', 'ue.enrolid')
+            ->join('mdl_user as u', 'u.id', '=', 'ue.userid')
+            ->join('mdl_role_assignments as ra', function ($join) use ($courseCtxId) {
+                $join->on('ra.userid', '=', 'ue.userid')
+                    ->where('ra.contextid', $courseCtxId)
+                    ->where('ra.roleid', 5);
+            })
+            ->where('e.courseid', $courseId)
+            ->where('ue.status', 0)
+            ->where('e.status', 0)
+            ->where('u.suspended', 0)
+            ->where('u.deleted', 0)
+            ->select([
+                'ue.id as enrol_id',
+                'ue.userid as enrol_userid',
+                'ue.status as enrol_status',
+                'ue.timecreated as timeenrol',
+                'ue.timestart',
+                'ue.timeend',
+                'u.id as moodle_user_id',
+                'u.username',
+                'u.idnumber',
+                DB::raw("CONCAT(u.firstname, ' ', u.lastname) as fullname"),
+                'u.email',
+            ])
+            ->distinct()
+            ->orderBy('ue.timecreated', 'asc')
+            ->get();
+
+        return $rows->map(function ($row) {
+            $dni = trim((string) (($row->idnumber ?? '') !== '' ? $row->idnumber : ($row->username ?? '')));
+
+            return [
+                'moodle_user_id' => (int) $row->moodle_user_id,
+                'username'       => $row->username,
+                'idnumber'       => $row->idnumber,
+                'fullname'       => $row->fullname,
+                'email'          => $row->email,
+                'dni'            => $dni,
+                'enrol_id'       => (int) $row->enrol_id,
+                'status'         => (int) $row->enrol_status,
+                'timeenrol'      => $row->timeenrol,
+                'timestart'      => $row->timestart,
+                'timeend'        => $row->timeend,
+            ];
+        })->values()->all();
+    }
+
+    /**
      * Sube la imagen de portada del curso a Moodle.
      *
      * Devuelve true si la imagen se envió o si no había imagen; false si
