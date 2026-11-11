@@ -717,6 +717,8 @@
     </div>
 </div>
 
+@include('capacitacion.partials.modal_participantes_moodle')
+
 <script>
     window.modalListaMatriculados = function() {
         return {

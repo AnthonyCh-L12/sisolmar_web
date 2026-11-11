@@ -244,6 +244,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/capacitacion/guardar-examen-word', [CapacitacionController::class, 'guardarExamenWord']);
         Route::post('/capacitacion/desmatricular-usuario', [CapacitacionController::class, 'desmatricularUsuario']);
         Route::post('/capacitacion/desmatricular-usuario-new', [NewCapacController::class, 'desmatricularUsuarioNew']);
+        Route::post('/capacitacion/desmatricular-moodle-new', [NewCapacController::class, 'desmatricularParticipanteMoodleNew']);
         Route::post('/capacitacion/suspender-usuario/{cursoId}', [CapacitacionController::class, 'suspenderUsuario']);
         Route::post('/capacitacion/registrar-reporte', [CapacitacionController::class, 'saveReporteCapacitacion']);
         Route::get('/capacitacion/listar-reportes', [CapacitacionController::class, 'listarReportesCapacitaciones']);

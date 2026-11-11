@@ -379,7 +379,26 @@ document.addEventListener("DOMContentLoaded", () => {
                         // Bloqueo preventivo: sin vigente no se opera
                         if (!data?.Vigente) return;
 
-                        window._activeTab = btnMat ? 'por-matricular' : 'matriculados';
+                        // Desmatricular abre el modal de participantes inscritos en Moodle
+                        if (btnDes) {
+                            const modalParticipantesEl = document.getElementById(
+                                "modal-participantes-moodle",
+                            );
+                            const componenteParticipantes =
+                                modalParticipantesEl?._x_dataStack?.[0];
+
+                            if (!componenteParticipantes?.abrir) {
+                                console.warn(
+                                    "No se encontró el componente Alpine del modal de participantes",
+                                );
+                                return;
+                            }
+
+                            componenteParticipantes.abrir(data);
+                            return;
+                        }
+
+                        window._activeTab = 'por-matricular';
 
                         const modalEl = document.getElementById(
                             "modal-lista-matriculados",
@@ -632,6 +651,246 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window._loaderDotsTimer) {
             clearInterval(window._loaderDotsTimer);
             window._loaderDotsTimer = null;
+        }
+    };
+
+    window.limpiarModalParticipantesMoodle = function () {
+        if (window.tabulatorParticipantesMoodle) {
+            window.tabulatorParticipantesMoodle.destroy();
+            window.tabulatorParticipantesMoodle = null;
+        }
+    };
+
+    window.cargarParticipantesMoodle = async function (alpineComponent) {
+        const cursoMoodleId = alpineComponent?.cursoMoodleId;
+        window.limpiarModalParticipantesMoodle();
+
+        if (!cursoMoodleId || Number(cursoMoodleId) <= 0) {
+            if (alpineComponent) {
+                alpineComponent.isLoading = false;
+                alpineComponent.total = 0;
+            }
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Curso sin aula virtual',
+                text: 'El curso no está vinculado al aula virtual, por lo que no tiene participantes inscritos en Moodle.',
+                confirmButtonColor: '#6366f1',
+            });
+            return;
+        }
+
+        try {
+            const res = await axios.get(
+                `${VITE_URL_APP}/api/obtener-participantes-inscritos-new/${cursoMoodleId}`,
+            );
+            const participantes = res.data?.matriculados || [];
+            if (alpineComponent) {
+                alpineComponent.total = Number(
+                    res.data?.total ?? participantes.length,
+                ) || 0;
+            }
+
+            window.tabulatorParticipantesMoodle = new Tabulator(
+                "#tblParticipantesMoodle",
+                {
+                    data: participantes,
+                    placeholder:
+                        '<div style="padding:28px 16px; text-align:center; color:#94a3b8; font-size:13px; font-weight:600;">No hay participantes inscritos en el aula virtual.</div>',
+                    layout: "fitDataFill",
+                    pagination: "local",
+                    paginationSize: 10,
+                    paginationSizeSelector: [10, 20, 50, 100],
+                    paginationCounter: "rows",
+                    langs: { "es-es": esLocale },
+                    locale: "es-es",
+                    initialSort: [
+                        { column: "nombre_completo", dir: "asc" },
+                    ],
+                    rowFormatter(row) {
+                        setRowHoverEffect(row);
+                    },
+                    columns: [
+                        {
+                            title: "Nombre del participante",
+                            field: "nombre_completo",
+                            minWidth: 240,
+                            formatter(cell) {
+                                const val = cell.getValue();
+                                if (!val) return "—";
+                                const initials = getInitials(val);
+                                return `
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <div style="width:28px; height:28px; border-radius:50%; background:#e0e7ff; color:#4338ca; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${initials}</div>
+                                        <span style="font-size:13px; color:#374151;">${val}</span>
+                                    </div>
+                                `;
+                            },
+                        },
+                        {
+                            title: "Cargo del participante",
+                            field: "cargo",
+                            minWidth: 180,
+                            formatter(cell) {
+                                const val = cell.getValue();
+                                return (
+                                    val ||
+                                    '<span style="color:#94a3b8;">—</span>'
+                                );
+                            },
+                        },
+                        {
+                            title: "Tipo de trabajador",
+                            field: "tipo_trabajador",
+                            minWidth: 150,
+                            formatter(cell) {
+                                const val = cell.getValue();
+                                return (
+                                    val ||
+                                    '<span style="color:#94a3b8;">—</span>'
+                                );
+                            },
+                        },
+                        {
+                            title: "Fecha inicio",
+                            field: "fecha_inicio",
+                            width: 120,
+                            hozAlign: "center",
+                            formatter(cell) {
+                                return formatDate(cell.getValue());
+                            },
+                        },
+                        {
+                            title: "Fecha fin",
+                            field: "fecha_fin",
+                            width: 120,
+                            hozAlign: "center",
+                            formatter(cell) {
+                                return formatDate(cell.getValue());
+                            },
+                        },
+                        {
+                            title: "Acción",
+                            hozAlign: "center",
+                            headerHozAlign: "center",
+                            headerSort: false,
+                            width: 150,
+                            formatter() {
+                                return `
+                                    <button class="btn-desmatricular-participante" style="
+                                        background: #fff;
+                                        color: #dc2626;
+                                        border: 1px solid #fecaca;
+                                        border-radius: 6px;
+                                        padding: 6px 12px;
+                                        font-size: 12px;
+                                        font-weight: 500;
+                                        display: inline-flex;
+                                        align-items: center;
+                                        gap: 6px;
+                                        transition: all 0.2s;
+                                        cursor: pointer;
+                                    ">
+                                        <i class="ti ti-user-minus" style="font-size: 14px;"></i>
+                                        Desmatricular
+                                    </button>
+                                `;
+                            },
+                            cellClick: async function (e, cell) {
+                                const btn = e.target?.closest?.(
+                                    ".btn-desmatricular-participante",
+                                );
+                                if (!btn) return;
+                                e.stopPropagation();
+
+                                const rowData = cell.getRow().getData();
+                                const nombre =
+                                    rowData.nombre_completo ||
+                                    "este participante";
+
+                                const result = await Swal.fire({
+                                    icon: "question",
+                                    title: "¿Desmatricular?",
+                                    text: `¿Está seguro de desmatricular a ${nombre} del aula virtual?`,
+                                    showCancelButton: true,
+                                    confirmButtonText: "Sí, desmatricular",
+                                    cancelButtonText: "Cancelar",
+                                    confirmButtonColor: "#ef4444",
+                                    cancelButtonColor: "#6366f1",
+                                    reverseButtons: true,
+                                });
+                                if (!result.isConfirmed) return;
+
+                                try {
+                                    Swal.fire({
+                                        title: "Desmatriculando...",
+                                        allowOutsideClick: false,
+                                        didOpen: () => Swal.showLoading(),
+                                    });
+
+                                    const resp = await axios.post(
+                                        `${VITE_URL_APP}/api/capacitacion/desmatricular-moodle-new`,
+                                        {
+                                            cursoMoodleId:
+                                                alpineComponent?.cursoMoodleId,
+                                            dni: rowData.dni,
+                                        },
+                                    );
+                                    Swal.close();
+
+                                    if (resp.data?.success) {
+                                        cell.getRow().delete();
+                                        if (alpineComponent) {
+                                            alpineComponent.total = (
+                                                window.tabulatorParticipantesMoodle?.getData() ||
+                                                []
+                                            ).length;
+                                        }
+                                        await Swal.fire({
+                                            icon: "success",
+                                            title: "Desmatriculado",
+                                            text:
+                                                resp.data.message ||
+                                                "El participante fue desmatriculado del aula virtual.",
+                                            confirmButtonColor: "#6366f1",
+                                            timer: 2000,
+                                            showConfirmButton: false,
+                                        });
+                                    } else {
+                                        await Swal.fire({
+                                            icon: "error",
+                                            title: "Error",
+                                            text:
+                                                resp.data?.message ||
+                                                "Error desconocido",
+                                            confirmButtonColor: "#6366f1",
+                                        });
+                                    }
+                                } catch (err) {
+                                    Swal.close();
+                                    await Swal.fire({
+                                        icon: "error",
+                                        title: "Error",
+                                        text:
+                                            err.response?.data?.message ||
+                                            "Error al desmatricular al participante",
+                                        confirmButtonColor: "#6366f1",
+                                    });
+                                }
+                            },
+                        },
+                    ],
+                },
+            );
+        } catch (error) {
+            console.error("Error cargando participantes de Moodle", error);
+            await Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No se pudieron cargar los participantes inscritos en el aula virtual.",
+                confirmButtonColor: "#6366f1",
+            });
+        } finally {
+            if (alpineComponent) alpineComponent.isLoading = false;
         }
     };
 

@@ -152,6 +152,7 @@ class NewCapacController extends Controller
                         'Id' => (int) $row->SW_CURS_AV_COD > 0
                             ? (int) $row->SW_CURS_AV_COD
                             : (int) $row->CODIGO,
+                        'MoodleId' => (int) $row->SW_CURS_AV_COD,
                         'LocalId' => (int) $row->CODIGO,
                         'Codigo' => (string) $row->SW_CURS_COD,
                         'Nombre' => mb_strtoupper((string) $row->SW_CURS_NOMBRE),
@@ -1435,6 +1436,78 @@ class NewCapacController extends Controller
             'success' => true,
             'message' => 'Personal desmatriculado correctamente.',
         ]);
+    }
+
+    /**
+     * Desmatricula a un participante únicamente del aula virtual (Moodle),
+     * sin modificar la tabla sw_matriculas.
+     */
+    public function desmatricularParticipanteMoodleNew(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'cursoMoodleId' => 'required|integer|min:1',
+                'dni' => 'required|string|max:20',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validacion.',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+
+        try {
+            $courseId = (int) $request->input('cursoMoodleId');
+            $dni = trim((string) $request->input('dni'));
+
+            $moodleUser = DB::connection('mysql_grupoihb')
+                ->table('mdl_user')
+                ->where('username', $dni)
+                ->orWhere('idnumber', $dni)
+                ->first(['id']);
+
+            if (! $moodleUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo desmatricular: usuario no encontrado en Moodle.',
+                ], 404);
+            }
+
+            $moodleCourse = DB::connection('mysql_grupoihb')
+                ->table('mdl_course')
+                ->where('id', $courseId)
+                ->first(['idnumber']);
+
+            if (! $moodleCourse) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo desmatricular: curso no encontrado en Moodle.',
+                ], 404);
+            }
+
+            DB::connection('mysql_grupoihb')->select(
+                'SELECT F_USER_matricula_eliminar2(?, ?, ?, ?, ?) AS result',
+                [$moodleUser->id, $moodleCourse->idnumber, '00001', 'Desmatriculacion desde Intranet', 5]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Participante desmatriculado del aula virtual correctamente.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@desmatricularParticipanteMoodleNew', [
+                'cursoMoodleId' => $request->input('cursoMoodleId'),
+                'dni' => $request->input('dni'),
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al desmatricular al participante del aula virtual.',
+            ], 500);
+        }
     }
 
     /**
