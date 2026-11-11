@@ -895,8 +895,8 @@ class ReportePersonalController extends Controller
         $condiciones = [
             "p.EMPR_CODIGO = '01'",
             "UPPER(LTRIM(RTRIM(ISNULL(p.ASIG_FAMI, '')))) IN ('SI', 'SÍ', '1')",
-            "EXISTS (SELECT 1 FROM si_solm.dbo.DERECHO_HABIENTE dh WHERE LTRIM(RTRIM(dh.CODI_PERS)) = LTRIM(RTRIM(p.CODI_PERS)) AND dh.TIPO_RELA LIKE 'HIJ%')",
-            "NOT EXISTS (SELECT 1 FROM si_solm.dbo.DERECHO_HABIENTE dm WHERE LTRIM(RTRIM(dm.CODI_PERS)) = LTRIM(RTRIM(p.CODI_PERS)) AND dm.TIPO_RELA LIKE 'HIJ%' AND (dm.FECH_NACI IS NULL OR dm.FECH_NACI > DATEADD(YEAR, -18, CAST(GETDATE() AS DATE))))",
+            "EXISTS (SELECT 1 FROM si_solm.dbo.DERECHO_HABIENTE dh WHERE LTRIM(RTRIM(dh.CODI_PERS)) = LTRIM(RTRIM(p.CODI_PERS)) AND dh.TIPO_RELA LIKE 'HIJ%' AND UPPER(LTRIM(RTRIM(ISNULL(dh.DEHA_VIGENCIA, 'SI')))) = 'SI')",
+            "NOT EXISTS (SELECT 1 FROM si_solm.dbo.DERECHO_HABIENTE dm WHERE LTRIM(RTRIM(dm.CODI_PERS)) = LTRIM(RTRIM(p.CODI_PERS)) AND dm.TIPO_RELA LIKE 'HIJ%' AND UPPER(LTRIM(RTRIM(ISNULL(dm.DEHA_VIGENCIA, 'SI')))) = 'SI' AND (dm.FECH_NACI IS NULL OR dm.FECH_NACI > DATEADD(YEAR, -18, CAST(GETDATE() AS DATE))))",
         ];
         $parametros = [];
         foreach ([
@@ -928,6 +928,7 @@ class ReportePersonalController extends Controller
             INNER JOIN si_solm.dbo.DERECHO_HABIENTE d
                     ON LTRIM(RTRIM(d.CODI_PERS)) = LTRIM(RTRIM(p.CODI_PERS))
                    AND d.TIPO_RELA LIKE 'HIJ%'
+                   AND UPPER(LTRIM(RTRIM(ISNULL(d.DEHA_VIGENCIA, 'SI')))) = 'SI'
             LEFT JOIN si_solm.dbo.SISO_SUCURSAL s ON s.SUCU_CODIGO = p.SUCU_CODIGO
             LEFT JOIN si_solm.dbo.ADMI_TIPO_PERSONAL tp ON tp.TIPE_CODIGO = p.PERS_TIPOTRAB
             LEFT JOIN si_solm.dbo.CARGOS c ON c.CODI_CARG = p.CODI_CARG

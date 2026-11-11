@@ -2,59 +2,98 @@
 
 @section('content')
 
-@include('layouts.shared/page-title', ['subtitle' => 'File Control', 'title' => 'Gestíon de Folios'])
+@include('layouts.shared/page-title', ['subtitle' => 'File Control', 'title' => 'Gestión de Folios'])
 
- <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-8">
+<style>
+    #folios-page .rep-card {
+        position: relative; overflow: hidden; background: #fff; border: 1px solid #e5e7eb;
+        border-radius: .75rem; padding: .65rem .85rem; min-width: 118px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+    }
+    #folios-page .rep-card .rep-label {
+        display: flex; align-items: center; gap: .35rem; font-size: 9px;
+        font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+    }
+    #folios-page .rep-card .rep-value {
+        display: block; font-size: 1.35rem; line-height: 1.15; font-weight: 800;
+        font-variant-numeric: tabular-nums;
+    }
+    #folios-page .rep-bar {
+        margin-top: .35rem; height: 5px; width: 100%; background: #e5e7eb;
+        border-radius: 999px; overflow: hidden;
+    }
+    #folios-page .rep-bar > i { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .8s cubic-bezier(.4, 0, .2, 1); }
+    #folios-page .rep-toolbar {
+        background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+        border: 1px solid #e2e8f0; border-radius: .75rem; padding: .75rem .85rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    #folios-page .rep-toolbar .form-select,
+    #folios-page .rep-toolbar input[type="text"] {
+        background: #fff; border: 1px solid #d1d5db; border-radius: .5rem;
+        font-size: .8125rem; transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    #folios-page .rep-toolbar .form-select:focus,
+    #folios-page .rep-toolbar input[type="text"]:focus {
+        border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .15); outline: none;
+    }
+    #folios-page #buscar { padding: .5rem 2.25rem; }
+</style>
+
+ <div id="folios-page" class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-8">
 
     {{-- ── CARD PRINCIPAL: Listado de Folios ───────────────────────────── --}}
      <div class="card overflow-hidden lg:col-span-12">
-        <div class="card-header flex flex-wrap justify-between items-center gap-4 border-b border-gray-100 pb-4">
-            <h4 class="text-lg font-bold text-primary uppercase">Listado de Folios</h4>
-            
-            <div class="flex items-center gap-4">
+        <div class="card-header border-b border-gray-100 py-4 px-5">
+            <div class="flex flex-wrap justify-between items-center gap-4">
+                <h4 class="text-lg font-bold text-primary uppercase flex items-center">
+                    <i class='bx bx-folder-open text-2xl mr-2'></i> LISTADO DE FOLIOS
+                </h4>
+
+                <div class="flex flex-wrap gap-2.5">
                 {{-- Tarjetas de Indicadores --}}
-                <div class="flex gap-2 border-r border-gray-200 pr-4">
-                    <div class="bg-blue-50 px-3 py-2 rounded-lg border border-blue-200 text-center min-w-[90px]">
-                        <span class="block text-[9px] text-blue-600 font-bold uppercase">Total</span>
-                        <span id="countTotal" class="text-lg font-bold text-blue-700 leading-none">0</span>
+                    <div class="rep-card">
+                        <div class="rep-label text-slate-400"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Total</div>
+                        <span id="countTotal" class="rep-value text-slate-800">0</span>
+                        <div class="rep-bar bg-slate-100"><i id="barTotal" class="bg-slate-500"></i></div>
                     </div>
-                    <div class="bg-green-50 px-3 py-2 rounded-lg border border-green-200 text-center min-w-[90px]">
-                        <span class="block text-[9px] text-green-600 font-bold uppercase">Activos</span>
-                        <span id="countActivos" class="text-lg font-bold text-green-700 leading-none">0</span>
+                    <div class="rep-card" style="border-color:#bbf7d0;">
+                        <div class="rep-label text-emerald-600"><i class='bx bx-check-circle'></i> Activos</div>
+                        <span id="countActivos" class="rep-value text-emerald-700">0</span>
+                        <div class="rep-bar bg-emerald-100"><i id="barActivos" class="bg-emerald-500"></i></div>
                     </div>
-                    <div class="bg-red-50 px-3 py-2 rounded-lg border border-red-200 text-center min-w-[90px]">
-                        <span class="block text-[9px] text-red-600 font-bold uppercase">Inactivos</span>
-                        <span id="countInactivos" class="text-lg font-bold text-red-700 leading-none">0</span>
+                    <div class="rep-card" style="border-color:#fecaca;">
+                        <div class="rep-label text-red-500"><i class='bx bx-x-circle'></i> Inactivos</div>
+                        <span id="countInactivos" class="rep-value text-red-600">0</span>
+                        <div class="rep-bar bg-red-100"><i id="barInactivos" class="bg-red-400"></i></div>
                     </div>
                 </div>
-
-                <button type="button" id="btnNuevoFolio" class="btn bg-primary text-white rounded-full text-sm px-4 py-2">
-                    <i class="fa-solid fa-plus me-1"></i> Nuevo Folio
-                </button>
             </div>
         </div>
 
         <div class="px-5 py-4 space-y-4">
 
-            {{-- Caja unificada de Filtros (Estilo Actualizar DJ) --}}
-            <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                <div class="flex flex-wrap items-center gap-4">
-                    
-                    {{-- Búsqueda --}}
-                    <div class="flex items-center gap-2">
-                        <input
-                            type="text"
-                            id="buscar"
-                            placeholder="Buscar folio..."
-                            autocomplete="off"
-                            class="w-48 px-4 py-1.5 border border-gray-300 rounded-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-sm uppercase" 
-                            style="min-width: 200px;"
-                        />
+            {{-- Barra de filtros con la misma estructura de Gestión DJ --}}
+            <div class="rep-toolbar">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="relative flex-1 min-w-[220px] max-w-[420px]">
+                        <i class='bx bx-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg pointer-events-none'></i>
+                        <input type="text" id="buscar" placeholder="Buscar folio..." autocomplete="off"
+                            class="w-full text-sm uppercase" />
                     </div>
+                    <div class="ml-auto flex flex-wrap items-center gap-2">
+                        <button type="button" id="btnNuevoFolio"
+                            class="btn rounded-full bg-primary/25 text-primary hover:bg-primary hover:text-white flex items-center gap-1 px-4 py-1">
+                            <i class='bx bx-plus text-base'></i><span>Nuevo Folio</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-slate-200">
 
                     {{-- Prioridad --}}
-                    <div class="flex items-center gap-2 border-l-2 border-gray-200 pl-4">
-                        <label for="filtroTipos" class="text-sm font-medium text-gray-700 whitespace-nowrap">Prioridad:</label>
+                    <div class="flex items-center gap-2">
+                        <label for="filtroTipos" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-category text-gray-400 text-lg'></i>Prioridad</label>
                         <select id="filtroTipos" class="form-select text-sm w-36 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
                             <option value="TODOS" selected>Todos ({{ $todos }})</option>
                             <option value="PRINCIPAL">Principal ({{ $principal }})</option>
@@ -63,8 +102,8 @@
                     </div>
 
                     {{-- Clasificación --}}
-                    <div class="flex items-center gap-2 border-l-2 border-gray-200 pl-4">
-                        <label for="filtroClasificacion" class="text-sm font-medium text-gray-700 whitespace-nowrap">Tipos:</label>
+                    <div class="flex items-center gap-2">
+                        <label for="filtroClasificacion" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-category text-gray-400 text-lg'></i>Tipo</label>
                         <select id="filtroClasificacion" class="form-select text-sm w-44 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
                             <option value="TODOS" selected>Todos</option>
                             <option value="DOCUMENTO">Documento ({{ $documento }})</option>
@@ -73,25 +112,36 @@
                         </select>
                     </div>
 
+                    {{-- Categoría --}}
+                    <div class="flex items-center gap-2">
+                        <label for="filtroCategoria" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-folder text-gray-400 text-lg'></i>Categoría</label>
+                        <select id="filtroCategoria" class="form-select text-sm w-48 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
+                            <option value="TODOS" selected>Todas</option>
+                            @foreach ($categorias as $categoria)
+                                <option value="{{ $categoria->codigo }}">{{ $categoria->nombre }}</option>
+                            @endforeach
+                            <option value="SIN_CATEGORIA">Sin categoría</option>
+                        </select>
+                    </div>
+
                     {{-- Caduca --}}
-                    <div class="flex items-center gap-2 border-l-2 border-gray-200 pl-4">
-                        <label for="vencimientoFiltro" class="text-sm font-medium text-gray-700 whitespace-nowrap">Caduca:</label>
+                    <div class="flex items-center gap-2">
+                        <label for="vencimientoFiltro" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-time text-gray-400 text-lg'></i>Caduca</label>
                         <select id="vencimientoFiltro" class="form-select text-sm w-36 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
                             <option value="TODOS" selected>Todos</option>
                             <option value="SI">Sí</option>
                             <option value="NO">No</option>
                         </select>
                     </div>
-                </div>
-
-                {{-- Filtro de Estado --}}
-                <div class="flex items-center gap-2 border-l-2 border-gray-200 pl-4 mt-2 lg:mt-0">
-                    <label for="filtroEstado" class="text-sm font-medium text-gray-700 whitespace-nowrap">Estado:</label>
+                    {{-- Estado --}}
+                    <div class="flex items-center gap-2 ml-auto">
+                    <label for="filtroEstado" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-time text-gray-400 text-lg'></i>Estado</label>
                     <select id="filtroEstado" class="form-select text-sm w-32 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
                         <option value="TODOS" selected>Todos</option>
                         <option value="1">Activos</option>
                         <option value="0">Inactivos</option>
                     </select>
+                </div>
                 </div>
             </div>
 
@@ -143,7 +193,7 @@
                 <form id="formSaveFolio">
                     <div x-data="{ nameFolio: '', tipoSeleccionado: '' }" class="space-y-4">
 
-                        {{-- Nombre + Tipo --}}
+                        {{-- Nombre + Categoría --}}
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                   <label for="nombre" class="block text-sm font-bold text-gray-700 mb-1">Nombre</label>
@@ -157,6 +207,19 @@
                                   </div>
                               </div>
                             <div>
+                                <label for="categoria" class="block text-sm font-bold text-gray-700 mb-1">Categoría</label>
+                                <select id="categoria" class="form-select w-full px-3 py-2 border-gray-300 rounded-md focus:border-primary focus:ring-primary" required>
+                                    <option value="" disabled selected>— Seleccionar —</option>
+                                    @foreach ($categorias as $cat)
+                                        <option value="{{ $cat->codigo }}">{{ $cat->nombre }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+
+                        {{-- Tipo + Responsable --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
                                 <label for="tipo" class="block text-sm font-bold text-gray-700 mb-1">Tipo</label>
                                 <select id="tipo" class="form-select w-full px-3 py-2 border-gray-300 rounded-md focus:border-primary focus:ring-primary" x-model="tipoSeleccionado" required>
                                     <option value="" disabled selected>— Seleccionar —</option>
@@ -165,25 +228,12 @@
                                     <option value="3">CERTIFICADO</option>
                                 </select>
                             </div>
-                        </div>
-
-                        {{-- Responsable y Categoría --}}
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label for="responsable" class="block text-sm font-bold text-gray-700 mb-1">Responsable</label>
                                 <select id="responsable" class="form-select w-full px-3 py-2 border-gray-300 rounded-md focus:border-primary focus:ring-primary" required>
                                     <option value="" disabled selected>— Seleccionar —</option>
-                                    @foreach ($roles as $rol)
-                                        <option value="{{ $rol->codigo }}">{{ $rol->nombre }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div>
-                                <label for="categoria" class="block text-sm font-bold text-gray-700 mb-1">Categoría</label>
-                                <select id="categoria" class="form-select w-full px-3 py-2 border-gray-300 rounded-md focus:border-primary focus:ring-primary" required>
-                                    <option value="" disabled selected>— Seleccionar —</option>
-                                    @foreach ($categorias as $cat)
-                                        <option value="{{ $cat->codigo }}">{{ $cat->nombre }}</option>
+                                    @foreach ($responsables as $responsable)
+                                        <option value="{{ (int) $responsable->codigo }}">{{ $responsable->nombre }}</option>
                                     @endforeach
                                 </select>
                             </div>

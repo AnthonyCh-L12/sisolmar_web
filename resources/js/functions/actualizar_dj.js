@@ -3618,6 +3618,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function makeFamilyRow() {
         return `
         <div class="family-row grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg relative" data-familia-row>
+            <input type="hidden" name="familiar_id[]" value="">
             <div>
                 <label class="text-sm font-medium inline-block mb-2">Parentesco</label>
                 <select name="parentesco[]" class="form-select w-full">
@@ -4276,25 +4277,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
 
-                // DNI obligatorio para todos los hijos, independientemente de la edad.
-                // (la regla NO aplica para el rol ADMINS RRHH)
-                if (!esAdminRrhhDj()) {
-                    const filasHijosDni = filasHijosDj();
-                    for (let i = 0; i < filasHijosDni.length; i++) {
-                        const stH = estadoDniHijo(filasHijosDni[i]);
-                        const okA = !!(stH.anverso || stH.tieneAnverso);
-                        const okR = !!(stH.reverso || stH.tieneReverso);
-                        if (!okA || !okR) {
-                            const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Falta el DNI del hijo ' + (i + 1),
-                                text: 'Debe subir el ' + falta + ' del DNI para continuar.',
-                                confirmButtonText: 'Entendido',
-                            });
-                            if (btnGuardar) btnGuardar.disabled = false;
-                            return;
-                        }
+                const filasHijosDni = filasHijosDj();
+                for (let i = 0; i < filasHijosDni.length; i++) {
+                    if (!requiereDniHijoDj(filasHijosDni[i])) continue;
+                    const stH = estadoDniHijo(filasHijosDni[i]);
+                    const okA = !!(stH.anverso || stH.tieneAnverso);
+                    const okR = !!(stH.reverso || stH.tieneReverso);
+                    if (!okA || !okR) {
+                        const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Falta el DNI del hijo ' + (i + 1),
+                            text: 'Debe subir el ' + falta + ' del DNI para continuar.',
+                            confirmButtonText: 'Entendido',
+                        });
+                        if (btnGuardar) btnGuardar.disabled = false;
+                        return;
                     }
                 }
 
@@ -4309,6 +4307,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     FAM_PARENTESCO: formData.getAll('parentesco[]'),
                     FAM_NOMBRES: formData.getAll('apellidosNombres[]'),
                     FAM_FECHA_NACI: formData.getAll('fechaNacimiento[]'),
+                    FAM_ID: formData.getAll('familiar_id[]'),
+                    FAM_PRESENTE: '1',
                     dj2026_descripcion: formData.getAll('ocupacion_alterna[]')
                 };
 
@@ -4338,6 +4338,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fotoAdjuntaAdj)         formDataSave.append('foto', fotoAdjuntaAdj);
                 if (dniAdjuntoAdj.anverso)  formDataSave.append('dni_anverso', dniAdjuntoAdj.anverso);
                 if (dniAdjuntoAdj.reverso) formDataSave.append('dni_reverso', dniAdjuntoAdj.reverso);
+                filasHijosDj().forEach((fila, i) => {
+                    const st = estadoDniHijo(fila);
+                    if (st.anverso) formDataSave.append(`dni_hijos_anverso[${i + 1}]`, st.anverso);
+                    if (st.reverso) formDataSave.append(`dni_hijos_reverso[${i + 1}]`, st.reverso);
+                });
 
                 const csrfTokenSave = document.querySelector('meta[name="csrf-token"]')?.content || '';
                 const response = await axios.post(url, formDataSave, {
@@ -4349,6 +4354,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.log('✅ Response:', response);
 
                 if (response.status === 200 || response.status === 201) {
+                    if (response.data?.asig_fami_desactivada) {
+                        await Swal.fire({
+                            icon: 'warning',
+                            title: 'Asignación familiar desactivada',
+                            text: 'Se desactivó la asignación familiar, porque el hijo ya cumplió la mayoría de edad',
+                            confirmButtonText: 'Entendido',
+                        });
+                    }
                     // Subir foto y DNI si fueron seleccionados
                     const fotoFile = inputFoto?.files?.[0];
                     const codiPersFoto = response.data.codi_pers || data.cod_postulante || '';
@@ -5716,8 +5729,15 @@ function estadoDniHijo(fila) {
     return st;
 }
 
-// Regla DNI: obligatorio para todos los parentescos de hijo.
-// El rol ADMINS RRHH (tipo 17) está exento de la regla.
+function requiereDniHijoDj(fila) {
+    const parentesco = (fila?.querySelector('select[name="parentesco[]"]')?.value || '').trim().toUpperCase();
+    const discapacitadoPermanente = parentesco.startsWith('HIJO MAYOR DE EDAD')
+        && /INCAPACITADO|DISCAPACIDAD/.test(parentesco)
+        && parentesco.includes('PERMANENT');
+    return discapacitadoPermanente
+        || (parentesco === 'HIJO MENOR DE EDAD' && esMenorDeEdadDj(fila.querySelector('input[name="fechaNacimiento[]"]')?.value));
+}
+
 function esMenorDeEdadDj(fecha) {
     if (!fecha) return false;
     const nac = new Date(String(fecha).slice(0, 10) + 'T00:00:00');
@@ -5727,10 +5747,6 @@ function esMenorDeEdadDj(fecha) {
     const m = hoy.getMonth() - nac.getMonth();
     if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) anios--;
     return anios < 18;
-}
-
-function esAdminRrhhDj() {
-    return String(window.tipoUsuario ?? '').trim() === '17';
 }
 
 function actualizarEstadoDniHijo(fila) {
@@ -5747,7 +5763,7 @@ function actualizarEstadoDniHijo(fila) {
         span.style.color = '#16a34a';
         return;
     }
-    const obligatorio = !esAdminRrhhDj();
+    const obligatorio = requiereDniHijoDj(fila);
     const detalle = (okA || okR) ? 'falta ' + (okA ? 'reverso' : 'anverso') : 'sin DNI';
     if (obligatorio) {
         span.textContent = '⚠ ' + detalle + ' (obligatorio)';
@@ -5850,7 +5866,7 @@ function configDniHijosDj() {
             if (btn) abrirModalDniHijosDj(btn.closest('.family-row'));
         });
         cont.addEventListener('change', (e) => {
-            if (e.target.matches('input[name="fechaNacimiento[]"]')) {
+            if (e.target.matches('input[name="fechaNacimiento[]"], select[name="parentesco[]"]')) {
                 actualizarExtrasFilaHijo(e.target.closest('.family-row'));
             }
         });
@@ -5991,6 +6007,7 @@ function addFamiliarRow(data = {}, container = null) {
     row.className = 'family-row';
     row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;';
     row.innerHTML = `
+        <input type="hidden" name="familiar_id[]" value="${data.CODI_DERE_HABI || ''}">
         <div>
             <label class="dj-label">Parentesco</label>
             <select name="parentesco[]" class="dj-select">

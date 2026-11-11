@@ -433,7 +433,7 @@
                                         <div>
                                             <label class="dj-label">Institución</label>
                                             <select id="ndj_institucion" name="ndj_institucion" class="dj-select">
-                                                <option value="" disabled selected>—</option>
+                                                <option value="" selected>—</option>
                                                 @foreach ($instituciones as $inst)
                                                     <option value="{{ $inst->id }}">{{ $inst->text }}</option>
                                                 @endforeach
@@ -442,7 +442,7 @@
                                         <div>
                                             <label class="dj-label">Carrera</label>
                                             <select id="ndj_carrera" name="ndj_carrera" class="dj-select">
-                                                <option value="999999">NO ESPECIFICA</option>
+                                                <option value="" selected>—</option>
                                                 @foreach ($carreras as $carrera)
                                                     <option value="{{ $carrera->id }}">{{ $carrera->text }}</option>
                                                 @endforeach

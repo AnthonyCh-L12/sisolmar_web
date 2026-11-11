@@ -191,7 +191,9 @@ class DjService
 
         foreach ($parentescos as $indice => $parentesco) {
             $parentesco = mb_strtoupper(trim((string) $parentesco), 'UTF-8');
-            if ($parentesco === 'HIJO MAYOR DE EDAD INCAPACITADO PERMANENTE') {
+            if (str_starts_with($parentesco, 'HIJO MAYOR DE EDAD')
+                && (str_contains($parentesco, 'INCAPACITADO') || str_contains($parentesco, 'DISCAPACIDAD'))
+                && str_contains($parentesco, 'PERMANENT')) {
                 return 'SI';
             }
 

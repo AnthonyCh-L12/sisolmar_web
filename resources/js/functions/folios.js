@@ -432,6 +432,7 @@ document.getElementById("buscar").addEventListener("keyup", function () {
 function aplicarTodosFiltros() {
       const filtroTipos          = document.getElementById('filtroTipos')?.value;
       const filtroClasificacion  = document.getElementById('filtroClasificacion')?.value;
+      const filtroCategoria      = document.getElementById('filtroCategoria')?.value;
       const vencimientoFiltro    = document.getElementById('vencimientoFiltro')?.value;
       const filtroEstado         = document.getElementById('filtroEstado')?.value; // <-- NUEVO
       const buscarValor          = document.getElementById('buscar')?.value.toLowerCase().trim() || '';
@@ -454,6 +455,12 @@ function aplicarTodosFiltros() {
           filtros.push({ field: "tipoFolio", type: "=", value: filtroClasificacion });
       }
 
+      if (filtroCategoria === "SIN_CATEGORIA") {
+          filtros.push({ field: "nombre_categoria", type: "=", value: "SIN CATEGORÍA" });
+      } else if (filtroCategoria && filtroCategoria !== "TODOS") {
+          filtros.push({ field: "cod_categoria", type: "=", value: filtroCategoria });
+      }
+
       if (vencimientoFiltro === "SI") {
           filtros.push({ field: "periodo", type: "!=", value: "NO VENCE" });
       } else if (vencimientoFiltro === "NO") {
@@ -465,6 +472,7 @@ function aplicarTodosFiltros() {
               { field: "nombre", type: "like", value: buscarValor },
               { field: "prioridad", type: "like", value: buscarValor },
               { field: "tipoFolio", type: "like", value: buscarValor },
+              { field: "nombre_categoria", type: "like", value: buscarValor },
               { field: "periodo", type: "like", value: buscarValor },
           ]);
       }
@@ -479,6 +487,7 @@ function aplicarTodosFiltros() {
   // Listeners para los Selects
   document.getElementById('filtroTipos')?.addEventListener('change', aplicarTodosFiltros);
   document.getElementById('filtroClasificacion')?.addEventListener('change', aplicarTodosFiltros);
+  document.getElementById('filtroCategoria')?.addEventListener('change', aplicarTodosFiltros);
   document.getElementById('vencimientoFiltro')?.addEventListener('change', aplicarTodosFiltros);
   document.getElementById('filtroEstado')?.addEventListener('change', aplicarTodosFiltros); // <-- NUEVO LISTENER
 
@@ -537,6 +546,11 @@ function cargarFolios() {
             document.getElementById('countTotal').textContent = total;
             document.getElementById('countActivos').textContent = activos;
             document.getElementById('countInactivos').textContent = inactivos;
+            const porcentajeActivos = total ? (activos / total) * 100 : 0;
+            const porcentajeInactivos = total ? (inactivos / total) * 100 : 0;
+            document.getElementById('barTotal').style.width = total ? '100%' : '0%';
+            document.getElementById('barActivos').style.width = `${porcentajeActivos}%`;
+            document.getElementById('barInactivos').style.width = `${porcentajeInactivos}%`;
         })
         .catch(error => {
             console.error("Error al obtener los datos:", error);

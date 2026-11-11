@@ -837,6 +837,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function makeFamilyRow() {
         return `
         <div class="family-row grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg relative" data-familia-row>
+            <input type="hidden" name="familiar_id[]" value="">
             <div>
                 <label class="text-sm font-medium inline-block mb-2">Parentesco</label>
                 <select name="parentesco[]" class="form-select w-full">
@@ -944,35 +945,47 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!selectProv || !selectDist) return;
         selectProv.innerHTML = '<option value="">Seleccionar</option>';
         selectDist.innerHTML = '<option value="">Seleccionar</option>';
+        selectProv.disabled = true;
+        selectDist.disabled = true;
         if (!departamentoId) return;
         try {
-            const response = await axios.get(`${API_BASE}/provincias/${departamentoId}`);
-            response.data.forEach(prov => selectProv.add(new Option(prov.provi_descripcion, prov.provi_codigo)));
+            const provincias = await getUbicacionCached({ type: 'prov', dept: departamentoId });
+            provincias.forEach(prov => selectProv.add(new Option(prov.text, prov.id)));
             if (selectedProvincia) {
                 selectProv.value = selectedProvincia;
                 await cargarDistritos(selectDist, selectedProvincia, selectedDistrito);
             }
-        } catch (error) { console.error("Error cargando provincias:", error); }
+        } catch (error) {
+            console.error("Error cargando provincias:", error);
+        } finally {
+            selectProv.disabled = false;
+            selectDist.disabled = !selectProv.value;
+        }
     }
 
     async function cargarDistritos(selectDist, provinciaId, selectedDistrito = null) {
         if (!selectDist) return;
         selectDist.innerHTML = '<option value="">Seleccionar</option>';
+        selectDist.disabled = true;
         if (!provinciaId) return;
         try {
-            const response = await axios.get(`${API_BASE}/distritos/${provinciaId}`);
-            response.data.forEach(dist => selectDist.add(new Option(dist.dist_descripcion, dist.dist_codigo)));
+            const distritos = await getUbicacionCached({ type: 'dist', prov: provinciaId });
+            distritos.forEach(dist => selectDist.add(new Option(dist.text, dist.id)));
             if (selectedDistrito) selectDist.value = selectedDistrito;
-        } catch (error) { console.error("Error cargando distritos:", error); }
+        } catch (error) {
+            console.error("Error cargando distritos:", error);
+        } finally {
+            selectDist.disabled = false;
+        }
     }
 
     if (departamentoSelect && departamentoSelectDni && departamentoSelectNac) {
-        axios.get(`${API_BASE}/departamentos`)
-            .then(response => {
-                response.data.forEach(dep => {
-                    departamentoSelect.add(new Option(dep.depa_descripcion, dep.depa_codigo));
-                    departamentoSelectDni.add(new Option(dep.depa_descripcion, dep.depa_codigo));
-                    departamentoSelectNac.add(new Option(dep.depa_descripcion, dep.depa_codigo));
+        getUbicacionCached({ type: 'dept' })
+            .then(departamentos => {
+                departamentos.forEach(dep => {
+                    departamentoSelect.add(new Option(dep.text, dep.id));
+                    departamentoSelectDni.add(new Option(dep.text, dep.id));
+                    departamentoSelectNac.add(new Option(dep.text, dep.id));
                 });
             })
             .catch(error => console.error("Error cargando departamentos:", error));
@@ -1448,25 +1461,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
 
-                // DNI obligatorio para todos los hijos, independientemente de la edad.
-                // (la regla NO aplica para el rol ADMINS RRHH)
-                if (!esAdminRrhhDj()) {
-                    const filasHijosDni = filasHijosDj();
-                    for (let i = 0; i < filasHijosDni.length; i++) {
-                        const stH = estadoDniHijo(filasHijosDni[i]);
-                        const okA = !!(stH.anverso || stH.tieneAnverso);
-                        const okR = !!(stH.reverso || stH.tieneReverso);
-                        if (!okA || !okR) {
-                            const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Falta el DNI del hijo ' + (i + 1),
-                                text: 'Debe subir el ' + falta + ' del DNI para continuar.',
-                                confirmButtonText: 'Entendido',
-                            });
-                            if (btnGuardar) btnGuardar.disabled = false;
-                            return;
-                        }
+                const filasHijosDni = filasHijosDj();
+                for (let i = 0; i < filasHijosDni.length; i++) {
+                    if (!requiereDniHijoDj(filasHijosDni[i])) continue;
+                    const stH = estadoDniHijo(filasHijosDni[i]);
+                    const okA = !!(stH.anverso || stH.tieneAnverso);
+                    const okR = !!(stH.reverso || stH.tieneReverso);
+                    if (!okA || !okR) {
+                        const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Falta el DNI del hijo ' + (i + 1),
+                            text: 'Debe subir el ' + falta + ' del DNI para continuar.',
+                            confirmButtonText: 'Entendido',
+                        });
+                        if (btnGuardar) btnGuardar.disabled = false;
+                        return;
                     }
                 }
 
@@ -1477,6 +1487,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     FAM_PARENTESCO: formData.getAll('parentesco[]'),
                     FAM_NOMBRES: formData.getAll('apellidosNombres[]'),
                     FAM_FECHA_NACI: formData.getAll('fechaNacimiento[]'),
+                    FAM_ID: formData.getAll('familiar_id[]'),
+                    // Señala que el listado completo fue enviado, incluso si el usuario
+                    // quitó todos los familiares y los arrays quedan vacíos.
+                    FAM_PRESENTE: '1',
                     dj2026_descripcion: formData.getAll('ocupacion_alterna[]')
                 };
 
@@ -1506,6 +1520,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fotoAdjuntaGest)        formDataSave.append('foto', fotoAdjuntaGest);
                 if (dniAdjuntoGest.anverso)  formDataSave.append('dni_anverso', dniAdjuntoGest.anverso);
                 if (dniAdjuntoGest.reverso) formDataSave.append('dni_reverso', dniAdjuntoGest.reverso);
+                filasHijosDj().forEach((fila, i) => {
+                    const st = estadoDniHijo(fila);
+                    if (st.anverso) formDataSave.append(`dni_hijos_anverso[${i + 1}]`, st.anverso);
+                    if (st.reverso) formDataSave.append(`dni_hijos_reverso[${i + 1}]`, st.reverso);
+                });
 
                 const csrfTokenSave = document.querySelector('meta[name="csrf-token"]')?.content || '';
                 const response = await axios.post(url, formDataSave, {
@@ -1517,6 +1536,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.log('✅ Response:', response);
 
                 if (response.status === 200 || response.status === 201) {
+                    if (response.data?.asig_fami_desactivada) {
+                        await Swal.fire({
+                            icon: 'warning',
+                            title: 'Asignación familiar desactivada',
+                            text: 'Se desactivó la asignación familiar, porque el hijo ya cumplió la mayoría de edad',
+                            confirmButtonText: 'Entendido',
+                        });
+                    }
                     // Subir foto y DNI si fueron seleccionados
                     const fotoFile = fotoSeleccionada;
                     const codiPersFoto = response.data.codi_pers || data.cod_postulante || codiPersActual || '';
@@ -2604,44 +2631,29 @@ async function llenarFormulario(data) {
     setValue('#pensionista', data.PERS_PENSIONISTA ? data.PERS_PENSIONISTA.trim() : '');
 
     setValue('#grado_instruccion', data.PERS_GRADO_INSTRUCCION ? data.PERS_GRADO_INSTRUCCION.trim() : '');
-    if (data.CARR_CODIGO == '999999') {
-        setValue('#institucion', data.IEDU_CODIGO ? data.IEDU_CODIGO.trim() : '299999999');
-        if (data.IEDU_CODIGO && window.allCarreras) {
-            const selCarrera = document.getElementById('carrera');
-            if (selCarrera) {
-                selCarrera.innerHTML = '<option value="">—</option>';
-                window.allCarreras
-                    .filter(c => c.IEDU_CODIGO === data.IEDU_CODIGO.trim())
-                    .forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = c.text;
-                        selCarrera.appendChild(opt);
-                    });
-                selCarrera.value = data.CARR_CODIGO ? data.CARR_CODIGO.trim() : '';
-            }
-        }
+    const institucionEducativa = String(data.IEDU_CODIGO ?? '').trim();
+    const carreraEducativa = String(data.CARR_CODIGO ?? '').trim();
+    const institucionNoEspecificada = ['', '999999', '199999999', '299999999'].includes(institucionEducativa);
+    const carreraNoEspecificada = ['', '999999'].includes(carreraEducativa);
+    const institucionValida = institucionNoEspecificada ? '' : institucionEducativa;
+    const carreraValida = (institucionValida && !carreraNoEspecificada) ? carreraEducativa : '';
 
-    } else {
-        setValue('#institucion', data.IEDU_CODIGO ? data.IEDU_CODIGO.trim() : '999999');
-        if (data.IEDU_CODIGO && window.allCarreras) {
-            const selCarrera = document.getElementById('carrera');
-            if (selCarrera) {
-                selCarrera.innerHTML = '<option value="">—</option>';
-                window.allCarreras
-                    .filter(c => c.IEDU_CODIGO === data.IEDU_CODIGO.trim())
-                    .forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = c.text;
-                        selCarrera.appendChild(opt);
-                    });
-                selCarrera.value = data.CARR_CODIGO ? data.CARR_CODIGO.trim() : '';
-            }
+    setValue('#institucion', institucionValida);
+    const selCarrera = document.getElementById('carrera');
+    if (selCarrera) {
+        selCarrera.innerHTML = '<option value="" selected>—</option>';
+        if (institucionValida && window.allCarreras) {
+            window.allCarreras
+                .filter(c => c.IEDU_CODIGO === institucionValida && String(c.id).trim() !== '999999')
+                .forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.text;
+                    selCarrera.appendChild(opt);
+                });
         }
+        selCarrera.value = carreraValida;
     }
-
-    setValue('#carrera', data.CARR_CODIGO ? data.CARR_CODIGO.trim() : '999999');
     setValue('#anio_egreso', data.EGRESO_EDUCATIVO ? data.EGRESO_EDUCATIVO.trim() : '');
 
     setValue('#embargos', data.PERS_EMBARGO ? data.PERS_EMBARGO.trim() : '');
@@ -2664,9 +2676,11 @@ async function llenarFormulario(data) {
     setValue('#tipo_zona_dni', data.TIZO_CODIGO ? data.TIZO_CODIGO.trim() : '');
     setValue('#zona_dirdni', data.PERS_ZONA_DIRDNI ? data.PERS_ZONA_DIRDNI.trim() : '');
 
-    cargarUbicaciones('actual', data.PERS_DEPT_ACT?.trim() ?? '', data.PERS_PROV_ACT?.trim() ?? '', data.PERS_DIST_ACT?.trim() ?? '');
-    cargarUbicaciones('dni', data.PERS_DPTO_DIRDNI?.trim() ?? '', data.PERS_PROV_DIRDNI?.trim() ?? '', data.PERS_DIST_DIRDNI?.trim() ?? '');
-    cargarUbicaciones('nac', data.DEPA_CODIGO_NACI?.trim() ?? '', data.PROVI_CODIGO_NACI?.trim() ?? '', data.DIST_NACI?.trim() ?? '');
+    await Promise.all([
+        cargarUbicaciones('actual', data.PERS_DEPT_ACT?.trim() ?? '', data.PERS_PROV_ACT?.trim() ?? '', data.PERS_DIST_ACT?.trim() ?? ''),
+        cargarUbicaciones('dni', data.PERS_DPTO_DIRDNI?.trim() ?? '', data.PERS_PROV_DIRDNI?.trim() ?? '', data.PERS_DIST_DIRDNI?.trim() ?? ''),
+        cargarUbicaciones('nac', data.DEPA_CODIGO_NACI?.trim() ?? '', data.PROVI_CODIGO_NACI?.trim() ?? '', data.DIST_NACI?.trim() ?? ''),
+    ]);
 
 
     setValue('#ocupacion_principal', data.dj2026_ocupacion_principal);
@@ -2738,8 +2752,15 @@ function estadoDniHijo(fila) {
     return st;
 }
 
-// Regla DNI: obligatorio para todos los parentescos de hijo.
-// El rol ADMINS RRHH (tipo 17) está exento de la regla.
+function requiereDniHijoDj(fila) {
+    const parentesco = (fila?.querySelector('select[name="parentesco[]"]')?.value || '').trim().toUpperCase();
+    const discapacitadoPermanente = parentesco.startsWith('HIJO MAYOR DE EDAD')
+        && /INCAPACITADO|DISCAPACIDAD/.test(parentesco)
+        && parentesco.includes('PERMANENT');
+    return discapacitadoPermanente
+        || (parentesco === 'HIJO MENOR DE EDAD' && esMenorDeEdadDj(fila.querySelector('input[name="fechaNacimiento[]"]')?.value));
+}
+
 function esMenorDeEdadDj(fecha) {
     if (!fecha) return false;
     const nac = new Date(String(fecha).slice(0, 10) + 'T00:00:00');
@@ -2749,10 +2770,6 @@ function esMenorDeEdadDj(fecha) {
     const m = hoy.getMonth() - nac.getMonth();
     if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) anios--;
     return anios < 18;
-}
-
-function esAdminRrhhDj() {
-    return String(window.tipoUsuario ?? '').trim() === '17';
 }
 
 function actualizarEstadoDniHijo(fila) {
@@ -2769,7 +2786,7 @@ function actualizarEstadoDniHijo(fila) {
         span.style.color = '#16a34a';
         return;
     }
-    const obligatorio = !esAdminRrhhDj();
+    const obligatorio = requiereDniHijoDj(fila);
     const detalle = (okA || okR) ? 'falta ' + (okA ? 'reverso' : 'anverso') : 'sin DNI';
     if (obligatorio) {
         span.textContent = '⚠ ' + detalle + ' (obligatorio)';
@@ -2872,7 +2889,7 @@ function configDniHijosDj() {
             if (btn) abrirModalDniHijosDj(btn.closest('.family-row'));
         });
         cont.addEventListener('change', (e) => {
-            if (e.target.matches('input[name="fechaNacimiento[]"]')) {
+                if (e.target.matches('input[name="fechaNacimiento[]"], select[name="parentesco[]"]')) {
                 actualizarExtrasFilaHijo(e.target.closest('.family-row'));
             }
         });
@@ -3009,6 +3026,7 @@ function addFamiliarRow(data = {}, container = null) {
     row.className = 'family-row';
     row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;';
     row.innerHTML = `
+        <input type="hidden" name="familiar_id[]" value="${data.CODI_DERE_HABI || ''}">
         <div>
             <label class="dj-label">Parentesco</label>
             <select name="parentesco[]" class="dj-select">
@@ -3048,10 +3066,26 @@ async function getUbicacionCached(params) {
     if (ubicacionCache.has(key)) return ubicacionCache.get(key);
     if (ubicacionPromise.has(key)) return ubicacionPromise.get(key);
 
-    const req = axios.get(`${API_URL}/dj/get-ubicacion`, { params })
+    const ubicacionApi = `${API_URL}/ubicacion`;
+    const url = params.type === 'dept'
+        ? `${ubicacionApi}/departamentos`
+        : params.type === 'prov'
+            ? `${ubicacionApi}/provincias/${encodeURIComponent(params.dept)}`
+            : `${ubicacionApi}/distritos/${encodeURIComponent(params.prov)}`;
+
+    const req = axios.get(url)
         .then(res => {
-            ubicacionCache.set(key, res.data);
-            return res.data;
+            const data = (res.data || []).map(item => {
+                if (params.type === 'dept') {
+                    return { id: item.depa_codigo, text: item.depa_descripcion };
+                }
+                if (params.type === 'prov') {
+                    return { id: item.provi_codigo, text: item.provi_descripcion };
+                }
+                return { id: item.dist_codigo, text: item.dist_descripcion };
+            });
+            ubicacionCache.set(key, data);
+            return data;
         })
         .finally(() => {
             ubicacionPromise.delete(key);
@@ -3064,6 +3098,10 @@ async function getUbicacionCached(params) {
 
 async function cargarUbicaciones(tipo, dept, prov, dist) {
     const prefix = tipo === 'actual' ? '_actual' : tipo === 'dni' ? '_dni' : '_nac';
+    const selectProv = document.querySelector(`#provincia${prefix}`);
+    const selectDist = document.querySelector(`#distrito${prefix}`);
+    if (selectProv) selectProv.innerHTML = '<option value="">Seleccionar...</option>';
+    if (selectDist) selectDist.innerHTML = '<option value="">Seleccionar...</option>';
     if (!dept) return;
 
     const depts = await getUbicacionCached({ type: 'dept' });

@@ -603,6 +603,7 @@ import Swal from 'sweetalert2';
         const selPar = div.querySelector('select[name="ndj_parentesco[]"]');
         const inpNom = div.querySelector('input[name="ndj_apellidosNombres[]"]');
         const inpFec = div.querySelector('input[name="ndj_fechaNacimiento[]"]');
+        const inpId  = div.querySelector('input[name="ndj_familiar_id[]"]');
         if (selPar) {
             const vPar = (f.TIPO_RELA || '').trim();
             if (vPar && ![...selPar.options].some(o => o.value === vPar)) selPar.add(new Option(vPar, vPar));
@@ -610,6 +611,7 @@ import Swal from 'sweetalert2';
         }
         if (inpNom) inpNom.value = f.Nombres   || '';
         if (inpFec) inpFec.value = fechaFormateada;
+        if (inpId) inpId.value = f.CODI_DERE_HABI || '';
         ndj_actualizarFechaFamiliar(div);
         return div;
     }
@@ -1035,7 +1037,7 @@ import Swal from 'sweetalert2';
     }
     function ndj_poblarInstituciones() {
         const sel = $('ndj_institucion'); if (!sel) return;
-        sel.innerHTML = '<option value="" disabled selected>—</option>';
+        sel.innerHTML = '<option value="" selected>—</option>';
         ndj_allInstituciones.forEach(i => { const o = document.createElement('option'); o.value = i.id; o.textContent = i.text; sel.appendChild(o); });
     }
     function ndj_poblarCarreras(ieduCodigo) {
@@ -1187,6 +1189,7 @@ import Swal from 'sweetalert2';
         div.className  = 'ndj-family-row';
         div.style.cssText = 'display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;';
         div.innerHTML = `
+            <input type="hidden" name="ndj_familiar_id[]" value="">
             <div><label class="dj-label">Parentesco</label>
                 <select name="ndj_parentesco[]" class="dj-select">
                     ${ndj_opcionesVinculo('')}
@@ -1356,21 +1359,13 @@ import Swal from 'sweetalert2';
         return st;
     }
 
-    // Regla DNI: obligatorio para todos los parentescos de hijo.
-    // El rol ADMINS RRHH (tipo 17) está exento de la regla.
-    function ndj_esMenorDeEdad(fecha) {
-        if (!fecha) return false;
-        const nac = new Date(String(fecha).slice(0, 10) + 'T00:00:00');
-        if (isNaN(nac)) return false;
-        const hoy = new Date();
-        let anios = hoy.getFullYear() - nac.getFullYear();
-        const m = hoy.getMonth() - nac.getMonth();
-        if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) anios--;
-        return anios < 18;
-    }
-
-    function ndj_esAdminRrhh() {
-        return String(window.tipoUsuario ?? '').trim() === '17';
+    // En nueva DJ: DNI obligatorio para hijo menor y mayor con discapacidad permanente.
+    function ndj_requiereDniHijo(fila) {
+        const parentesco = (fila?.querySelector('select[name="ndj_parentesco[]"]')?.value || '').trim().toUpperCase();
+        return parentesco === 'HIJO MENOR DE EDAD'
+            || (parentesco.startsWith('HIJO MAYOR DE EDAD')
+                && /INCAPACITADO|DISCAPACIDAD/.test(parentesco)
+                && parentesco.includes('PERMANENT'));
     }
 
     function ndj_actualizarEstadoDniHijo(fila) {
@@ -1387,7 +1382,7 @@ import Swal from 'sweetalert2';
             span.style.color = '#16a34a';
             return;
         }
-        const obligatorio = !ndj_esAdminRrhh();
+        const obligatorio = ndj_requiereDniHijo(fila);
         const detalle = (okA || okR) ? 'falta ' + (okA ? 'reverso' : 'anverso') : 'sin DNI';
         if (obligatorio) {
             span.textContent = '⚠ ' + detalle + ' (obligatorio)';
@@ -1455,8 +1450,9 @@ import Swal from 'sweetalert2';
                 if (btn) ndj_abrirModalDniHijos(btn.closest('.ndj-family-row'));
             });
             cont.addEventListener('change', (e) => {
-                if (e.target.matches('input[name="ndj_fechaNacimiento[]"]')) {
+                if (e.target.matches('input[name="ndj_fechaNacimiento[]"], select[name="ndj_parentesco[]"]')) {
                     ndj_actualizarFechaFamiliar(e.target.closest('.ndj-family-row'));
+                    ndj_actualizarExtrasFilaHijo(e.target.closest('.ndj-family-row'));
                 }
             });
         }
@@ -1751,24 +1747,21 @@ import Swal from 'sweetalert2';
             return;
         }
 
-        // DNI obligatorio para todos los hijos, independientemente de la edad.
-        // (la regla NO aplica para el rol ADMINS RRHH)
-        if (!ndj_esAdminRrhh()) {
-            const filasHijosDni = ndj_filasHijos();
-            for (let i = 0; i < filasHijosDni.length; i++) {
-                const stH = ndj_estadoDniHijo(filasHijosDni[i]);
-                const okA = !!(stH.anverso || stH.tieneAnverso);
-                const okR = !!(stH.reverso || stH.tieneReverso);
-                if (!okA || !okR) {
-                    const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Falta el DNI del hijo ' + (i + 1),
-                        text: 'Debe subir el ' + falta + ' del DNI para continuar.',
-                        confirmButtonText: 'Entendido',
-                    });
-                    return;
-                }
+        const filasHijosDni = ndj_filasHijos();
+        for (let i = 0; i < filasHijosDni.length; i++) {
+            if (!ndj_requiereDniHijo(filasHijosDni[i])) continue;
+            const stH = ndj_estadoDniHijo(filasHijosDni[i]);
+            const okA = !!(stH.anverso || stH.tieneAnverso);
+            const okR = !!(stH.reverso || stH.tieneReverso);
+            if (!okA || !okR) {
+                const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Falta el DNI del hijo ' + (i + 1),
+                    text: 'Debe subir el ' + falta + ' del DNI para continuar.',
+                    confirmButtonText: 'Entendido',
+                });
+                return;
             }
         }
 
@@ -1798,6 +1791,7 @@ import Swal from 'sweetalert2';
         payload.ndj_parentesco       = fd.getAll('ndj_parentesco[]');
         payload.ndj_apellidosNombres = fd.getAll('ndj_apellidosNombres[]');
         payload.ndj_fechaNacimiento  = fd.getAll('ndj_fechaNacimiento[]');
+        payload.ndj_familiar_id     = fd.getAll('ndj_familiar_id[]');
 
         const body = {
             ...payload,
@@ -1871,6 +1865,9 @@ import Swal from 'sweetalert2';
             FAM_PARENTESCO:        payload.ndj_parentesco,
             FAM_NOMBRES:           payload.ndj_apellidosNombres,
             FAM_FECHA_NACI:        payload.ndj_fechaNacimiento,
+            FAM_ID:                payload.ndj_familiar_id,
+            // El envío explícito permite guardar también una lista totalmente vacía.
+            FAM_PRESENTE:          '1',
             sucursal:              payload.ndj_filtroSucursal,
             fecha_ingreso_solmar:  payload.ndj_fecha_ingreso_solmar,
             usuario:               payload.ndj_usuario,
@@ -1898,6 +1895,11 @@ import Swal from 'sweetalert2';
         if (fotoAdjuntaNueva)    fdGuardado.append('foto', fotoAdjuntaNueva);
         if (ndjDniFiles.anverso) fdGuardado.append('dni_anverso', ndjDniFiles.anverso);
         if (ndjDniFiles.reverso) fdGuardado.append('dni_reverso', ndjDniFiles.reverso);
+        ndj_filasHijos().forEach((fila, i) => {
+            const st = ndj_estadoDniHijo(fila);
+            if (st.anverso) fdGuardado.append(`dni_hijos_anverso[${i + 1}]`, st.anverso);
+            if (st.reverso) fdGuardado.append(`dni_hijos_reverso[${i + 1}]`, st.reverso);
+        });
         const opciones = {
             method:  'POST',
             headers: { 'X-CSRF-TOKEN': csrfTokenSave, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },

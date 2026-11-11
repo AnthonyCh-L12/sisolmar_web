@@ -123,6 +123,7 @@ class NotificacionModel extends Model
                 ELSE NULL
             END AS fecha_mayoria) AS fechas
             WHERE UPPER(LTRIM(RTRIM(dh.TIPO_RELA))) LIKE N'HIJO%'
+                AND UPPER(LTRIM(RTRIM(ISNULL(dh.DEHA_VIGENCIA, 'SI')))) = 'SI'
                 AND nacimiento.fecha_nacimiento IS NOT NULL
                 AND fechas.fecha_mayoria IS NOT NULL
                 AND UPPER(LTRIM(RTRIM(ISNULL(p.ASIG_FAMI, '')))) = 'SI'

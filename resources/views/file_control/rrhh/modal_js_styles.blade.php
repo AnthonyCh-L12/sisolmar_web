@@ -1,4 +1,9 @@
 <style>
+    /* Las alertas SweetAlert2 deben quedar por encima del modal de DJ (z-index 9999). */
+    .swal2-container {
+        z-index: 10050 !important;
+    }
+
       /* ============================================================
    ESTILOS GENERALES DEL MODAL DJ
    ============================================================ */

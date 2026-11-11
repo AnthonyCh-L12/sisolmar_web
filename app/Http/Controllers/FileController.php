@@ -1377,12 +1377,14 @@ class FileController extends Controller
         $formato = Folio::habilitado()->where('tipo', 2)->count();
         $certificado = Folio::habilitado()->where('tipo', 3)->count();
 
-        $roles = FileControl::getRoles();
-        
+        $responsables = DB::table('si_solm.dbo.TIPO_CARGO')
+            ->select('CODI_TIPO_CARG as codigo', 'DESC_TIPO_CARG as nombre')
+            ->orderBy('CODI_TIPO_CARG')
+            ->get();
 
         $categorias = DB::table('sw_folios_categoria')->where('habilitado', 1)->get();
 
-        return view('file_control.folios', compact('periodos', 'todos', 'principal', 'adicional', 'documento', 'formato', 'certificado', 'roles', 'categorias'));
+        return view('file_control.folios', compact('periodos', 'todos', 'principal', 'adicional', 'documento', 'formato', 'certificado', 'responsables', 'categorias'));
     }
 
     public function ViewBusquedaLegajo()

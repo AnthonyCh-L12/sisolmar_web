@@ -105,6 +105,14 @@ class DjController extends Controller
             $dniAnversoReq = $request->file('dni_anverso');
             $dniReversoReq = $request->file('dni_reverso');
 
+            // La nueva DJ exige el DNI de ambos lados para cada hijo menor
+            // registrado y para cada hijo mayor con discapacidad permanente.
+            $errorDniHijos = $this->validarDniHijosRequeridos($request, $data, null, false);
+            if ($errorDniHijos) {
+                DB::rollBack();
+                return response()->json($errorDniHijos, 422);
+            }
+
             if (!$exentoValidaciones) {
                 // ── Documentos obligatorios: foto del personal + DNI (anverso y reverso) ──
                 // Sin ellos no se crea el personal (solo exentos se lo saltan).
@@ -859,6 +867,9 @@ class DjController extends Controller
                     ? 'si_solm.dbo.DERECHO_HABIENTE'
                     : 'sisolm_web.dbo.sw_MIGRA_DERECHO_HABIENTE');
 
+            $filtroVigenciaFamiliares = $familiaresTable === 'si_solm.dbo.DERECHO_HABIENTE'
+                ? " AND UPPER(LTRIM(RTRIM(ISNULL(DEHA_VIGENCIA, 'SI')))) = 'SI'"
+                : '';
             $familiares = DB::select(
                 "SELECT *, 
                 (ISNULL(APEL_1,'') + ' ' + ISNULL(APEL_2,'') + ' ' + ISNULL(NOMB_1,'') + ' ' + ISNULL(NOMB_2,'')) AS Nombres,
@@ -866,6 +877,7 @@ class DjController extends Controller
                 FECH_NACI AS FECH_NACI2
                 FROM {$familiaresTable}
                 WHERE CODI_PERS = ?
+                {$filtroVigenciaFamiliares}
                 ORDER BY TIPO_RELA",
                 [$codiPers]
             );
@@ -1218,6 +1230,12 @@ class DjController extends Controller
 
             $data = $request->all();
 
+            $errorDniHijos = $this->validarDniHijosRequeridos($request, $data, (string) $codiPers, true);
+            if ($errorDniHijos) {
+                DB::rollBack();
+                return response()->json($errorDniHijos, 422);
+            }
+
             $exentoValidaciones = in_array('exento_validaciones', session('funcionalidades', []));
 
             // ── Documentos obligatorios: solo se exige lo que falte en el servidor ──
@@ -1389,7 +1407,11 @@ class DjController extends Controller
             }
             // SCTR: OP (01/03) → 'SI' automático; ADMIN (02/05) → según checkbox
             $this->aplicarScrt($codiPers, $data);
-            $this->aplicarAsigFami($codiPers, $data);
+            $asigFamiAnterior = DB::selectOne(
+                'SELECT ASIG_FAMI FROM si_solm.dbo.PERSONAL WHERE CODI_PERS = ?',
+                [$codiPers]
+            );
+            $resultadoAsigFami = $this->aplicarAsigFami($codiPers, $data, (string) ($asigFamiAnterior->ASIG_FAMI ?? ''));
             $this->aplicarConHijos($codiPers, $data);
             $this->insertOrUpdateDJ2026Personal($codiPers, $data, $source);
 
@@ -1399,8 +1421,8 @@ class DjController extends Controller
             // ✅ 3. GUARDAR FAMILIARES en tablas temporales
             $this->saveFamiliaresTemp($codiPers, $data);
 
-            // ✅ 4. COPIAR FAMILIARES a DJ2026_DERECHO_HABIENTE
-            $this->migrarFamiliares($codiPers);
+            // ✅ 4. Sincronizar familiares existentes usando baja lógica
+            $this->migrarFamiliaresConVigencia($codiPers, $data);
 
             // ✅ 5. GUARDAR OCUPACIONES en tabla temporal
             //$this->saveOcupacionesTemp($dni, $data);
@@ -1479,6 +1501,7 @@ class DjController extends Controller
 
             return response()->json([
                 'success'        => true,
+                'asig_fami_desactivada' => $resultadoAsigFami['desactivada_por_mayoria_edad'],
                 'message'        => !empty($pendientesMsg)
                     ? 'Declaración Jurada guardada y migrada correctamente, pero ' . implode(' y ', $pendientesMsg) . ' quedó pendiente de subir.'
                     : 'Declaración Jurada guardada y migrada correctamente',
@@ -1549,6 +1572,7 @@ class DjController extends Controller
                 CONVERT(CHAR(10), FECH_NACI, 103) AS FECH_NACI
              FROM si_solm.dbo.DERECHO_HABIENTE
              WHERE CODI_PERS = ?
+               AND UPPER(LTRIM(RTRIM(ISNULL(DEHA_VIGENCIA, 'SI')))) = 'SI'
              ORDER BY TIPO_RELA",
                 [$codiPers]
             );
@@ -1569,11 +1593,14 @@ class DjController extends Controller
     // ✅ FAMILIARES - Guardar en tabla temporal
     private function saveFamiliaresTemp($codiPers, $data)
     {
-        if (!isset($data['FAM_NOMBRES']) || !is_array($data['FAM_NOMBRES'])) {
+        $listadoFamiliarEnviado = !empty($data['FAM_PRESENTE']);
+        if ((!isset($data['FAM_NOMBRES']) || !is_array($data['FAM_NOMBRES'])) && !$listadoFamiliarEnviado) {
             Log::info('No hay familiares para guardar');
 
             return;
         }
+
+        $nombresFamiliares = is_array($data['FAM_NOMBRES'] ?? null) ? $data['FAM_NOMBRES'] : [];
 
         // Limpiar registros previos
         DB::delete(
@@ -1582,7 +1609,7 @@ class DjController extends Controller
         );
 
         // Insertar nuevos
-        foreach ($data['FAM_NOMBRES'] as $index => $nombreCompleto) {
+        foreach ($nombresFamiliares as $index => $nombreCompleto) {
             if (empty($nombreCompleto)) {
                 continue;
             }
@@ -3356,6 +3383,124 @@ private function migrarFamiliares_solo_nuevo($codiPers)
     //     // );
     // }
 
+    /**
+     * Sincroniza familiares de una DJ existente usando baja lógica:
+     * conserva filas eliminadas con DEHA_VIGENCIA='NO', reactiva las vigentes
+     * y agrega solo las que aún no existen.
+     */
+    private function migrarFamiliaresConVigencia($codiPers, array $data)
+    {
+        $usuario = strtoupper(trim((string) (session('usuario') ?? '')));
+
+        DB::update(
+            "UPDATE si_solm.dbo.DERECHO_HABIENTE
+             SET DEHA_VIGENCIA = 'NO', USUA_CODIGO_MOD = ?, USUA_FECHA_MOD = GETDATE()
+             WHERE CODI_PERS = ?
+               AND UPPER(LTRIM(RTRIM(ISNULL(DEHA_VIGENCIA, 'SI')))) = 'SI'",
+            [$usuario ?: null, $codiPers]
+        );
+
+        $nombres = is_array($data['FAM_NOMBRES'] ?? null) ? $data['FAM_NOMBRES'] : [];
+        $parentescos = is_array($data['FAM_PARENTESCO'] ?? null) ? $data['FAM_PARENTESCO'] : [];
+        $fechas = is_array($data['FAM_FECHA_NACI'] ?? null) ? $data['FAM_FECHA_NACI'] : [];
+        $ids = is_array($data['FAM_ID'] ?? null) ? $data['FAM_ID'] : [];
+
+        // Las filas que ya existen conservan su identidad; se editan/reactivan
+        // mediante su ID en vez de eliminarlas y generar otro registro.
+        foreach ($nombres as $i => $nombreCompleto) {
+            $nombreCompleto = trim((string) $nombreCompleto);
+            $id = $ids[$i] ?? null;
+            if ($nombreCompleto === '' || !$id || !ctype_digit((string) $id)) continue;
+
+            [$apel1, $apel2, $nomb1, $nomb2] = $this->separarNombreFamiliar($nombreCompleto);
+            $parentesco = strtoupper(trim((string) ($parentescos[$i] ?? '')));
+            $fecha = preg_match('/^HIJ/i', $parentesco) ? trim((string) ($fechas[$i] ?? '')) : '';
+
+            DB::update(
+                "UPDATE si_solm.dbo.DERECHO_HABIENTE
+                 SET TIPO_RELA = ?, APEL_1 = ?, APEL_2 = ?, NOMB_1 = ?, NOMB_2 = ?,
+                     FECH_NACI = TRY_CONVERT(datetime, NULLIF(?, ''), 23),
+                     DEHA_VIGENCIA = 'SI', USUA_CODIGO_MOD = ?, USUA_FECHA_MOD = GETDATE()
+                 WHERE CODI_DERE_HABI = ? AND CODI_PERS = ?",
+                [$parentesco, $apel1, $apel2, $nomb1, $nomb2, $fecha, $usuario ?: null, $id, $codiPers]
+            );
+        }
+
+        // Compatibilidad con registros que vienen de una tabla intermedia y no
+        // tienen ID: la fecha no forma parte de la identidad, porque justamente
+        // puede ser el dato que el usuario está corrigiendo.
+        // Las tablas están en bases con collations distintas. Normalizamos cada
+        // comparación de texto al collation de la base de conexión para evitar
+        // el conflicto Modern_Spanish_CI_AS vs SQL_Latin1_General_CP1_CI_AS.
+        $coincidencia = "(d.CODI_PERS COLLATE DATABASE_DEFAULT) = (s.CODI_PERS COLLATE DATABASE_DEFAULT)
+            AND (ISNULL(LTRIM(RTRIM(d.TIPO_RELA)), '') COLLATE DATABASE_DEFAULT) = (ISNULL(LTRIM(RTRIM(s.TIPO_RELA)), '') COLLATE DATABASE_DEFAULT)
+            AND (ISNULL(LTRIM(RTRIM(d.APEL_1)), '') COLLATE DATABASE_DEFAULT) = (ISNULL(LTRIM(RTRIM(s.APEL_1)), '') COLLATE DATABASE_DEFAULT)
+            AND (ISNULL(LTRIM(RTRIM(d.APEL_2)), '') COLLATE DATABASE_DEFAULT) = (ISNULL(LTRIM(RTRIM(s.APEL_2)), '') COLLATE DATABASE_DEFAULT)
+            AND (ISNULL(LTRIM(RTRIM(d.NOMB_1)), '') COLLATE DATABASE_DEFAULT) = (ISNULL(LTRIM(RTRIM(s.NOMB_1)), '') COLLATE DATABASE_DEFAULT)
+            AND (ISNULL(LTRIM(RTRIM(d.NOMB_2)), '') COLLATE DATABASE_DEFAULT) = (ISNULL(LTRIM(RTRIM(s.NOMB_2)), '') COLLATE DATABASE_DEFAULT)";
+
+        DB::update(
+            "UPDATE d
+             SET TIPO_RELA = s.TIPO_RELA,
+                 APEL_1 = s.APEL_1,
+                 APEL_2 = s.APEL_2,
+                 NOMB_1 = s.NOMB_1,
+                 NOMB_2 = s.NOMB_2,
+                 FECH_NACI = TRY_CONVERT(datetime, s.FECH_NACI),
+                 DEHA_VIGENCIA = 'SI',
+                 USUA_CODIGO_MOD = ?,
+                 USUA_FECHA_MOD = GETDATE()
+             FROM si_solm.dbo.DERECHO_HABIENTE d
+             INNER JOIN sisolm_web.dbo.sw_MIGRA_DERECHO_HABIENTE s ON {$coincidencia}
+             WHERE d.CODI_PERS = ?",
+            [$usuario ?: null, $codiPers]
+        );
+
+        $toDate = fn ($col) => "TRY_CONVERT(datetime, NULLIF(LTRIM(RTRIM({$col})), ''), 120)";
+        DB::statement("INSERT INTO si_solm.dbo.DERECHO_HABIENTE
+            (CODI_PERS, TIPO_RELA, NOMB_1, NOMB_2, APEL_1, APEL_2,
+             CODI_TIPO_DOCU, NRO_DOCU_IDEN, FECH_NACI, FALLECIDO,
+             DEHA_OCUPACION, DEHA_EDAD, USUA_CODIGO_REG, USUA_FECHA_REG,
+             USUA_CODIGO_MOD, USUA_FECHA_MOD, DEHA_SEXO, DEHA_MES_CONCEPCION,
+             DEHA_FECHA_ALTA, DEHA_TIPO_BAJA, DEHA_FECHA_BAJA, DEHA_INCAPACIDAD,
+             DEHA_RESOL_INCAPACIDAD, DEHA_VIGENCIA, DEHA_telefono, domicilio,
+             DEHA_DEREHABI, TIDV_CODIGO)
+            SELECT s.CODI_PERS, s.TIPO_RELA, s.NOMB_1, s.NOMB_2, s.APEL_1, s.APEL_2,
+                   s.CODI_TIPO_DOCU, s.NRO_DOCU_IDEN, {$toDate('s.FECH_NACI')}, 0,
+                   s.DEHA_OCUPACION, s.DEHA_EDAD, s.USUA_CODIGO_REG, GETDATE(),
+                   ?, GETDATE(), s.DEHA_SEXO, s.DEHA_MES_CONCEPCION,
+                   {$toDate('s.DEHA_FECHA_ALTA')}, s.DEHA_TIPO_BAJA,
+                   {$toDate('s.DEHA_FECHA_BAJA')}, s.DEHA_INCAPACIDAD,
+                   s.DEHA_RESOL_INCAPACIDAD, 'SI', s.DEHA_telefono, s.domicilio,
+                   s.DEHA_DEREHABI, s.TIDV_CODIGO
+            FROM sisolm_web.dbo.sw_MIGRA_DERECHO_HABIENTE s
+            WHERE s.CODI_PERS = ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM si_solm.dbo.DERECHO_HABIENTE d WHERE {$coincidencia}
+              )", [$usuario ?: null, $codiPers]);
+    }
+
+    private function separarNombreFamiliar(string $nombreCompleto): array
+    {
+        $apel1 = $apel2 = $nomb1 = $nomb2 = '';
+        if (strpos($nombreCompleto, ',') !== false) {
+            [$apellidos, $nombres] = explode(',', $nombreCompleto, 2);
+            $apellidosPartes = preg_split('/\s+/', trim($apellidos), 2);
+            $nombresPartes = preg_split('/\s+/', trim($nombres), 2);
+            $apel1 = $apellidosPartes[0] ?? '';
+            $apel2 = $apellidosPartes[1] ?? '';
+            $nomb1 = $nombresPartes[0] ?? '';
+            $nomb2 = $nombresPartes[1] ?? '';
+        } else {
+            $partes = preg_split('/\s+/', trim($nombreCompleto));
+            $apel1 = $partes[0] ?? '';
+            $apel2 = $partes[1] ?? '';
+            $nomb1 = $partes[2] ?? '';
+            $nomb2 = isset($partes[3]) ? implode(' ', array_slice($partes, 3)) : '';
+        }
+        return [$apel1, $apel2, $nomb1, $nomb2];
+    }
+
     private function saveOcupaciones($dni, $data)
     {
         // ✅ Cambiar el nombre del campo esperado
@@ -4816,18 +4961,118 @@ private function migrarFamiliares_solo_nuevo($codiPers)
         }
     }
 
+    private function parentescoHijoConDiscapacidadPermanente($parentesco): bool
+    {
+        $parentesco = mb_strtoupper(trim((string) $parentesco), 'UTF-8');
+        return str_starts_with($parentesco, 'HIJO MAYOR DE EDAD')
+            && (str_contains($parentesco, 'INCAPACITADO') || str_contains($parentesco, 'DISCAPACIDAD'))
+            && str_contains($parentesco, 'PERMANENT');
+    }
+
+    private function edadDesdeFechaNacimiento($fecha): ?int
+    {
+        $fecha = trim((string) $fecha);
+        if ($fecha === '') return null;
+        try {
+            $nacimiento = \Carbon\Carbon::parse($fecha);
+            if ($nacimiento->isFuture()) return null;
+            return $nacimiento->age;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     /**
-     * ASIG_FAMI (si_solm.dbo.PERSONAL / DJ2026_PERSONAL):
-     * 'SI' si registra un hijo menor de 18 años o un hijo mayor incapacitado
-     * permanentemente; 'NO' para hijos mayores de edad sin esa condición.
+     * Valida anverso y reverso de DNI para hijos con asignación familiar.
+     * En DJ existente admite los archivos que ya están guardados en el servidor.
      */
-    private function aplicarAsigFami($codiPers, &$data)
+    private function validarDniHijosRequeridos(Request $request, array $data, ?string $codiPers, bool $esExistente): ?array
+    {
+        $parentescos = is_array($data['FAM_PARENTESCO'] ?? null) ? $data['FAM_PARENTESCO'] : [];
+        $fechas = is_array($data['FAM_FECHA_NACI'] ?? null) ? $data['FAM_FECHA_NACI'] : [];
+        $numeroHijo = 0;
+
+        foreach ($parentescos as $i => $parentesco) {
+            $parentesco = mb_strtoupper(trim((string) $parentesco), 'UTF-8');
+            if (!str_starts_with($parentesco, 'HIJO')) continue;
+            $numeroHijo++;
+
+            $edad = $this->edadDesdeFechaNacimiento($fechas[$i] ?? '');
+            $esMenorSeleccionado = $parentesco === 'HIJO MENOR DE EDAD';
+            $requiereDni = $this->parentescoHijoConDiscapacidadPermanente($parentesco)
+                || ($esMenorSeleccionado && (!$esExistente || ($edad !== null && $edad < 18)));
+            if (!$requiereDni) continue;
+
+            // Los índices se asignan consecutivamente solo entre hijos, igual que
+            // los nombres CODI_PERS_H1/H2, H3/H4 que usa el cargador actual.
+            $anverso = $request->file("dni_hijos_anverso.{$numeroHijo}");
+            $reverso = $request->file("dni_hijos_reverso.{$numeroHijo}");
+
+            if (!$anverso && $esExistente && $codiPers) {
+                $anverso = $this->dniHijoExisteEnServidor($codiPers, $numeroHijo * 2 - 1);
+            }
+            if (!$reverso && $esExistente && $codiPers) {
+                $reverso = $this->dniHijoExisteEnServidor($codiPers, $numeroHijo * 2);
+            }
+
+            if (!$anverso || !$reverso) {
+                $faltan = [];
+                if (!$anverso) $faltan[] = 'anverso';
+                if (!$reverso) $faltan[] = 'reverso';
+                return [
+                    'success' => false,
+                    'code' => 'dni_hijo_requerido',
+                    'hijo' => $numeroHijo,
+                    'message' => 'Falta subir el ' . implode(' y ', $faltan) . ' del DNI del hijo ' . $numeroHijo . '.',
+                ];
+            }
+
+            foreach ([$anverso, $reverso] as $archivo) {
+                if ($archivo instanceof \Illuminate\Http\UploadedFile) {
+                    $extension = strtolower((string) $archivo->getClientOriginalExtension());
+                    if (!in_array($extension, ['jpg', 'jpeg'], true) || $archivo->getSize() > 10 * 1024 * 1024) {
+                        return [
+                            'success' => false,
+                            'code' => 'dni_hijo_invalido',
+                            'hijo' => $numeroHijo,
+                            'message' => 'El DNI del hijo ' . $numeroHijo . ' debe estar en JPG y no superar 10 MB por lado.',
+                        ];
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function dniHijoExisteEnServidor(string $codiPers, int $numeroLado): bool
+    {
+        $nombre = rawurlencode(trim($codiPers) . '_H' . $numeroLado . '.jpg');
+        $carpeta = ($numeroLado % 2 === 1) ? 'DNI1_HIJOS' : 'DNI2_HIJOS';
+        try {
+            return Http::timeout(5)->head("http://190.116.178.163/Biblioteca_Grafica/{$carpeta}/{$nombre}")->successful();
+        } catch (\Exception $e) {
+            Log::warning('No se pudo verificar DNI de hijo existente', [
+                'codi_pers' => $codiPers,
+                'lado' => $numeroLado,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * ASIG_FAMI='SI' si hay hijo menor de 18 o hijo mayor incapacitado/con
+     * discapacidad permanente. Para hijos mayores sin esa condición es 'NO'.
+     */
+    private function aplicarAsigFami($codiPers, &$data, string $asigAnterior = 'NO'): array
     {
         $asig = 'NO';
+        $hijoMenorCumplio18 = false;
 
-        $evaluar = function ($parentesco, $fechaNaci) use (&$asig) {
+        $evaluar = function ($parentesco, $fechaNaci) use (&$asig, &$hijoMenorCumplio18) {
             $parentesco = mb_strtoupper(trim((string) $parentesco), 'UTF-8');
-            if ($parentesco === 'HIJO MAYOR DE EDAD INCAPACITADO PERMANENTE') {
+            if ($this->parentescoHijoConDiscapacidadPermanente($parentesco)) {
                 $asig = 'SI';
                 return;
             }
@@ -4839,7 +5084,11 @@ private function migrarFamiliares_solo_nuevo($codiPers)
             if ($f === '') return;
             try {
                 $nac = \Carbon\Carbon::createFromFormat('Y-m-d', substr($f, 0, 10));
-                if ($nac && $nac->age < 18) $asig = 'SI';
+                if ($nac && $nac->age < 18) {
+                    $asig = 'SI';
+                } elseif ($nac && $nac->age >= 18) {
+                    $hijoMenorCumplio18 = true;
+                }
             } catch (\Exception $e) {
                 // fecha inválida: no cuenta como menor de edad
             }
@@ -4848,15 +5097,16 @@ private function migrarFamiliares_solo_nuevo($codiPers)
         $parentescos = $data['FAM_PARENTESCO'] ?? null;
         $fechas      = $data['FAM_FECHA_NACI'] ?? null;
 
-        if (is_array($parentescos) && is_array($fechas)) {
-            foreach ($parentescos as $i => $p) {
+        if (!empty($data['FAM_PRESENTE']) || (is_array($parentescos) && is_array($fechas))) {
+            foreach ((array) $parentescos as $i => $p) {
                 $evaluar($p, $fechas[$i] ?? '');
             }
         } elseif (!empty($codiPers)) {
             // Fallback: familias ya registradas en BD
             $rows = DB::select(
                 "SELECT TIPO_RELA, CONVERT(varchar(10), FECH_NACI, 23) AS FECH_NACI
-                 FROM si_solm.dbo.DERECHO_HABIENTE WHERE CODI_PERS = ?",
+                 FROM si_solm.dbo.DERECHO_HABIENTE
+                 WHERE CODI_PERS = ? AND UPPER(LTRIM(RTRIM(ISNULL(DEHA_VIGENCIA, 'SI')))) = 'SI'",
                 [$codiPers]
             );
             foreach ($rows as $r) {
@@ -4873,6 +5123,12 @@ private function migrarFamiliares_solo_nuevo($codiPers)
         );
 
         Log::info('aplicarAsigFami', ['CODI_PERS' => $codiPers, 'ASIG_FAMI' => $asig]);
+
+        $asigAnterior = mb_strtoupper(trim($asigAnterior), 'UTF-8');
+        return [
+            'valor' => $asig,
+            'desactivada_por_mayoria_edad' => $asigAnterior === 'SI' && $asig === 'NO' && $hijoMenorCumplio18,
+        ];
     }
 
     /**
@@ -4884,8 +5140,8 @@ private function migrarFamiliares_solo_nuevo($codiPers)
         $hayHijos = false;
         $parentescos = $data['FAM_PARENTESCO'] ?? null;
 
-        if (is_array($parentescos)) {
-            foreach ($parentescos as $parentesco) {
+        if (!empty($data['FAM_PRESENTE']) || is_array($parentescos)) {
+            foreach ((array) $parentescos as $parentesco) {
                 if (preg_match('/^HIJ/i', trim((string) $parentesco))) {
                     $hayHijos = true;
                     break;
@@ -4895,7 +5151,8 @@ private function migrarFamiliares_solo_nuevo($codiPers)
             $rows = DB::select(
                 "SELECT TOP 1 1 AS TIENE_HIJOS
                  FROM si_solm.dbo.DERECHO_HABIENTE
-                 WHERE CODI_PERS = ? AND UPPER(LTRIM(RTRIM(TIPO_RELA))) LIKE 'HIJ%'",
+                 WHERE CODI_PERS = ? AND UPPER(LTRIM(RTRIM(TIPO_RELA))) LIKE 'HIJ%'
+                   AND UPPER(LTRIM(RTRIM(ISNULL(DEHA_VIGENCIA, 'SI')))) = 'SI'",
                 [$codiPers]
             );
             $hayHijos = !empty($rows);
@@ -5232,7 +5489,7 @@ $tipotrab    = $tipoPer;
             );
  
             $this->saveFamiliaresTemp($codiPers, $data);
-            $this->migrarFamiliares($codiPers);
+            $this->migrarFamiliaresConVigencia($codiPers, $data);
             $this->saveTelefonosTemp($codiPers, $data);
             $this->migrarTelefonos($codiPers);
 
