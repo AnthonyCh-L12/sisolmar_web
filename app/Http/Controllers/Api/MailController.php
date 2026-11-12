@@ -39,32 +39,46 @@ class MailController extends Controller
 
     public function enviarRecordatorioCurso(Request $request)
     {
-        try {
-            $email = $request->email;
-            $full_name = $request->full_name;
-            $course_id = $request->course_id;
+        $email = trim((string) $request->input('email'));
+        $full_name = trim((string) $request->input('full_name', ''));
+        $course_id = (int) $request->input('course_id');
 
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL) || $course_id <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Datos inválidos para enviar el recordatorio.',
+            ], 422);
+        }
+
+        try {
             $curso = DB::connection('mysql_grupoihb')->select(
                 'SELECT fullname AS course_name, shortname AS course_shortname, enddate AS enrolment_end_date, startdate AS enrolment_start_date
            FROM mdl_course WHERE id = ?',
                 [$course_id]
             );
 
-            $curso = $curso[0];
+            if (empty($curso)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se encontró el curso solicitado.',
+                ], 404);
+            }
+
             $usuario = (object) [
                 'email' => $email,
-                'full_name' => $full_name
+                'full_name' => $full_name,
             ];
 
             Mail::to($usuario->email)
-                ->queue(new RecordatorioCursoPendienteMail($usuario, $curso));
+                ->send(new RecordatorioCursoPendienteMail($usuario, $curso[0]));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Recordatorio con curso sin acceder enviado correctamente',
-            ], 202);
+            ]);
         } catch (\Exception $e) {
             Log::error("Error enviando recordatorio individual a {$email}: " . $e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al enviar el recordatorio sobre curso sin acceder',
@@ -105,12 +119,12 @@ class MailController extends Controller
                 ], 422);
             }
 
-            Mail::to($usuario->email)->queue(new RecordatorioCursosPendientesMail($usuario, $cursosSinAcceder));
+            Mail::to($usuario->email)->send(new RecordatorioCursosPendientesMail($usuario, $cursosSinAcceder));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Recordatorio con cursos sin acceder enviado correctamente',
-            ], 202);
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

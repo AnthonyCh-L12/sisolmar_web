@@ -1346,9 +1346,9 @@
                                         </template>
                                         <template x-if="p.correo && !recordatoriosEnviados[p.nroDoc]">
                                             <button type="button" @click="enviarRecordatorio(p)"
-                                                :class="enviandoRecordatorio[p.nroDoc] ? 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-primary/70 cursor-wait' : 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all cursor-pointer'">
-                                                <i class="ti text-[12px]" :class="enviandoRecordatorio[p.nroDoc] ? 'ti-loader animate-spin' : 'ti-mail'"></i>
-                                                <span x-text="enviandoRecordatorio[p.nroDoc] ? 'Enviando...' : 'Enviar recordatorio'"></span>
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all cursor-pointer">
+                                                <i class="ti ti-mail text-[12px]"></i>
+                                                <span>Enviar recordatorio</span>
                                             </button>
                                         </template>
                                     </td>
@@ -2744,30 +2744,32 @@
                 return this.ordenDireccion === 'asc' ? 'ti-sort-ascending' : 'ti-sort-descending';
             },
 
-            async enviarRecordatorio(p) {
+            enviarRecordatorio(p) {
                 if (this.enviandoRecordatorio[p.nroDoc] || this.recordatoriosEnviados[p.nroDoc]) return;
                 this.enviandoRecordatorio[p.nroDoc] = true;
-                try {
-                    const res = await fetch(`${VITE_URL_APP}/api/mail/enviar-recordatorio?course_id=${this.cursoId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                        },
-                        body: JSON.stringify({
-                            email: p.correo,
-                            full_name: p.nombreCompleto
-                        })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        this.recordatoriosEnviados[p.nroDoc] = true;
-                    }
-                } catch (error) {
+                this.recordatoriosEnviados[p.nroDoc] = true;
+                fetch(`${VITE_URL_APP}/api/mail/enviar-recordatorio?course_id=${this.cursoId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    },
+                    body: JSON.stringify({
+                        email: p.correo,
+                        full_name: p.nombreCompleto
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.message || 'No se pudo enviar el recordatorio');
+                })
+                .catch(error => {
                     console.error('Error al enviar recordatorio:', error);
-                } finally {
+                    this.recordatoriosEnviados[p.nroDoc] = false;
+                })
+                .finally(() => {
                     this.enviandoRecordatorio[p.nroDoc] = false;
-                }
+                });
             },
 
             limpiarFiltros() {
