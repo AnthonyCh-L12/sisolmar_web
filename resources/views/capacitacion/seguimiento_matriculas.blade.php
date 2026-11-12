@@ -2443,6 +2443,7 @@
                 programacion_actual: null,
                 programacion_pendiente: null,
                 estadisticas: {
+                    total: 0,
                     aprobados: 0,
                     desaprobados: 0,
                     sin_acceder: 0,
@@ -2464,6 +2465,7 @@
                 this.curso.programacion_actual = null;
                 this.curso.programacion_pendiente = null;
                 this.curso.estadisticas = {
+                    total: 0,
                     aprobados: 0,
                     desaprobados: 0,
                     sin_acceder: 0,
@@ -2490,11 +2492,15 @@
                             this.curso.programacion_actual = d.programacion_actual || null;
                             this.curso.programacion_pendiente = d.programacion_pendiente || null;
                             this.curso.estadisticas = d.estadisticas || {
+                                total: 0,
                                 aprobados: 0,
                                 desaprobados: 0,
                                 sin_acceder: 0,
                                 en_curso: 0,
                             };
+                            const est = this.curso.estadisticas;
+                            this.curso.total = Number(est.total)
+                                || (est.aprobados + est.desaprobados + est.sin_acceder + est.en_curso);
                         }
                     })
                     .catch(error => {
@@ -3054,7 +3060,7 @@
                     allowOutsideClick: false,
                     didOpen: () => Swal.showLoading()
                 });
-                fetch(`${VITE_URL_APP}/api/mail/enviar-recordatorios`, {
+                fetch(`${VITE_URL_APP}/api/notificar-cursos-pendientes-new`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3068,14 +3074,22 @@
                         }),
                     })
                     .then(r => r.json())
-                    .then(() => {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Recordatorio enviado',
-                            timer: 2000,
-                            timerProgressBar: true,
-                            showConfirmButton: false
-                        });
+                    .then(res => {
+                        if (res.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Recordatorio enviado',
+                                timer: 2000,
+                                timerProgressBar: true,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: res.message || 'No se pudo enviar el recordatorio'
+                            });
+                        }
                     })
                     .catch(() => {
                         Swal.fire({
@@ -3102,7 +3116,7 @@
                     allowOutsideClick: false,
                     didOpen: () => Swal.showLoading(),
                 });
-                fetch(`${VITE_URL_APP}/api/enviar-memo-personal`, {
+                fetch(`${VITE_URL_APP}/api/enviar-memo-personal-new`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',

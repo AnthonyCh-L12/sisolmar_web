@@ -10,9 +10,8 @@
   use Illuminate\Bus\Queueable;
   use Illuminate\Queue\SerializesModels;
   use Illuminate\Support\Collection;
-  use Illuminate\Contracts\Queue\ShouldQueue;
 
-  class MemoMail extends Mailable implements ShouldQueue
+  class MemoMail extends Mailable
   {
       use Queueable, SerializesModels;
 

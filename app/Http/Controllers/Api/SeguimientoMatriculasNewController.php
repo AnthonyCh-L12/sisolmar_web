@@ -4,11 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
+use App\Mail\MemoMail;
+use App\Mail\RecordatorioCursosPendientesMail;
 use App\Services\MoodleCursoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Seguimiento de matrículas respaldado por sw_cursos_new.
@@ -317,6 +321,204 @@ class SeguimientoMatriculasNewController extends Controller
                 'success' => false,
                 'message' => 'Error al obtener los cursos del alumno',
             ], 500);
+        }
+    }
+
+    /**
+     * Envía (de forma síncrona) el recordatorio de cursos pendientes al colaborador.
+     */
+    public function notificarCursosPendientesNew(Request $request): JsonResponse
+    {
+        try {
+            $dni = trim((string) $request->input('dni'));
+            $nombreCompleto = (string) $request->input('nombreCompleto', '');
+            $email = trim((string) $request->input('email'));
+
+            if ($dni === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El colaborador no tiene un correo válido registrado.',
+                ], 422);
+            }
+
+            $cursosMoodle = collect(
+                DB::connection('mysql_grupoihb')->select(
+                    'CALL SP_OBTENER_CURSOS_POR_USUARIO(?, ?)',
+                    [$dni, date('Y')]
+                )
+            );
+
+            $cursosLocalesHabilitados = DB::table('sw_cursos_new')
+                ->where('habilitado', 1)
+                ->whereNotNull('SW_CURS_AV_COD')
+                ->pluck('SW_CURS_AV_COD')
+                ->map(fn($c) => (int) $c)
+                ->flip();
+
+            $cursosSinAcceder = $cursosMoodle
+                ->filter(fn($curso) => isset($cursosLocalesHabilitados[(int) $curso->course_id]))
+                ->filter(fn($curso) => ($curso->estado ?? null) === 'Sin acceder')
+                ->values()
+                ->all();
+
+            if (empty($cursosSinAcceder)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El colaborador no tiene cursos pendientes por iniciar.',
+                ], 422);
+            }
+
+            $usuario = (object) [
+                'email' => $email,
+                'full_name' => $nombreCompleto,
+            ];
+
+            Mail::to($email)->send(
+                new RecordatorioCursosPendientesMail($usuario, $cursosSinAcceder)
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Recordatorio enviado correctamente.',
+                'total' => count($cursosSinAcceder),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en notificarCursosPendientesNew', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al enviar el recordatorio de cursos pendientes.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Genera y envía (de forma síncrona) el MEMO disciplinario al colaborador.
+     */
+    public function enviarMemoNew(Request $request): JsonResponse
+    {
+        try {
+            $personal = (object) [
+                'nroDoc' => trim((string) $request->input('nroDoc')),
+                'nombreCompleto' => (string) $request->input('nombreCompleto', ''),
+                'correo' => trim((string) $request->input('correo')),
+                'cargo' => (string) $request->input('cargo', ''),
+            ];
+
+            if ($personal->nroDoc === '' || ! filter_var($personal->correo, FILTER_VALIDATE_EMAIL)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El colaborador no tiene un correo válido registrado.',
+                ], 422);
+            }
+
+            $cursosUsuario = collect(
+                DB::connection('mysql_grupoihb')->select(
+                    'CALL grupoihb_see.SP_GET_CURSOS_ALUMNO_ESTADO(NULL, ?, ?)',
+                    [$personal->nroDoc, date('Y')]
+                )
+            );
+
+            $cursosLocalesHabilitados = DB::table('sw_cursos_new')
+                ->where('habilitado', 1)
+                ->whereNotNull('SW_CURS_AV_COD')
+                ->pluck('SW_CURS_AV_COD')
+                ->map(fn($c) => (int) $c)
+                ->flip();
+
+            $cursosUsuario = $cursosUsuario
+                ->filter(fn($curso) => isset($cursosLocalesHabilitados[(int) $curso->course_id]))
+                ->values();
+
+            if ($cursosUsuario->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El alumno no tiene cursos pendientes.',
+                ], 422);
+            }
+
+            $this->procesarMemoSincrono($personal, $cursosUsuario);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'MEMO enviado correctamente.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en enviarMemoNew', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al enviar el MEMO.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Registra el MEMO y lo envía sin encolar jobs.
+     */
+    private function procesarMemoSincrono(object $personal, Collection $cursosUsuario): void
+    {
+        $cursosSinAcceder = $cursosUsuario
+            ->where('estado', 'sin_iniciar')
+            ->map(fn($curso) => [
+                'course_id' => $curso->course_id,
+                'course_nombre' => $curso->course_nombre,
+            ])
+            ->values()
+            ->toArray();
+
+        $historicoMemos = DB::table('SW_MEMO_RECORDATORIOS')
+            ->where('NRO_DOCU_IDEN', $personal->nroDoc)
+            ->orderBy('id')
+            ->get();
+
+        $ultimoMemo = $historicoMemos->last();
+
+        $tipoMemo = ! $ultimoMemo
+            ? 1
+            : match ((int) $ultimoMemo->NUM_MEMO) {
+                1 => 2,
+                2 => 3,
+                3 => 1,
+                default => 1,
+            };
+
+        Mail::to($personal->correo)->send(new MemoMail(
+            nombreCompleto: $personal->nombreCompleto,
+            cargoPersonal: $personal->cargo,
+            cursosSinAcceder: $cursosSinAcceder,
+            tipoMemo: $tipoMemo,
+            historicoMemos: $historicoMemos
+        ));
+
+        $memoId = DB::table('SW_MEMO_RECORDATORIOS')
+            ->insertGetId([
+                'NRO_DOCU_IDEN'   => $personal->nroDoc,
+                'MOODLE_USER_ID'  => $personal->nroDoc,
+                'NOMBRE_COMPLETO' => $personal->nombreCompleto,
+                'NUM_MEMO'        => $tipoMemo,
+                'FECHA_ENVIO'     => now(),
+            ]);
+
+        if (! empty($cursosSinAcceder)) {
+            DB::table('SW_MEMO_RECORDATORIOS_CURSOS')
+                ->insert(
+                    collect($cursosSinAcceder)
+                        ->map(fn($curso) => [
+                            'MEMO_RECORDATORIO_ID' => $memoId,
+                            'CODIGO_MOODLE'        => $curso['course_id'],
+                            'NOMBRE_CURSO'         => $curso['course_nombre'],
+                        ])
+                        ->toArray()
+                );
         }
     }
 }
