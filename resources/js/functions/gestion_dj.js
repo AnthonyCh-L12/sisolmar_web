@@ -1480,9 +1480,45 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
 
+                // La decisión de desactivar se solicita antes de guardar cuando un
+                // hijo registrado como menor ya cumplió 18 años.
+                let desactivarAsignacionFamiliar = false;
+                let mantenerAsignacionFamiliar = false;
+                const hijosMayorEdad = filasHijosDj().filter(fila =>
+                    fila.querySelector('select[name="parentesco[]"]')?.value?.trim().toUpperCase() === 'HIJO MENOR DE EDAD'
+                    && !esMenorDeEdadDj(fila.querySelector('input[name="fechaNacimiento[]"]')?.value)
+                    && !!fila.querySelector('input[name="fechaNacimiento[]"]')?.value
+                );
+                if (hijosMayorEdad.length) {
+                    const decision = await Swal.fire({
+                        icon: 'warning',
+                        title: 'El hijo ya cumplió la mayoría de edad',
+                        text: '¿Desactivar asignación familiar?',
+                        showDenyButton: true,
+                        confirmButtonText: 'Sí',
+                        denyButtonText: 'No',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                    });
+                    desactivarAsignacionFamiliar = decision.isConfirmed;
+                    mantenerAsignacionFamiliar = decision.isDenied;
+                    if (mantenerAsignacionFamiliar) {
+                        for (const fila of hijosMayorEdad) {
+                            const st = estadoDniHijo(fila);
+                            if (!st.anverso || !st.reverso) {
+                                Swal.fire({ icon: 'warning', title: 'DNI del hijo obligatorio', text: 'Para conservar la asignación familiar, vuelva a subir el anverso y el reverso del DNI de cada hijo mayor de edad.', confirmButtonText: 'Entendido' });
+                                abrirModalDniHijosDj(fila);
+                                if (btnGuardar) btnGuardar.disabled = false;
+                                return;
+                            }
+                        }
+                    }
+                }
                 const payload = {
                     ...data,
                     source: tabActiva,
+                    desactivar_asignacion_familiar: desactivarAsignacionFamiliar ? '1' : '0',
+                    mantener_asignacion_familiar: mantenerAsignacionFamiliar ? '1' : '0',
                     no_caduca_dni: data.no_caduca_dni === 'on' ? '1' : '0',
                     FAM_PARENTESCO: formData.getAll('parentesco[]'),
                     FAM_NOMBRES: formData.getAll('apellidosNombres[]'),
@@ -1536,14 +1572,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.log('✅ Response:', response);
 
                 if (response.status === 200 || response.status === 201) {
-                    if (response.data?.asig_fami_desactivada) {
-                        await Swal.fire({
-                            icon: 'warning',
-                            title: 'Asignación familiar desactivada',
-                            text: 'Se desactivó la asignación familiar, porque el hijo ya cumplió la mayoría de edad',
-                            confirmButtonText: 'Entendido',
-                        });
-                    }
                     // Subir foto y DNI si fueron seleccionados
                     const fotoFile = fotoSeleccionada;
                     const codiPersFoto = response.data.codi_pers || data.cod_postulante || codiPersActual || '';

@@ -4999,7 +4999,10 @@ private function migrarFamiliares_solo_nuevo($codiPers)
 
             $edad = $this->edadDesdeFechaNacimiento($fechas[$i] ?? '');
             $esMenorSeleccionado = $parentesco === 'HIJO MENOR DE EDAD';
-            $requiereDni = $this->parentescoHijoConDiscapacidadPermanente($parentesco)
+            $forzarDniNuevo = $esExistente
+                && (string) ($data['mantener_asignacion_familiar'] ?? '0') === '1'
+                && $esMenorSeleccionado && $edad !== null && $edad >= 18;
+            $requiereDni = $forzarDniNuevo || $this->parentescoHijoConDiscapacidadPermanente($parentesco)
                 || ($esMenorSeleccionado && (!$esExistente || ($edad !== null && $edad < 18)));
             if (!$requiereDni) continue;
 
@@ -5008,10 +5011,10 @@ private function migrarFamiliares_solo_nuevo($codiPers)
             $anverso = $request->file("dni_hijos_anverso.{$numeroHijo}");
             $reverso = $request->file("dni_hijos_reverso.{$numeroHijo}");
 
-            if (!$anverso && $esExistente && $codiPers) {
+            if (!$anverso && $esExistente && $codiPers && !$forzarDniNuevo) {
                 $anverso = $this->dniHijoExisteEnServidor($codiPers, $numeroHijo * 2 - 1);
             }
-            if (!$reverso && $esExistente && $codiPers) {
+            if (!$reverso && $esExistente && $codiPers && !$forzarDniNuevo) {
                 $reverso = $this->dniHijoExisteEnServidor($codiPers, $numeroHijo * 2);
             }
 
@@ -5114,6 +5117,13 @@ private function migrarFamiliares_solo_nuevo($codiPers)
             }
         }
 
+        $asigAnterior = mb_strtoupper(trim($asigAnterior), 'UTF-8');
+        $decisionDesactivar = (string) ($data['desactivar_asignacion_familiar'] ?? '0') === '1';
+        if ($asigAnterior === 'SI' && $hijoMenorCumplio18) {
+            // La mayoría de edad ya no desactiva por sí sola la asignación.
+            // Solo se da de baja si el usuario confirma expresamente.
+            $asig = $decisionDesactivar ? 'NO' : 'SI';
+        }
         $data['ASIG_FAMI'] = $asig;
 
         // Reflejar en la tabla maestra PERSONAL (DJ2026 se llena vía insertOrUpdate)
@@ -5124,7 +5134,6 @@ private function migrarFamiliares_solo_nuevo($codiPers)
 
         Log::info('aplicarAsigFami', ['CODI_PERS' => $codiPers, 'ASIG_FAMI' => $asig]);
 
-        $asigAnterior = mb_strtoupper(trim($asigAnterior), 'UTF-8');
         return [
             'valor' => $asig,
             'desactivada_por_mayoria_edad' => $asigAnterior === 'SI' && $asig === 'NO' && $hijoMenorCumplio18,
@@ -5252,7 +5261,7 @@ private function migrarFamiliares_solo_nuevo($codiPers)
             }
  
             $personal = DB::selectOne(
-                "SELECT CODI_PERS, NRO_DOCU_IDEN, PERS_VIGENCIA, PERS_TIPOTRAB FROM si_solm.dbo.PERSONAL WHERE CODI_PERS = ?",
+                "SELECT CODI_PERS, NRO_DOCU_IDEN, PERS_VIGENCIA, PERS_TIPOTRAB, ASIG_FAMI FROM si_solm.dbo.PERSONAL WHERE CODI_PERS = ?",
                 [$codiPers]
             );
 
@@ -5265,6 +5274,14 @@ private function migrarFamiliares_solo_nuevo($codiPers)
             }
 
             $data = $request->all();
+
+            // Si el usuario confirmó la baja por mayoría de edad, exigir fotos
+            // nuevas de ambos lados aunque ya existan archivos del contrato anterior.
+            $errorDniHijos = $this->validarDniHijosRequeridos($request, $data, (string) $codiPers, true);
+            if ($errorDniHijos) {
+                DB::rollBack();
+                return response()->json($errorDniHijos, 422);
+            }
 
             // Fecha de Ingreso a Solmar: OBLIGATORIA en recontratación
             // (es el nuevo ingreso; no se hereda la fecha anterior)
@@ -5496,7 +5513,7 @@ $tipotrab    = $tipoPer;
             // Actualizar DJ2026_PERSONAL con los datos de la recontratación (sucursal, fecha modificación, etc.)
             // SCTR: OP (01/03) → 'SI' automático; ADMIN (02/05) → según checkbox
             $this->aplicarScrt($codiPers, $data);
-            $this->aplicarAsigFami($codiPers, $data);
+            $this->aplicarAsigFami($codiPers, $data, (string) ($personal->ASIG_FAMI ?? ''));
             $this->aplicarConHijos($codiPers, $data);
             $this->insertOrUpdateDJ2026Personal($codiPers, $data, 'recontratacion');
 

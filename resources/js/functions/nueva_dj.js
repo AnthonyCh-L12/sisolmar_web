@@ -1353,6 +1353,16 @@ import Swal from 'sweetalert2';
             .filter(f => (f.querySelector('select[name="ndj_parentesco[]"]')?.value || '').startsWith('HIJO'));
     }
 
+    function ndj_edadDesdeFecha(fecha) {
+        if (!fecha) return null;
+        const nac = new Date(String(fecha).slice(0, 10) + 'T00:00:00');
+        if (Number.isNaN(nac.getTime())) return null;
+        const hoy = new Date();
+        let edad = hoy.getFullYear() - nac.getFullYear();
+        if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) edad--;
+        return edad;
+    }
+
     function ndj_estadoDniHijo(fila) {
         let st = ndjDniHijosRows.get(fila);
         if (!st) { st = { anverso: null, reverso: null, tieneAnverso: false, tieneReverso: false }; ndjDniHijosRows.set(fila, st); }
@@ -1786,6 +1796,44 @@ import Swal from 'sweetalert2';
         } // fin exentoValidaciones
         // ── Fin validaciones ─────────────────────────────────
 
+        let desactivarAsignacionFamiliar = false;
+        let mantenerAsignacionFamiliar = false;
+        const hijosQueCumplieronMayorEdad = modoRecontratacion
+            ? ndj_filasHijos().filter(fila =>
+                fila.querySelector('select[name="ndj_parentesco[]"]')?.value?.trim().toUpperCase() === 'HIJO MENOR DE EDAD'
+                && ndj_edadDesdeFecha(fila.querySelector('input[name="ndj_fechaNacimiento[]"]')?.value) >= 18
+            )
+            : [];
+        if (hijosQueCumplieronMayorEdad.length) {
+            const decision = await Swal.fire({
+                icon: 'warning',
+                title: 'El hijo ya cumplió la mayoría de edad',
+                text: '¿Desactivar asignación familiar?',
+                showDenyButton: true,
+                confirmButtonText: 'Sí',
+                denyButtonText: 'No',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+            });
+            desactivarAsignacionFamiliar = decision.isConfirmed;
+            mantenerAsignacionFamiliar = decision.isDenied;
+            if (mantenerAsignacionFamiliar) {
+                for (const fila of hijosQueCumplieronMayorEdad) {
+                    const st = ndj_estadoDniHijo(fila);
+                    if (!st.anverso || !st.reverso) {
+                        await Swal.fire({
+                            icon: 'warning',
+                            title: 'DNI del hijo obligatorio',
+                            text: 'Para conservar la asignación familiar, vuelva a subir el anverso y el reverso del DNI de cada hijo mayor de edad.',
+                            confirmButtonText: 'Entendido',
+                        });
+                        ndj_abrirModalDniHijos(fila);
+                        return;
+                    }
+                }
+            }
+        }
+
         const fd      = new FormData($('formNuevaDJ'));
         const payload = Object.fromEntries(fd.entries());
         payload.ndj_parentesco       = fd.getAll('ndj_parentesco[]');
@@ -1872,6 +1920,8 @@ import Swal from 'sweetalert2';
             fecha_ingreso_solmar:  payload.ndj_fecha_ingreso_solmar,
             usuario:               payload.ndj_usuario,
             PERS_CONTRATADO:       0,
+            desactivar_asignacion_familiar: desactivarAsignacionFamiliar ? '1' : '0',
+            mantener_asignacion_familiar: mantenerAsignacionFamiliar ? '1' : '0',
         };
 
         const esRecontratacion = modoRecontratacion && codiPersRecontratacion;
