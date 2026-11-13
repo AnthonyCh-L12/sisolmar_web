@@ -513,6 +513,7 @@ export default document.addEventListener("alpine:init", () => {
         selectedEstado: 0,
         selectedSucursal: "",
         personalVigente: "1",
+        importados: [],
 
         cursos: [],
         todosLosCursos: [],
@@ -698,6 +699,7 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedEstado = 0;
             this.selectedSucursal = "";
             this.personalVigente = "1";
+            this.importados = [];
 
             this.cursos = [...this.todosLosCursos];
             this.periodos = [];
@@ -792,6 +794,69 @@ export default document.addEventListener("alpine:init", () => {
         seleccionarSucursal(idx) {
             this.selectedSucursalIdx = idx;
             this.currentPage = 1;
+        },
+
+        dnisImportadosSet() {
+            return new Set(
+                this.importados
+                    .map((i) => String(i.dni ?? "").trim())
+                    .filter(Boolean),
+            );
+        },
+
+        _filtrarDnisPersonal(datos) {
+            const dnis = this.dnisImportadosSet();
+            if (dnis.size === 0 || !Array.isArray(datos)) return datos;
+
+            const esAgrupado =
+                datos.length > 0 && datos[0]?.Personales !== undefined;
+
+            if (esAgrupado) {
+                return datos
+                    .map((grupo) => ({
+                        ...grupo,
+                        Personales: (grupo.Personales || []).filter((p) =>
+                            dnis.has(String(p.NroDoc ?? "").trim()),
+                        ),
+                    }))
+                    .filter((grupo) => grupo.Personales.length > 0);
+            }
+
+            return datos.filter((p) =>
+                dnis.has(String(p.NroDoc ?? "").trim()),
+            );
+        },
+
+        _contarDnisPersonal(datos) {
+            if (!Array.isArray(datos)) return 0;
+            if (datos.length > 0 && datos[0]?.Personales !== undefined) {
+                return datos.reduce(
+                    (sum, grupo) => sum + (grupo.Personales?.length ?? 0),
+                    0,
+                );
+            }
+            return datos.length;
+        },
+
+        aplicarDnisImportados(detalle) {
+            if (!detalle || detalle.target !== "reporte") return;
+
+            const encontrados = Array.isArray(detalle.encontrados)
+                ? detalle.encontrados
+                : [];
+
+            if (encontrados.length === 0) return;
+
+            const mapa = new Map(this.importados.map((i) => [i.dni, i]));
+            encontrados.forEach((persona) => {
+                if (!persona?.dni) return;
+                mapa.set(persona.dni, persona);
+            });
+            this.importados = [...mapa.values()];
+        },
+
+        quitarImportados() {
+            this.importados = [];
         },
 
         get nombreCurso() {
@@ -1468,8 +1533,8 @@ export default document.addEventListener("alpine:init", () => {
 
             if (this.cacheReportes[cacheKey]) {
                 const cached = this.cacheReportes[cacheKey];
-                this.personal = cached.personal;
-                this.totalPersonal = cached.total;
+                this.personal = this._filtrarDnisPersonal(cached.personal);
+                this.totalPersonal = this._contarDnisPersonal(this.personal);
                 this.currentPage = 1;
                 this.selectedCursoIndex = -1;
                 this.selectedSucursalIdx = 0;
@@ -1497,17 +1562,16 @@ export default document.addEventListener("alpine:init", () => {
                     const cursos = response.data.Cursos || [];
                     this._cursosExportData = cursos;
 
-                    this.personal = cursos;
-                    this.totalPersonal = cursos.reduce(
-                        (sum, c) => sum + (c.Personales?.length ?? 0),
-                        0,
+                    this.personal = this._filtrarDnisPersonal(cursos);
+                    this.totalPersonal = this._contarDnisPersonal(
+                        this.personal,
                     );
 
                     this.selectedCursoIndex = this.personal.length > 0 ? 0 : -1;
                     this.selectedSucursalIdx = 0;
 
                     this.cacheReportes[cacheKey] = {
-                        personal: this.personal,
+                        personal: cursos,
                         total: this.totalPersonal,
                     };
 
@@ -1538,8 +1602,10 @@ export default document.addEventListener("alpine:init", () => {
             ].join("_");
 
             if (this.cacheReportes[cacheKey]) {
-                this.personal = this.cacheReportes[cacheKey].personal;
-                this.totalPersonal = this.cacheReportes[cacheKey].total;
+                this.personal = this._filtrarDnisPersonal(
+                    this.cacheReportes[cacheKey].personal,
+                );
+                this.totalPersonal = this._contarDnisPersonal(this.personal);
                 return true;
             }
 
@@ -1559,12 +1625,12 @@ export default document.addEventListener("alpine:init", () => {
                 if (response.data.success) {
                     const cursos = response.data.Cursos || [];
                     this._cursosExportData = cursos;
-                    this.personal = cursos.flatMap(
-                        (curso) => curso.Personales || [],
+                    this.personal = this._filtrarDnisPersonal(cursos);
+                    this.totalPersonal = this._contarDnisPersonal(
+                        this.personal,
                     );
-                    this.totalPersonal = this.personal.length;
                     this.cacheReportes[cacheKey] = {
-                        personal: this.personal,
+                        personal: cursos,
                         total: this.totalPersonal,
                     };
                     return true;
@@ -4426,6 +4492,7 @@ export default document.addEventListener("alpine:init", () => {
         selectedCourseIds: [],
         selectAllPersonal: false,
         selectAllCursos: false,
+        importados: [],
 
         personalPerPage: 20,
         cursosPerPage: 15,
@@ -4632,23 +4699,69 @@ export default document.addEventListener("alpine:init", () => {
                 this.selectedUsernames.push(dni);
             } else {
                 this.selectedUsernames.splice(idx, 1);
+                this.importados = this.importados.filter(
+                    (i) => i.dni !== dni,
+                );
             }
-            this.selectAllPersonal =
-                this.selectedUsernames.length ===
-                    this.personalesFiltrados.length &&
-                this.personalesFiltrados.length > 0;
+            this.recalcularSeleccionPersonal();
         },
 
         toggleAllPersonal() {
             if (this.selectAllPersonal) {
                 this.selectedUsernames = [];
+                this.importados = [];
                 this.selectAllPersonal = false;
-            } else {
-                this.selectedUsernames = this.personalesFiltrados
-                    .map((p) => p.dni)
-                    .filter(Boolean);
-                this.selectAllPersonal = true;
+                return;
             }
+
+            const dnis = [
+                ...this.personalesFiltrados.map((p) => p.dni).filter(Boolean),
+                ...this.importados.map((i) => i.dni),
+            ];
+            this.selectedUsernames = [...new Set(dnis)];
+            this.selectAllPersonal = true;
+        },
+
+        recalcularSeleccionPersonal() {
+            this.selectAllPersonal =
+                this.personalesFiltrados.length > 0 &&
+                this.personalesFiltrados.every((p) =>
+                    this.selectedUsernames.includes(p.dni),
+                );
+        },
+
+        aplicarDnisImportados(detalle) {
+            if (!detalle || detalle.target !== "general") return;
+
+            const encontrados = Array.isArray(detalle.encontrados)
+                ? detalle.encontrados
+                : [];
+
+            if (encontrados.length === 0) return;
+
+            const seleccionados = new Set(this.selectedUsernames);
+            const mapa = new Map(this.importados.map((i) => [i.dni, i]));
+
+            encontrados.forEach((persona) => {
+                if (!persona?.dni) return;
+                seleccionados.add(persona.dni);
+                mapa.set(persona.dni, persona);
+            });
+
+            this.selectedUsernames = [...seleccionados];
+            this.importados = [...mapa.values()];
+            this.recalcularSeleccionPersonal();
+        },
+
+        quitarImportados() {
+            if (this.importados.length === 0) return;
+
+            const dnis = new Set(this.importados.map((i) => i.dni));
+            this.selectedUsernames = this.selectedUsernames.filter(
+                (dni) => !dnis.has(dni),
+            );
+            this.importados = [];
+            this.recalcularSeleccionPersonal();
         },
 
         toggleCurso(id) {
@@ -5307,6 +5420,7 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedCourseIds = [];
             this.selectAllPersonal = false;
             this.selectAllCursos = false;
+            this.importados = [];
         },
     }));
 

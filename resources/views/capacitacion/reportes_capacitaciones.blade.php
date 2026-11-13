@@ -413,6 +413,7 @@
 
     {{-- Modal Reporte Por Capacitacion --}}
     <div id="modal-reporte-por-capacitacion" x-data="modalReportePorCapacitacion" x-show="open" x-cloak
+        @dnis-importados.window="aplicarDnisImportados($event.detail)"
         @keydown.escape.window="cerrar()" class="fixed inset-0 z-[80] flex items-center justify-center p-4"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
         x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
@@ -529,6 +530,49 @@
                         <option value="3">Sin acceder</option>
                         <option value="4">En curso</option>
                     </select>
+                </div>
+
+                {{-- Filtro de personal por Excel (opcional) --}}
+                <div>
+                    <div class="flex items-center justify-between gap-2 mb-1.5">
+                        <label class="text-xs font-medium text-default-700 block">
+                            Personal <span class="text-default-400 font-normal">(opcional, filtra el reporte)</span>
+                        </label>
+                        <button type="button"
+                            @click="$dispatch('abrir-importar-dnis', { target: 'reporte', cursoSeleccionado: courseIds.length > 0 })"
+                            class="inline-flex items-center gap-1 px-2 h-6 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold hover:bg-emerald-100 transition-colors cursor-pointer shrink-0">
+                            <i class="ti ti-file-spreadsheet text-[11px]"></i>
+                            Importar Excel
+                        </button>
+                    </div>
+
+                    <template x-if="importados.length > 0">
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                                    <i class="ti ti-file-spreadsheet text-xs"></i>
+                                    <span x-text="importados.length"></span> importado(s) desde Excel
+                                </span>
+                                <button type="button" @click="quitarImportados()"
+                                    class="text-[11px] font-medium text-danger hover:text-danger/80 transition-colors cursor-pointer">
+                                    Quitar
+                                </button>
+                            </div>
+                            <div class="mt-1.5 flex flex-wrap gap-1 max-h-14 overflow-y-auto custom-scrollbar">
+                                <template x-for="imp in importados" :key="'importado-reporte-' + imp.dni">
+                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-default-200 text-[10px] text-default-600"
+                                        :title="(imp.nombre_completo || '') + ' · ' + imp.dni">
+                                        <span class="font-mono" x-text="imp.dni"></span>
+                                        <span class="text-default-400 truncate max-w-[90px]" x-text="imp.nombre_completo || ''"></span>
+                                    </span>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="importados.length === 0">
+                        <p class="text-xs text-default-400 italic">Todos los personales de los cursos seleccionados.</p>
+                    </template>
                 </div>
 
                 {{-- Selección de cursos --}}
@@ -2061,6 +2105,7 @@
 
     {{-- Modal Reporte General de Capacitaciones --}}
     <div id="modal-reporte-general" x-data="modalReporteGeneral" x-show="open" x-cloak
+        @dnis-importados.window="aplicarDnisImportados($event.detail)"
         @keydown.escape.window="cerrar()" class="fixed inset-0 z-[80] flex items-center justify-center p-4"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
         x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
@@ -2177,13 +2222,47 @@
                         </div>
 
                         <div>
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs text-default-500" x-text="selectedUsernames.length + ' personal(es) seleccionado(s)'"></span>
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-xs text-default-500" x-text="selectedUsernames.length + ' personal(es) seleccionado(s)'"></span>
+                                    <button type="button"
+                                        @click="$dispatch('abrir-importar-dnis', { target: 'general', cursoSeleccionado: selectedCourseIds.length > 0 })"
+                                        class="inline-flex items-center gap-1 px-2 h-6 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold hover:bg-emerald-100 transition-colors cursor-pointer shrink-0">
+                                        <i class="ti ti-file-spreadsheet text-[11px]"></i>
+                                        Importar Excel
+                                    </button>
+                                </div>
                                 <button type="button" @click="toggleAllPersonal()"
-                                    class="text-xs text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer"
+                                    class="text-xs text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer shrink-0"
                                     x-text="selectAllPersonal ? 'Deseleccionar todos' : 'Seleccionar todos'">
                                 </button>
                             </div>
+
+                            {{-- DNIs importados desde Excel --}}
+                            <template x-if="importados.length > 0">
+                                <div class="mb-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                                            <i class="ti ti-file-spreadsheet text-xs"></i>
+                                            <span x-text="importados.length"></span> importado(s) desde Excel
+                                        </span>
+                                        <button type="button" @click="quitarImportados()"
+                                            class="text-[11px] font-medium text-danger hover:text-danger/80 transition-colors cursor-pointer">
+                                            Quitar
+                                        </button>
+                                    </div>
+                                    <div class="mt-1.5 flex flex-wrap gap-1 max-h-14 overflow-y-auto custom-scrollbar">
+                                        <template x-for="imp in importados" :key="'importado-general-' + imp.dni">
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-default-200 text-[10px] text-default-600"
+                                                :title="(imp.nombre_completo || '') + ' · ' + imp.dni">
+                                                <span class="font-mono" x-text="imp.dni"></span>
+                                                <span class="text-default-400 truncate max-w-[90px]" x-text="imp.nombre_completo || ''"></span>
+                                            </span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
                             <div class="border border-default-200 rounded-lg max-h-64 overflow-y-auto custom-scrollbar">
                                 <template x-if="personalesFiltrados.length === 0">
                                     <div class="text-center py-6 text-default-400 text-sm">
