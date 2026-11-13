@@ -304,6 +304,7 @@ export default document.addEventListener("alpine:init", () => {
         personalPerPage: 6,
 
         seleccionadosPersonal: [],
+        importados: [],
         exportandoPDF: false,
 
         mostrarPreview: false,
@@ -622,9 +623,54 @@ export default document.addEventListener("alpine:init", () => {
             const idx = this.seleccionadosPersonal.indexOf(clave);
             if (idx !== -1) {
                 this.seleccionadosPersonal.splice(idx, 1);
+                this.importados = this.importados.filter(
+                    (i) => this.clavePersonal(i) !== clave,
+                );
                 return;
             }
             this.seleccionadosPersonal.push(clave);
+        },
+
+        aplicarDnisImportados(detalle) {
+            if (!detalle || detalle.target !== "examenes") return;
+
+            const encontrados = Array.isArray(detalle.encontrados)
+                ? detalle.encontrados
+                : [];
+
+            if (encontrados.length === 0) return;
+
+            const seleccionados = new Set(this.seleccionadosPersonal);
+            const mapa = new Map(
+                this.importados.map((i) => [this.clavePersonal(i), i]),
+            );
+
+            encontrados.forEach((persona) => {
+                if (!persona?.dni) return;
+                const clave = this.clavePersonal(persona);
+                seleccionados.add(clave);
+                mapa.set(clave, persona);
+            });
+
+            this.seleccionadosPersonal = [...seleccionados];
+            this.importados = [...mapa.values()];
+        },
+
+        quitarImportados() {
+            if (this.importados.length === 0) return;
+
+            const claves = new Set(
+                this.importados.map((i) => this.clavePersonal(i)),
+            );
+            this.seleccionadosPersonal = this.seleccionadosPersonal.filter(
+                (clave) => !claves.has(clave),
+            );
+            this.importados = [];
+        },
+
+        limpiarSeleccion() {
+            this.seleccionadosPersonal = [];
+            this.importados = [];
         },
 
         // true si todos los personales filtrados (de todas las páginas) ya están seleccionados
@@ -644,6 +690,9 @@ export default document.addEventListener("alpine:init", () => {
                 const claves = new Set(lista.map((p) => this.clavePersonal(p)));
                 this.seleccionadosPersonal = this.seleccionadosPersonal.filter(
                     (c) => !claves.has(c),
+                );
+                this.importados = this.importados.filter(
+                    (i) => !claves.has(this.clavePersonal(i)),
                 );
                 return;
             }
@@ -680,8 +729,14 @@ export default document.addEventListener("alpine:init", () => {
 
         get personalSeleccionadoDetalle() {
             return this.seleccionadosPersonal
-                .map((clave) =>
-                    this.personal.find((p) => this.clavePersonal(p) === clave),
+                .map(
+                    (clave) =>
+                        this.personal.find(
+                            (p) => this.clavePersonal(p) === clave,
+                        ) ||
+                        this.importados.find(
+                            (p) => this.clavePersonal(p) === clave,
+                        ),
                 )
                 .filter(Boolean);
         },
