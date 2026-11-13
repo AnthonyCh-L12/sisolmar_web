@@ -172,240 +172,265 @@
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {{-- Card 1: Reporte por capacitación --}}
         <div
-            class="card-hover group relative overflow-hidden rounded-2xl border border-default-200/60 bg-white shadow-sm">
-            <div class="relative p-6 flex flex-col h-full">
-                <!-- Icon + Badge -->
-                <div class="flex items-start justify-between mb-5">
+            class="group relative flex flex-col overflow-hidden rounded-2xl border border-default-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10">
+            <span class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-blue-400 to-cyan-400"></span>
+            <span class="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-primary/10 blur-3xl transition-transform duration-500 group-hover:scale-125"></span>
+
+            <div class="relative flex flex-1 flex-col p-6">
+                <div class="mb-5 flex items-start justify-between">
                     <div
-                        class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center shadow-md shadow-primary/20">
-                        <i class="ti ti-file-report text-xl text-white"></i>
+                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-blue-400 text-white shadow-lg shadow-primary/25 ring-4 ring-primary/10">
+                        <i class="ti ti-file-report text-xl"></i>
                     </div>
                     <span
-                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-default-100 text-default-600 text-[10px] font-bold uppercase tracking-wider">
+                        class="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
                         <i class="ti ti-users text-[9px]"></i>
                         Personal
                     </span>
                 </div>
 
-                <!-- Title + Description -->
-                <h3 class="text-base font-bold text-default-900 mb-2">Reporte por capacitación</h3>
-                <p class="text-sm text-default-500 leading-relaxed mb-4">
+                <h3 class="mb-1.5 text-[15px] font-bold leading-snug text-default-900">Reporte por capacitación</h3>
+                <p class="mb-4 text-[13px] leading-relaxed text-default-500">
                     Identifique al personal según su estado en una capacitación específica.
                 </p>
 
-                <!-- Features -->
-                <div class="space-y-2 mb-5 flex-grow">
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-primary shrink-0"></i>
-                        <span class="text-xs text-default-600">Filtre por sistema, área, sucursal y curso</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-primary shrink-0"></i>
-                        <span class="text-xs text-default-600">Estado: Pendiente, Aprobado o Desaprobado</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-primary shrink-0"></i>
-                        <span class="text-xs text-default-600">Exporte a Excel y PDF</span>
-                    </div>
-                </div>
+                <ul class="mb-5 flex-grow space-y-2.5">
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Filtre por sistema, área, sucursal y curso</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Estado: Pendiente, Aprobado o Desaprobado</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Exporte a Excel y PDF</span>
+                    </li>
+                </ul>
 
-                <!-- Button -->
                 <button @click="abrirModalReporte()"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors w-full">
-                    <i class="ti ti-arrow-right text-sm"></i>
+                    class="group/btn inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all duration-300 hover:brightness-105 hover:shadow-md hover:shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2">
                     Generar reporte
+                    <i class="ti ti-arrow-right text-sm transition-transform duration-300 group-hover/btn:translate-x-0.5"></i>
                 </button>
             </div>
         </div>
 
         {{-- Card 2: Reporte de capacitaciones --}}
         <div
-            class="card-hover group relative overflow-hidden rounded-2xl border border-default-200/60 bg-white shadow-sm">
-            <div class="relative p-6 flex flex-col h-full">
-                <!-- Icon + Badge -->
-                <div class="flex items-start justify-between mb-5">
+            class="group relative flex flex-col overflow-hidden rounded-2xl border border-default-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-amber-300 hover:shadow-xl hover:shadow-amber-500/10">
+            <span class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-yellow-400"></span>
+            <span class="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-amber-500/10 blur-3xl transition-transform duration-500 group-hover:scale-125"></span>
+
+            <div class="relative flex flex-1 flex-col p-6">
+                <div class="mb-5 flex items-start justify-between">
                     <div
-                        class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-400 flex items-center justify-center shadow-md shadow-amber-500/20">
-                        <i class="ti ti-books text-xl text-white"></i>
+                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-400 text-white shadow-lg shadow-amber-500/25 ring-4 ring-amber-500/10">
+                        <i class="ti ti-books text-xl"></i>
                     </div>
                     <span
-                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-[10px] font-bold uppercase tracking-wider">
+                        class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600">
                         <i class="ti ti-calendar text-[9px]"></i>
                         Cursos
                     </span>
                 </div>
 
-                <!-- Title + Description -->
-                <h3 class="text-base font-bold text-default-900 mb-2">Reporte de capacitaciones</h3>
-                <p class="text-sm text-default-500 leading-relaxed mb-4">
+                <h3 class="mb-1.5 text-[15px] font-bold leading-snug text-default-900">Reporte de capacitaciones</h3>
+                <p class="mb-4 text-[13px] leading-relaxed text-default-500">
                     Obtenga el listado completo de cursos con fechas, responsables y descripciones.
                 </p>
 
-                <!-- Features -->
-                <div class="space-y-2 mb-5 flex-grow">
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-amber-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Filtre por sistema, área y período</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-amber-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Detalle de responsable y descripción</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-amber-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Exporte a Excel y PDF</span>
-                    </div>
-                </div>
+                <ul class="mb-5 flex-grow space-y-2.5">
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Filtre por sistema, área y período</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Detalle de responsable y descripción</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Exporte a Excel y PDF</span>
+                    </li>
+                </ul>
 
-                <!-- Button -->
                 <button @click="abrirModalCursosArea()"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors w-full">
-                    <i class="ti ti-arrow-right text-sm"></i>
+                    class="group/btn inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-amber-500/25 transition-all duration-300 hover:brightness-105 hover:shadow-md hover:shadow-amber-500/30 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:ring-offset-2">
                     Generar reporte
+                    <i class="ti ti-arrow-right text-sm transition-transform duration-300 group-hover/btn:translate-x-0.5"></i>
                 </button>
             </div>
         </div>
 
         {{-- Card 3: Récord por personal --}}
         <div
-            class="card-hover group relative overflow-hidden rounded-2xl border border-default-200/60 bg-white shadow-sm">
-            <div class="relative p-6 flex flex-col h-full">
-                <!-- Icon + Badge -->
-                <div class="flex items-start justify-between mb-5">
+            class="group relative flex flex-col overflow-hidden rounded-2xl border border-default-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-500/10">
+            <span class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-green-400 to-teal-400"></span>
+            <span class="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-emerald-500/10 blur-3xl transition-transform duration-500 group-hover:scale-125"></span>
+
+            <div class="relative flex flex-1 flex-col p-6">
+                <div class="mb-5 flex items-start justify-between">
                     <div
-                        class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-400 flex items-center justify-center shadow-md shadow-green-500/20">
-                        <i class="ti ti-history text-xl text-white"></i>
+                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-400 text-white shadow-lg shadow-emerald-500/25 ring-4 ring-emerald-500/10">
+                        <i class="ti ti-history text-xl"></i>
                     </div>
                     <span
-                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-bold uppercase tracking-wider">
+                        class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600">
                         <i class="ti ti-user text-[9px]"></i>
                         Historial
                     </span>
                 </div>
 
-                <!-- Title + Description -->
-                <h3 class="text-base font-bold text-default-900 mb-2">Récord Histórico de Capacitación por personal</h3>
-                <p class="text-sm text-default-500 leading-relaxed mb-4">
+                <h3 class="mb-1.5 text-[15px] font-bold leading-snug text-default-900">Récord Histórico de Capacitación por personal</h3>
+                <p class="mb-4 text-[13px] leading-relaxed text-default-500">
                     Consulte el historial completo de cursos de un colaborador específico.
                 </p>
 
-                <!-- Features -->
-                <div class="space-y-2 mb-5 flex-grow">
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-green-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Búsqueda por nombre o DNI</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-green-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Filtre por sistema, área y estado</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-green-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Fechas de matrícula y último acceso</span>
-                    </div>
-                </div>
+                <ul class="mb-5 flex-grow space-y-2.5">
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Búsqueda por nombre o DNI</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Filtre por sistema, área y estado</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Fechas de matrícula y último acceso</span>
+                    </li>
+                </ul>
 
-                <!-- Button -->
                 <button @click="abrirModalRecordPersonal()"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-green-500 text-white text-sm font-semibold hover:bg-green-600 transition-colors w-full">
-                    <i class="ti ti-arrow-right text-sm"></i>
+                    class="group/btn inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-500/25 transition-all duration-300 hover:brightness-105 hover:shadow-md hover:shadow-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:ring-offset-2">
                     Generar reporte
+                    <i class="ti ti-arrow-right text-sm transition-transform duration-300 group-hover/btn:translate-x-0.5"></i>
                 </button>
             </div>
         </div>
 
         {{-- Card 4: Reporte General de Capacitaciones --}}
         <div
-            class="card-hover group relative overflow-hidden rounded-2xl border border-default-200/60 bg-white shadow-sm">
-            <div class="relative p-6 flex flex-col h-full">
-                <!-- Icon + Badge -->
-                <div class="flex items-start justify-between mb-5">
+            class="group relative flex flex-col overflow-hidden rounded-2xl border border-default-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl hover:shadow-violet-500/10">
+            <span class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 via-purple-400 to-fuchsia-400"></span>
+            <span class="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-violet-500/10 blur-3xl transition-transform duration-500 group-hover:scale-125"></span>
+
+            <div class="relative flex flex-1 flex-col p-6">
+                <div class="mb-5 flex items-start justify-between">
                     <div
-                        class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-400 flex items-center justify-center shadow-md shadow-violet-500/20">
-                        <i class="ti ti-report-analytics text-xl text-white"></i>
+                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-400 text-white shadow-lg shadow-violet-500/25 ring-4 ring-violet-500/10">
+                        <i class="ti ti-report-analytics text-xl"></i>
                     </div>
                     <span
-                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-violet-50 text-violet-600 text-[10px] font-bold uppercase tracking-wider">
+                        class="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-violet-600">
                         <i class="ti ti-chart-bar text-[9px]"></i>
                         General
                     </span>
                 </div>
 
-                <!-- Title + Description -->
-                <h3 class="text-base font-bold text-default-900 mb-2">Reporte General de Capacitaciones</h3>
-                <p class="text-sm text-default-500 leading-relaxed mb-4">
+                <h3 class="mb-1.5 text-[15px] font-bold leading-snug text-default-900">Reporte General de Capacitaciones</h3>
+                <p class="mb-4 text-[13px] leading-relaxed text-default-500">
                     Visualice y exporte datos consolidados con filtros avanzados.
                 </p>
 
-                <!-- Features -->
-                <div class="space-y-2 mb-5 flex-grow">
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-violet-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Filtre por empresa, sucursal y tipo de trabajo</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-violet-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Personal, estado, capacitación y pool</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-violet-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Exporte a Excel y PDF</span>
-                    </div>
-                </div>
+                <ul class="mb-5 flex-grow space-y-2.5">
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Filtre por empresa, sucursal y tipo de trabajo</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Personal, estado, capacitación y pool</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-violet-500/10 text-violet-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Exporte a Excel y PDF</span>
+                    </li>
+                </ul>
 
-                <!-- Button -->
                 <button @click="abrirModalReporteGeneral()"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-violet-500 text-white text-sm font-semibold hover:bg-violet-600 transition-colors w-full">
-                    <i class="ti ti-arrow-right text-sm"></i>
+                    class="group/btn inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-400 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-violet-500/25 transition-all duration-300 hover:brightness-105 hover:shadow-md hover:shadow-violet-500/30 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:ring-offset-2">
                     Generar reporte
+                    <i class="ti ti-arrow-right text-sm transition-transform duration-300 group-hover/btn:translate-x-0.5"></i>
                 </button>
             </div>
         </div>
 
         {{-- Card 5: Reporte Formato --}}
         <div
-            class="card-hover group relative overflow-hidden rounded-2xl border border-default-200/60 bg-white shadow-sm">
-            <div class="relative p-6 flex flex-col h-full">
-                <!-- Icon + Badge -->
-                <div class="flex items-start justify-between mb-5">
+            class="group relative flex flex-col overflow-hidden rounded-2xl border border-default-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-rose-300 hover:shadow-xl hover:shadow-rose-500/10">
+            <span class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-500 via-pink-400 to-fuchsia-400"></span>
+            <span class="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-rose-500/10 blur-3xl transition-transform duration-500 group-hover:scale-125"></span>
+
+            <div class="relative flex flex-1 flex-col p-6">
+                <div class="mb-5 flex items-start justify-between">
                     <div
-                        class="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-rose-400 flex items-center justify-center shadow-md shadow-rose-500/20">
-                        <i class="ti ti-certificate text-xl text-white"></i>
+                        class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-pink-400 text-white shadow-lg shadow-rose-500/25 ring-4 ring-rose-500/10">
+                        <i class="ti ti-certificate text-xl"></i>
                     </div>
                     <span
-                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 text-[10px] font-bold uppercase tracking-wider">
+                        class="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-600">
                         <i class="ti ti-signature text-[9px]"></i>
                         Constancia
                     </span>
                 </div>
 
-                <!-- Title + Description -->
-                <h3 class="text-base font-bold text-default-900 mb-2">Reporte Formato</h3>
-                <p class="text-sm text-default-500 leading-relaxed mb-4">
+                <h3 class="mb-1.5 text-[15px] font-bold leading-snug text-default-900">Reporte Formato</h3>
+                <p class="mb-4 text-[13px] leading-relaxed text-default-500">
                     Constancia de participación del personal seleccionado en una capacitación, con firma del capacitador y personal capacitado.
                 </p>
 
-                <!-- Features -->
-                <div class="space-y-2 mb-5 flex-grow">
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-rose-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Personal seleccionado por curso</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-rose-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Firma del capacitador y del personal</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i class="ti ti-check text-xs text-rose-500 shrink-0"></i>
-                        <span class="text-xs text-default-600">Exporte a PDF</span>
-                    </div>
-                </div>
+                <ul class="mb-5 flex-grow space-y-2.5">
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Personal seleccionado por curso</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Firma del capacitador y del personal</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-rose-500/10 text-rose-600">
+                            <i class="ti ti-check text-[9px]"></i>
+                        </span>
+                        <span class="text-xs leading-relaxed text-default-600">Exporte a PDF</span>
+                    </li>
+                </ul>
 
-                <!-- Button -->
                 <button @click="abrirModalReporteFormato()"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500 text-white text-sm font-semibold hover:bg-rose-600 transition-colors w-full">
-                    <i class="ti ti-arrow-right text-sm"></i>
+                    class="group/btn inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-400 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-rose-500/25 transition-all duration-300 hover:brightness-105 hover:shadow-md hover:shadow-rose-500/30 focus:outline-none focus:ring-2 focus:ring-rose-500/40 focus:ring-offset-2">
                     Generar reporte
+                    <i class="ti ti-arrow-right text-sm transition-transform duration-300 group-hover/btn:translate-x-0.5"></i>
                 </button>
             </div>
         </div>
@@ -2074,7 +2099,7 @@
         x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
         style="background: rgba(36,39,70,0.45);">
 
-        <div :class="view === 'results' ? 'max-w-[90vw] max-h-[100vh]' : 'max-w-4xl'" class="flex flex-col w-full bg-white rounded-2xl shadow-2xl shadow-primary/10 border border-default-200 overflow-hidden transition-all duration-300"
+                <div :class="view === 'results' ? 'max-w-[90vw] max-h-[100vh]' : 'max-w-5xl'" class="flex flex-col w-full bg-white rounded-2xl shadow-2xl shadow-primary/10 border border-default-200 overflow-hidden transition-all duration-300"
             x-transition:enter="transition ease-out duration-300"
             x-transition:enter-start="opacity-0 scale-95 translate-y-4"
             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
