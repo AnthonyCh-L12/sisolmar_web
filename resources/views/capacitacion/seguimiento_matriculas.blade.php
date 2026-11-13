@@ -422,7 +422,8 @@
                         </h1>
 
                         <p class="mt-3 text-sm leading-7 text-default-600 max-w-3xl">
-                            Control de los participantes matriculados, aplicando medidas disciplinarias en los casos de incumplimiento de la programación.
+                            Control de los participantes matriculados, aplicando medidas disciplinarias en los casos de
+                            incumplimiento de la programación.
                         </p>
                     </div>
 
@@ -541,7 +542,8 @@
                 x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2">
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
                     <h2 class="text-base font-bold text-default-900">Cursos registrados</h2>
-                    <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
+                    <div
+                        class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
                         <div class="relative sm:flex-none sm:min-w-[220px]">
                             <i
                                 class="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
@@ -573,75 +575,85 @@
                 <div class="flex flex-col gap-3 mb-4">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-bold text-default-900">Lista de personal</h2>
-                        <div id="selectedPersonalInfo" class="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/5 px-2.5 py-1 rounded-full">
+                        <div id="selectedPersonalInfo"
+                            class="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/5 px-2.5 py-1 rounded-full">
                             <i class="ti ti-checks text-sm"></i>
                             <span><span id="selectedPersonalCount">0</span> seleccionados</span>
                         </div>
                     </div>
-                    <div class="flex flex-col gap-3 bg-white rounded-xl p-4 border border-default-200/60 shadow-sm" x-data="filtrosPersonal()">
+                    <div class="flex flex-col gap-3 bg-white rounded-xl p-4 border border-default-200/60 shadow-sm"
+                        x-data="filtrosPersonal()">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-xs font-medium text-default-700">Sucursal</label>
                                 <div class="relative">
-                                    <i class="ti ti-building-store absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
-                                    <select id="filtroSucursalPersonal" :disabled="tabActivo !== 'personal' && tabActivo !== 'memos'"
-                                        @change="verificar()"
-                                        style="background-image: none !important;" class="w-full pl-8 pr-8 py-1.5 text-sm border border-default-200 rounded-lg
+                                    <i
+                                        class="ti ti-building-store absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
+                                    <select id="filtroSucursalPersonal"
+                                        :disabled="tabActivo !== 'personal' && tabActivo !== 'memos'"
+                                        @change="verificar()" style="background-image: none !important;" class="w-full pl-8 pr-8 py-1.5 text-sm border border-default-200 rounded-lg
                                    !bg-white !text-default-700 !appearance-none cursor-pointer
                                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50"
                                         :class="{ '!cursor-not-allowed opacity-60': tabActivo !== 'personal' && tabActivo !== 'memos' }">
                                         <option value="">Todas las sucursales</option>
                                     </select>
-                                    <i class="ti ti-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-default-400 pointer-events-none"></i>
+                                    <i
+                                        class="ti ti-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-default-400 pointer-events-none"></i>
                                 </div>
                             </div>
 
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-xs font-medium text-default-700">Tipo de trabajador</label>
                                 <div class="relative">
-                                    <i class="ti ti-briefcase absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
-                                    <select id="filtroTipoPersonal" :disabled="tabActivo !== 'personal' && tabActivo !== 'memos'"
-                                        @change="verificar()"
-                                        style="background-image: none !important;" class="w-full pl-8 pr-8 py-1.5 text-sm border border-default-200 rounded-lg
+                                    <i
+                                        class="ti ti-briefcase absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
+                                    <select id="filtroTipoPersonal"
+                                        :disabled="tabActivo !== 'personal' && tabActivo !== 'memos'"
+                                        @change="verificar()" style="background-image: none !important;" class="w-full pl-8 pr-8 py-1.5 text-sm border border-default-200 rounded-lg
                                    !bg-white !text-default-700 !appearance-none cursor-pointer
                                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50"
                                         :class="{ '!cursor-not-allowed opacity-60': tabActivo !== 'personal' && tabActivo !== 'memos' }">
                                         <option value="">Todos los tipos</option>
                                     </select>
-                                    <i class="ti ti-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-default-400 pointer-events-none"></i>
+                                    <i
+                                        class="ti ti-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-default-400 pointer-events-none"></i>
                                 </div>
                             </div>
 
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-xs font-medium text-default-700">Cargo</label>
                                 <div class="relative">
-                                    <i class="ti ti-tag absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
-                                    <select id="filtroCargoPersonal" :disabled="tabActivo !== 'personal' && tabActivo !== 'memos'"
-                                        @change="verificar()"
-                                        style="background-image: none !important;" class="w-full pl-8 pr-8 py-1.5 text-sm border border-default-200 rounded-lg
+                                    <i
+                                        class="ti ti-tag absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
+                                    <select id="filtroCargoPersonal"
+                                        :disabled="tabActivo !== 'personal' && tabActivo !== 'memos'"
+                                        @change="verificar()" style="background-image: none !important;" class="w-full pl-8 pr-8 py-1.5 text-sm border border-default-200 rounded-lg
                                    !bg-white !text-default-700 !appearance-none cursor-pointer
                                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50"
                                         :class="{ '!cursor-not-allowed opacity-60': tabActivo !== 'personal' && tabActivo !== 'memos' }">
                                         <option value="">Todos los cargos</option>
                                     </select>
-                                    <i class="ti ti-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-default-400 pointer-events-none"></i>
+                                    <i
+                                        class="ti ti-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-default-400 pointer-events-none"></i>
                                 </div>
                             </div>
 
                             <div class="flex flex-col gap-1.5">
                                 <label class="text-xs font-medium text-default-700">Cliente</label>
                                 <div class="relative">
-                                    <i class="ti ti-building absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
-                                    <select id="filtroClientePersonal" :disabled="tabActivo !== 'personal' && tabActivo !== 'memos'"
-                                        @change="verificar()"
-                                        style="background-image: none !important;" class="w-full pl-8 pr-8 py-1.5 text-sm border border-default-200 rounded-lg
+                                    <i
+                                        class="ti ti-building absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
+                                    <select id="filtroClientePersonal"
+                                        :disabled="tabActivo !== 'personal' && tabActivo !== 'memos'"
+                                        @change="verificar()" style="background-image: none !important;" class="w-full pl-8 pr-8 py-1.5 text-sm border border-default-200 rounded-lg
                                    !bg-white !text-default-700 !appearance-none cursor-pointer
                                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50"
                                         :class="{ '!cursor-not-allowed opacity-60': tabActivo !== 'personal' && tabActivo !== 'memos' }">
                                         <option value="">Todos los clientes</option>
                                         <option value="Sin cliente">Sin cliente</option>
                                     </select>
-                                    <i class="ti ti-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-default-400 pointer-events-none"></i>
+                                    <i
+                                        class="ti ti-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-default-400 pointer-events-none"></i>
                                 </div>
                             </div>
                         </div>
@@ -649,7 +661,8 @@
                         <div class="flex flex-col gap-1.5" x-data="searchPersonalSeguimiento()">
                             <label class="text-xs font-medium text-default-700">Buscar personal</label>
                             <div class="relative">
-                                <i class="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
+                                <i
+                                    class="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
                                 <input x-ref="inputBuscar" x-model="query" @input="search(); posicionarDropdown()"
                                     @focus="posicionarDropdown()" @keydown.enter.stop="seleccionarPrimerResultado()"
                                     @click.away="open = false" :disabled="tabActivo === 'memos'"
@@ -666,7 +679,8 @@
                                     class="fixed z-[999] bg-white border border-default-200 rounded-xl shadow-xl overflow-hidden">
 
                                     <div class="px-3 py-2 border-b border-default-100">
-                                        <span class="text-[10px] font-semibold tracking-widest uppercase text-default-400">Resultados</span>
+                                        <span
+                                            class="text-[10px] font-semibold tracking-widest uppercase text-default-400">Resultados</span>
                                     </div>
 
                                     <div class="max-h-56 overflow-y-auto custom-scrollbar">
@@ -680,7 +694,8 @@
                                                         x-text="p.nombre_completo"></p>
                                                     <p class="text-xs mt-0.5">
                                                         <span class="text-default-400">DNI</span>
-                                                        <span class="ml-1 bg-default-100 text-default-600 rounded px-1 py-0.5 font-mono text-[11px]"
+                                                        <span
+                                                            class="ml-1 bg-default-100 text-default-600 rounded px-1 py-0.5 font-mono text-[11px]"
                                                             x-text="p.dni || '—'"></span>
                                                     </p>
                                                 </div>
@@ -697,10 +712,7 @@
 
                         <div class="flex gap-2 w-full">
 
-                            <button
-                                id="btnLimpiarFiltroPersonal"
-                                type="button"
-                                :disabled="!hayFiltros"
+                            <button id="btnLimpiarFiltroPersonal" type="button" :disabled="!hayFiltros"
                                 :class="hayFiltros
                                     ? 'flex-1 h-9 px-4 inline-flex items-center justify-center gap-1.5 bg-default-100 text-default-700 text-xs font-semibold rounded-lg shadow-sm hover:bg-default-200 transition cursor-pointer'
                                     : 'flex-1 h-9 px-4 inline-flex items-center justify-center gap-1.5 bg-default-100 text-default-300 text-xs font-semibold rounded-lg cursor-not-allowed'">
@@ -708,11 +720,7 @@
                                 Limpiar filtros
                             </button>
 
-                            <button
-                                id="btnDeshacerSeleccionPersonal"
-                                type="button"
-                                disabled
-                                class="h-9 px-4 inline-flex items-center justify-center gap-1.5
+                            <button id="btnDeshacerSeleccionPersonal" type="button" disabled class="h-9 px-4 inline-flex items-center justify-center gap-1.5
             bg-white text-default-700 text-xs font-semibold
             rounded-lg shadow-sm border border-default-200
             opacity-50 cursor-not-allowed
@@ -721,11 +729,7 @@
                                 Deshacer selección
                             </button>
 
-                            <button
-                                id="btnEnviarMemosPersonal"
-                                type="button"
-                                disabled
-                                class="flex-1 h-9 px-4 inline-flex items-center justify-center gap-1.5
+                            <button id="btnEnviarMemosPersonal" type="button" disabled class="flex-1 h-9 px-4 inline-flex items-center justify-center gap-1.5
             bg-primary text-white text-xs font-semibold
             rounded-lg shadow-sm opacity-50 cursor-not-allowed
             hover:bg-primary/90 transition">
@@ -750,12 +754,12 @@
                 <div class="flex flex-col gap-3">
                     <div x-data="memosStats()" class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <!-- MEMOs de nivel uno enviados -->
-                        <div
-                            @click="filtrarNivel(1)"
+                        <div @click="filtrarNivel(1)"
                             :class="nivelActivo === 1
                                 ? 'rounded-xl border-2 border-blue-400 bg-blue-50/40 shadow-md ring-2 ring-blue-200/50 cursor-pointer transition-all duration-200 -translate-y-0.5'
                                 : 'rounded-xl border border-primary/20 bg-white shadow-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-blue-300'">
-                            <div class="flex items-center gap-3 px-4 py-3 border-b border-primary/10 bg-gradient-to-r from-blue-50/80 to-transparent">
+                            <div
+                                class="flex items-center gap-3 px-4 py-3 border-b border-primary/10 bg-gradient-to-r from-blue-50/80 to-transparent">
                                 <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
                                     <i class="ti ti-info-circle text-blue-600 text-sm"></i>
                                 </div>
@@ -766,8 +770,7 @@
                             </div>
                             <div class="px-4 py-3 flex items-center justify-between">
                                 <span class="text-[11px] text-default-500">Total enviados</span>
-                                <span class="text-lg font-bold text-blue-600"
-                                    x-text="totalNivelUno"></span>
+                                <span class="text-lg font-bold text-blue-600" x-text="totalNivelUno"></span>
                             </div>
                         </div>
 
@@ -776,7 +779,8 @@
                             :class="nivelActivo === 2
                                 ? 'rounded-xl border-2 border-orange-400 bg-orange-50/40 shadow-md ring-2 ring-orange-200/50 cursor-pointer transition-all duration-200 -translate-y-0.5'
                                 : 'rounded-xl border border-primary/20 bg-white shadow-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-orange-300'">
-                            <div class="flex items-center gap-3 px-4 py-3 border-b border-orange-100 bg-gradient-to-r from-orange-50/80 to-transparent">
+                            <div
+                                class="flex items-center gap-3 px-4 py-3 border-b border-orange-100 bg-gradient-to-r from-orange-50/80 to-transparent">
                                 <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
                                     <i class="ti ti-alert-triangle text-orange-600 text-sm"></i>
                                 </div>
@@ -787,8 +791,7 @@
                             </div>
                             <div class="px-4 py-3 flex items-center justify-between">
                                 <span class="text-[11px] text-default-500">Total enviados</span>
-                                <span class="text-lg font-bold text-orange-600"
-                                    x-text="totalNivelDos"></span>
+                                <span class="text-lg font-bold text-orange-600" x-text="totalNivelDos"></span>
                             </div>
                         </div>
 
@@ -797,7 +800,8 @@
                             :class="nivelActivo === 3
                                 ? 'rounded-xl border-2 border-red-400 bg-red-50/40 shadow-md ring-2 ring-red-200/50 cursor-pointer transition-all duration-200 -translate-y-0.5'
                                 : 'rounded-xl border border-primary/20 bg-white shadow-sm cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-red-300'">
-                            <div class="flex items-center gap-3 px-4 py-3 border-b border-red-100 bg-gradient-to-r from-red-50/80 to-transparent">
+                            <div
+                                class="flex items-center gap-3 px-4 py-3 border-b border-red-100 bg-gradient-to-r from-red-50/80 to-transparent">
                                 <div class="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
                                     <i class="ti ti-bell-ringing text-red-600 text-sm"></i>
                                 </div>
@@ -808,16 +812,13 @@
                             </div>
                             <div class="px-4 py-3 flex items-center justify-between">
                                 <span class="text-[11px] text-default-500">Total enviados</span>
-                                <span class="text-lg font-bold text-red-600"
-                                    x-text="totalNivelTres"></span>
+                                <span class="text-lg font-bold text-red-600" x-text="totalNivelTres"></span>
                             </div>
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        @click="document.getElementById('modal-comparativa')._x_dataStack?.[0]?.abrir()"
-                        class="w-full px-4 py-2.5 inline-flex items-center justify-center gap-2
+                    <button type="button"
+                        @click="document.getElementById('modal-comparativa')._x_dataStack?.[0]?.abrir()" class="w-full px-4 py-2.5 inline-flex items-center justify-center gap-2
                             rounded-xl border border-purple-200/60
                             bg-white/70 backdrop-blur
                             text-purple-700 text-sm font-semibold
@@ -834,10 +835,7 @@
                     <div class="w-full flex flex-col gap-2">
                         <div class="flex flex-col md:flex-row gap-2">
                             <div class="relative flex-1">
-                                <input
-                                    id="buscarMemosEnviados"
-                                    type="text"
-                                    placeholder="Buscar por nombre o DNI..."
+                                <input id="buscarMemosEnviados" type="text" placeholder="Buscar por nombre o DNI..."
                                     class="w-full h-10 pl-9 pr-3 text-sm text-default-700 placeholder:text-default-400
                        bg-white border border-default-200 rounded-lg shadow-sm
                        outline-none transition
@@ -846,9 +844,7 @@
                             </div>
 
                             <div class="w-full md:w-64">
-                                <select
-                                    id="filtroClienteMemos"
-                                    class="w-full h-10 px-3 text-sm text-default-700
+                                <select id="filtroClienteMemos" class="w-full h-10 px-3 text-sm text-default-700
                        bg-white border border-default-200 rounded-lg shadow-sm
                        outline-none transition
                        hover:border-default-300
@@ -858,9 +854,7 @@
                             </div>
 
                             <div class="w-full md:w-64">
-                                <select
-                                    id="filtroTipoTrabMemos"
-                                    class="w-full h-10 px-3 text-sm text-default-700
+                                <select id="filtroTipoTrabMemos" class="w-full h-10 px-3 text-sm text-default-700
                        bg-white border border-default-200 rounded-lg shadow-sm
                        outline-none transition
                        hover:border-default-300
@@ -870,9 +864,7 @@
                             </div>
 
                             <div class="w-full md:w-64">
-                                <select
-                                    id="filtroSucursalMemos"
-                                    class="w-full h-10 px-3 text-sm text-default-700
+                                <select id="filtroSucursalMemos" class="w-full h-10 px-3 text-sm text-default-700
                        bg-white border border-default-200 rounded-lg shadow-sm
                        outline-none transition
                        hover:border-default-300
@@ -881,10 +873,7 @@
                                 </select>
                             </div>
 
-                            <button
-                                id="btnLimpiarFiltroMemos"
-                                type="button"
-                                class="h-10 px-4 inline-flex items-center gap-1.5
+                            <button id="btnLimpiarFiltroMemos" type="button" class="h-10 px-4 inline-flex items-center gap-1.5
                    bg-default-100 text-default-700 text-xs font-semibold
                    rounded-lg shadow-sm
                    hover:bg-default-200 transition">
@@ -918,21 +907,25 @@
         <!-- Header -->
         <div class="flex justify-between items-start py-5 px-6 border-b border-default-100">
             <div class="flex items-start gap-4 flex-1 min-w-0">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white shadow-sm shrink-0">
+                <div
+                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white shadow-sm shrink-0">
                     <i class="ti ti-book text-lg"></i>
                 </div>
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                        <h3 class="text-[15px] font-semibold text-default-900 leading-tight truncate" x-text="curso.nombre">Cargando...</h3>
+                        <h3 class="text-[15px] font-semibold text-default-900 leading-tight truncate"
+                            x-text="curso.nombre">Cargando...</h3>
                     </div>
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider"
+                        <span
+                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider"
                             x-text="'#' + curso.codigo"></span>
                         <template x-if="curso.responsable">
                             <div class="flex items-center gap-1.5">
                                 <span class="text-default-300">|</span>
                                 <i class="ti ti-user text-[10px] text-default-400"></i>
-                                <span class="text-[10px] font-semibold text-default-500 truncate" x-text="curso.responsable"></span>
+                                <span class="text-[10px] font-semibold text-default-500 truncate"
+                                    x-text="curso.responsable"></span>
                             </div>
                         </template>
                         <template x-if="curso.fechaCreacion">
@@ -949,7 +942,8 @@
                                 <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
                                 <span class="text-[11px] text-default-600">
                                     <span class="font-semibold">Progamación actual:</span>
-                                    <span x-text="formatearFecha(curso.programacion_actual.fecha_inicio) + ' al ' + formatearFecha(curso.programacion_actual.fecha_final)"></span>
+                                    <span
+                                        x-text="formatearFecha(curso.programacion_actual.fecha_inicio) + ' al ' + formatearFecha(curso.programacion_actual.fecha_final)"></span>
                                 </span>
                             </div>
                         </template>
@@ -1059,14 +1053,15 @@
         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-        x-transition:leave-end="opacity-0 scale-95 translate-y-4"
-        @click.outside="cerrar()">
+        x-transition:leave-end="opacity-0 scale-95 translate-y-4" @click.outside="cerrar()">
 
         <!-- Header -->
-        <div class="flex justify-between items-start py-5 px-6 border-b border-default-100 shrink-0 bg-gradient-to-r from-white to-default-50/30">
+        <div
+            class="flex justify-between items-start py-5 px-6 border-b border-default-100 shrink-0 bg-gradient-to-r from-white to-default-50/30">
             <div class="flex items-start gap-4 flex-1 min-w-0">
                 <div class="relative shrink-0">
-                    <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white shadow-sm">
+                    <div
+                        class="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white shadow-sm">
                         <i class="ti text-lg" :class="{
                             'ti-users': statusId === 0,
                             'ti-circle-check': statusId === 1,
@@ -1075,8 +1070,7 @@
                             'ti-player-play': statusId === 4
                         }"></i>
                     </div>
-                    <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white"
-                        :class="{
+                    <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white" :class="{
                             'bg-default-400': statusId === 0,
                             'bg-green-500': statusId === 1,
                             'bg-red-500': statusId === 2,
@@ -1087,8 +1081,10 @@
 
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <h3 class="text-[15px] font-semibold text-default-900 leading-tight truncate" x-text="cursoNombre">Cargando...</h3>
-                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm"
+                        <h3 class="text-[15px] font-semibold text-default-900 leading-tight truncate"
+                            x-text="cursoNombre">Cargando...</h3>
+                        <span
+                            class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm"
                             :class="{
                                 'bg-default-100 text-default-700': statusId === 0,
                                 'bg-green-100 text-green-700': statusId === 1,
@@ -1096,8 +1092,7 @@
                                 'bg-gray-100 text-gray-600': statusId === 3,
                                 'bg-blue-100 text-blue-700': statusId === 4
                             }">
-                            <i class="ti text-[10px]"
-                                :class="{
+                            <i class="ti text-[10px]" :class="{
                                     'ti-users': statusId === 0,
                                     'ti-circle-check': statusId === 1,
                                     'ti-circle-x': statusId === 2,
@@ -1113,9 +1108,11 @@
                             <i class="ti ti-users text-xs"></i>
                             <span>Total: <strong x-text="personales.length" class="text-default-700"></strong></span>
                         </div>
-                        <div class="flex items-center gap-1" x-show="!loading && personales.length > 0 && personalesFiltrados.length !== personales.length">
+                        <div class="flex items-center gap-1"
+                            x-show="!loading && personales.length > 0 && personalesFiltrados.length !== personales.length">
                             <i class="ti ti-filter text-xs"></i>
-                            <span>Filtrados: <strong x-text="personalesFiltrados.length" class="text-primary-600"></strong></span>
+                            <span>Filtrados: <strong x-text="personalesFiltrados.length"
+                                    class="text-primary-600"></strong></span>
                         </div>
                     </div>
                 </div>
@@ -1128,7 +1125,8 @@
         </div>
 
         <!-- Filtros -->
-        <div x-show="!loading && personales.length > 0" class="px-6 pt-4 pb-3 border-b border-default-100 shrink-0 bg-default-50/30">
+        <div x-show="!loading && personales.length > 0"
+            class="px-6 pt-4 pb-3 border-b border-default-100 shrink-0 bg-default-50/30">
             <div class="flex flex-wrap items-end gap-3">
                 <!-- Buscador -->
                 <div class="flex-1 min-w-[220px]">
@@ -1136,7 +1134,8 @@
                         <i class="ti ti-search text-[10px]"></i> Buscar
                     </label>
                     <div class="relative">
-                        <input type="text" x-model="busqueda" @input="paginaActual = 1" placeholder="Buscar por nombre o DNI..."
+                        <input type="text" x-model="busqueda" @input="paginaActual = 1"
+                            placeholder="Buscar por nombre o DNI..."
                             class="w-full h-9 pl-9 pr-3 text-xs text-default-700 bg-white border border-default-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all placeholder:text-default-300">
                     </div>
                 </div>
@@ -1241,8 +1240,10 @@
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="border-b border-default-200 bg-default-50/50">
-                            <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest w-12">N°</th>
-                            <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest">Nro. Documento</th>
+                            <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest w-12">
+                                N°</th>
+                            <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest">Nro.
+                                Documento</th>
                             <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest cursor-pointer select-none hover:text-primary transition-colors"
                                 @click="toggleOrden('nombreCompleto')">
                                 <div class="flex items-center gap-1.5">
@@ -1271,7 +1272,8 @@
                                     <i class="ti text-[11px]" :class="getIconoOrden('sucursal')"></i>
                                 </div>
                             </th>
-                            <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest">Correo</th>
+                            <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest">
+                                Correo</th>
                             <template x-if="!mostrarAcciones">
                                 <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest text-center cursor-pointer select-none hover:text-primary transition-colors"
                                     @click="toggleOrden('nota_final')">
@@ -1291,22 +1293,30 @@
                                 </th>
                             </template>
                             <template x-if="mostrarAcciones">
-                                <th class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest text-center">Acción</th>
+                                <th
+                                    class="py-3 px-4 text-[10px] font-bold text-default-400 uppercase tracking-widest text-center">
+                                    Acción</th>
                             </template>
                         </tr>
                     </thead>
                     <tbody>
                         <template x-for="(p, idx) in personalesPaginados" :key="idx">
                             <tr class="border-b border-default-100 hover:bg-primary/[0.02] transition-colors">
-                                <td class="py-3 px-4 text-xs text-default-400 font-mono" x-text="(paginaActual - 1) * itemsPorPagina + idx + 1"></td>
+                                <td class="py-3 px-4 text-xs text-default-400 font-mono"
+                                    x-text="(paginaActual - 1) * itemsPorPagina + idx + 1"></td>
                                 <td class="py-3 px-4">
-                                    <span class="text-xs font-mono font-semibold text-default-700 bg-default-100 px-2 py-0.5 rounded" x-text="p.nroDoc"></span>
+                                    <span
+                                        class="text-xs font-mono font-semibold text-default-700 bg-default-100 px-2 py-0.5 rounded"
+                                        x-text="p.nroDoc"></span>
                                 </td>
                                 <td class="py-3 px-4">
-                                    <span class="text-xs font-semibold text-default-900" x-text="p.nombreCompleto"></span>
+                                    <span class="text-xs font-semibold text-default-900"
+                                        x-text="p.nombreCompleto"></span>
                                 </td>
                                 <td class="py-3 px-4">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100" x-text="p.tipo_trabajador || '—'"></span>
+                                    <span
+                                        class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100"
+                                        x-text="p.tipo_trabajador || '—'"></span>
                                 </td>
                                 <td class="py-3 px-4">
                                     <span class="text-xs text-default-700" x-text="p.cargo || '—'"></span>
@@ -1320,7 +1330,8 @@
                                 <template x-if="!mostrarAcciones">
                                     <td class="py-3 px-4 text-center">
                                         <template x-if="p.nota_final !== null">
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+                                            <span
+                                                class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold"
                                                 :class="p.nota_final >= 11 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
                                                 x-text="p.nota_final.toFixed(2)"></span>
                                         </template>
@@ -1331,7 +1342,8 @@
                                 </template>
                                 <template x-if="!mostrarAcciones">
                                     <td class="py-3 px-4">
-                                        <span class="text-xs text-default-500" x-text="formatearFechaHora(p.ultimo_acceso)"></span>
+                                        <span class="text-xs text-default-500"
+                                            x-text="formatearFechaHora(p.ultimo_acceso)"></span>
                                     </td>
                                 </template>
                                 <template x-if="mostrarAcciones">
@@ -1340,7 +1352,8 @@
                                             <span class="text-xs text-default-300">—</span>
                                         </template>
                                         <template x-if="p.correo && recordatoriosEnviados[p.nroDoc]">
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-green-100 text-green-700">
+                                            <span
+                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-green-100 text-green-700">
                                                 <i class="ti ti-check text-[11px]"></i> Enviado
                                             </span>
                                         </template>
@@ -1361,12 +1374,15 @@
         </div>
 
         <!-- Footer -->
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-3 py-4 px-6 border-t border-default-100 shrink-0 bg-gradient-to-r from-white to-default-50/30">
+        <div
+            class="flex flex-col sm:flex-row justify-between items-center gap-3 py-4 px-6 border-t border-default-100 shrink-0 bg-gradient-to-r from-white to-default-50/30">
             <!-- Info + Paginación -->
             <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                 <span class="text-[11px] text-default-400 shrink-0" x-show="!loading && personales.length > 0">
-                    Mostrando <strong x-text="(paginaActual - 1) * itemsPorPagina + 1" class="text-default-600"></strong>
-                    - <strong x-text="Math.min(paginaActual * itemsPorPagina, personalesFiltrados.length)" class="text-default-600"></strong>
+                    Mostrando <strong x-text="(paginaActual - 1) * itemsPorPagina + 1"
+                        class="text-default-600"></strong>
+                    - <strong x-text="Math.min(paginaActual * itemsPorPagina, personalesFiltrados.length)"
+                        class="text-default-600"></strong>
                     de <strong x-text="personalesFiltrados.length" class="text-default-600"></strong>
                 </span>
 
@@ -1378,9 +1394,7 @@
                     </button>
 
                     <template x-for="(pag, i) in paginasVisibles" :key="i">
-                        <button type="button" @click="irPagina(pag)"
-                            x-text="pag"
-                            :disabled="pag === '...'"
+                        <button type="button" @click="irPagina(pag)" x-text="pag" :disabled="pag === '...'"
                             class="min-w-[28px] h-7 inline-flex items-center justify-center rounded-md text-[11px] font-semibold transition-all cursor-pointer disabled:cursor-default"
                             :class="pag === paginaActual ? 'bg-primary text-white shadow-sm shadow-primary/20' : pag === '...' ? 'text-default-300 cursor-default' : 'text-default-500 hover:bg-default-100'">
                         </button>
@@ -1682,7 +1696,8 @@
                                         <p class="font-medium text-default-800 text-xs" x-text="c.codigo || ''"></p>
                                     </td>
                                     <td class="py-2.5 px-3">
-                                        <p class="font-medium text-default-800 text-xs" x-text="c.nombre_curso || c.curso_nombre || c.nombre || ''"></p>
+                                        <p class="font-medium text-default-800 text-xs"
+                                            x-text="c.nombre_curso || c.curso_nombre || c.nombre || ''"></p>
                                     </td>
                                     <td class="py-2.5 px-3 text-center">
                                         <p class="font-medium text-default-800 text-xs" x-text="c.tipo_curso || ''"></p>
@@ -1741,14 +1756,14 @@
         <!-- Footer -->
         <div class="flex justify-between items-center gap-2 py-4 px-6 border-t border-default-100 bg-white shrink-0">
             <div class="flex items-center gap-2">
-                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-semibold">
+                <span
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-semibold">
                     <i class="ti ti-repeat text-[10px]"></i>
                     Envío cíclico: después del tercer MEMO se reinicia al primero
                 </span>
             </div>
             <div class="flex items-center gap-2">
-                <button type="button"
-                    @click="countByEstado('Sin acceder') > 0 && notificarCursosPendientes()"
+                <button type="button" @click="countByEstado('Sin acceder') > 0 && notificarCursosPendientes()"
                     :disabled="countByEstado('Sin acceder') === 0"
                     :class="countByEstado('Sin acceder') > 0
                         ? 'px-4 h-9 inline-flex justify-center items-center rounded-lg font-semibold bg-sky-500 text-white hover:bg-sky-600 transition-all text-xs shadow-sm'
@@ -1757,8 +1772,7 @@
                     <span>Notificar sobre cursos pendientes</span>
                 </button>
 
-                <button type="button"
-                    @click="countByEstado('Sin acceder') > 0 && enviarMEMO()"
+                <button type="button" @click="countByEstado('Sin acceder') > 0 && enviarMEMO()"
                     :disabled="countByEstado('Sin acceder') === 0"
                     :class="countByEstado('Sin acceder') > 0
                         ? 'px-4 h-9 inline-flex justify-center items-center rounded-lg font-semibold bg-rose-500 text-white hover:bg-rose-600 transition-all text-xs shadow-sm'
@@ -1798,7 +1812,8 @@
                     <i class="ti ti-notes text-primary text-lg"></i>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h3 class="text-[15px] font-semibold text-default-900 leading-tight truncate" x-text="personal">Cargando...</h3>
+                    <h3 class="text-[15px] font-semibold text-default-900 leading-tight truncate" x-text="personal">
+                        Cargando...</h3>
                     <p class="text-[10px] font-bold text-default-400 uppercase tracking-widest mt-0.5">
                         <span x-text="'DNI: ' + nroDoc"></span>
                         <span class="mx-2 text-default-300">|</span>
@@ -1817,8 +1832,10 @@
             <!-- Left panel: MEMOs list -->
             <div class="w-1/2 border-r border-default-200 flex flex-col min-h-0">
                 <div class="flex items-center justify-between px-6 py-3 border-b border-default-100 shrink-0">
-                    <span class="text-[10px] font-bold text-default-400 uppercase tracking-widest">MEMOs registrados</span>
-                    <span x-show="!cargando" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold"
+                    <span class="text-[10px] font-bold text-default-400 uppercase tracking-widest">MEMOs
+                        registrados</span>
+                    <span x-show="!cargando"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold"
                         x-text="total + ' total'"></span>
                 </div>
                 <div class="flex-1 overflow-y-auto custom-scrollbar p-4">
@@ -1850,14 +1867,14 @@
                                     </p>
                                 </div>
                                 <div>
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                                    <span
+                                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
                                         :class="{
                                             'bg-blue-50 text-blue-700': nivelTexto === 'NIVEL UNO',
                                             'bg-orange-50 text-orange-700': nivelTexto === 'NIVEL DOS',
                                             'bg-red-50 text-red-700': nivelTexto === 'NIVEL TRES'
                                         }">
-                                        <i class="ti"
-                                            :class="{
+                                        <i class="ti" :class="{
                                                 'ti-info-circle': nivelTexto === 'NIVEL UNO',
                                                 'ti-alert-triangle': nivelTexto === 'NIVEL DOS',
                                                 'ti-bell-ringing': nivelTexto === 'NIVEL TRES'
@@ -1874,7 +1891,8 @@
             <!-- Right panel: Courses of selected MEMO -->
             <div class="w-1/2 flex flex-col min-h-0">
                 <div class="flex items-center justify-between px-6 py-3 border-b border-default-100 shrink-0">
-                    <span class="text-[10px] font-bold text-default-400 uppercase tracking-widest">Cursos del MEMO</span>
+                    <span class="text-[10px] font-bold text-default-400 uppercase tracking-widest">Cursos del
+                        MEMO</span>
                     <span x-show="selectedMemoId && !cargandoCursos && cursos.length > 0"
                         class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-sky-100 text-sky-700 text-[10px] font-bold"
                         x-text="cursos.length + ' curso(s)'"></span>
@@ -1904,16 +1922,20 @@
                     <!-- Courses list -->
                     <div x-show="selectedMemoId && !cargandoCursos && cursos.length > 0" class="flex flex-col gap-2">
                         <template x-for="(c, idx) in cursos" :key="idx">
-                            <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-sky-50/60 border border-sky-200/60">
+                            <div
+                                class="flex items-center gap-3 px-4 py-3 rounded-xl bg-sky-50/60 border border-sky-200/60">
                                 <div class="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center shrink-0">
                                     <i class="ti ti-book text-sky-600 text-sm"></i>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <p class="text-xs font-bold text-default-700 leading-tight" x-text="c.NOMBRE_CURSO"></p>
+                                    <p class="text-xs font-bold text-default-700 leading-tight" x-text="c.NOMBRE_CURSO">
+                                    </p>
                                     <p class="text-[10px] text-default-400 mt-0.5">
-                                        <span class="font-mono font-semibold text-default-500" x-text="'ID: ' + c.ID"></span>
+                                        <span class="font-mono font-semibold text-default-500"
+                                            x-text="'ID: ' + c.ID"></span>
                                         <span class="mx-1.5 text-default-300">|</span>
-                                        <span class="font-mono text-primary font-semibold" x-text="'Moodle: ' + c.CODIGO_MOODLE"></span>
+                                        <span class="font-mono text-primary font-semibold"
+                                            x-text="'Moodle: ' + c.CODIGO_MOODLE"></span>
                                     </p>
                                 </div>
                             </div>
@@ -1936,13 +1958,9 @@
 <!-- Modal comparativa entre grupos de MEMOs -->
 <div id="modal-comparativa" x-data="modalComparativa()" x-show="open" x-cloak
     class="fixed inset-0 z-[120] flex items-center justify-center p-4"
-    x-transition:enter="transition ease-out duration-300"
-    x-transition:enter-start="opacity-0"
-    x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-200"
-    x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0"
-    style="background: rgba(36,39,70,0.45);">
+    x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" style="background: rgba(36,39,70,0.45);">
 
     <div class="flex flex-col w-full max-w-xl bg-white rounded-2xl border border-default-200 shadow-2xl shadow-primary/10 overflow-hidden"
         x-transition:enter="transition ease-out duration-300"
@@ -1983,8 +2001,7 @@
                     <!-- Level cards -->
                     <div class="grid grid-cols-3 gap-3">
                         <template x-for="nivel in [1,2,3]" :key="nivel">
-                            <button type="button"
-                                @click="toggleNivel(nivel)"
+                            <button type="button" @click="toggleNivel(nivel)"
                                 :disabled="seleccionados.length === 1 && nivel <= seleccionados[0] && !seleccionados.includes(nivel)"
                                 class="relative group flex flex-col items-center gap-2 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 :class="{
@@ -1992,7 +2009,9 @@
                                     'ring-2 ring-offset-1': seleccionados.includes(nivel)
                                 }">
                                 <template x-if="!seleccionados.includes(nivel)">
-                                    <div class="absolute inset-0 rounded-xl border border-default-200 bg-default-50 group-hover:bg-default-100 group-hover:border-default-300 transition-all"></div>
+                                    <div
+                                        class="absolute inset-0 rounded-xl border border-default-200 bg-default-50 group-hover:bg-default-100 group-hover:border-default-300 transition-all">
+                                    </div>
                                 </template>
                                 <template x-if="seleccionados.includes(nivel)">
                                     <div class="absolute inset-0 rounded-xl border-2 shadow-sm transition-all duration-200"
@@ -2013,26 +2032,22 @@
                                     </div>
                                 </template>
                                 <div class="relative flex flex-col items-center gap-2 px-4 pt-5 pb-4">
-                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center"
-                                        :class="{
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" :class="{
                                             'bg-blue-100 text-blue-600': nivel === 1,
                                             'bg-orange-100 text-orange-600': nivel === 2,
                                             'bg-red-100 text-red-600': nivel === 3
                                         }">
-                                        <i class="ti text-lg"
-                                            :class="{
+                                        <i class="ti text-lg" :class="{
                                                 'ti-info-circle': nivel === 1,
                                                 'ti-alert-triangle': nivel === 2,
                                                 'ti-bell-ringing': nivel === 3
                                             }"></i>
                                     </div>
-                                    <span class="text-xs font-bold"
-                                        :class="{
+                                    <span class="text-xs font-bold" :class="{
                                             'text-blue-700': nivel === 1,
                                             'text-orange-700': nivel === 2,
                                             'text-red-700': nivel === 3
-                                        }"
-                                        x-text="'MEMO ' + nivel">
+                                        }" x-text="'MEMO ' + nivel">
                                     </span>
                                     <span class="text-[10px] text-default-400 font-medium text-center leading-snug"
                                         x-text="nivel === 1
@@ -2054,10 +2069,13 @@
                                 Flujo de comparación
                             </p>
                             <template x-if="seleccionados.length === 2">
-                                <span class="text-[10px] font-semibold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Listo</span>
+                                <span
+                                    class="text-[10px] font-semibold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Listo</span>
                             </template>
                             <template x-if="seleccionados.length !== 2">
-                                <span class="text-[10px] font-semibold text-default-400 bg-default-200/60 px-2 py-0.5 rounded-full" x-text="seleccionados.length + ' / 2'"></span>
+                                <span
+                                    class="text-[10px] font-semibold text-default-400 bg-default-200/60 px-2 py-0.5 rounded-full"
+                                    x-text="seleccionados.length + ' / 2'"></span>
                             </template>
                         </div>
                         <div class="flex items-center gap-2">
@@ -2065,7 +2083,8 @@
                                 :class="{ 'border-green-300 shadow-sm': seleccionados.length >= 1 }">
                                 <div class="flex items-center gap-1.5 mb-1">
                                     <i class="ti ti-arrow-back-up text-[9px] text-default-300"></i>
-                                    <span class="text-[9px] uppercase tracking-wide font-bold text-default-400">Base</span>
+                                    <span
+                                        class="text-[9px] uppercase tracking-wide font-bold text-default-400">Base</span>
                                 </div>
                                 <p class="text-sm font-semibold mt-0.5"
                                     :class="seleccionados[0] ? 'text-default-800' : 'text-default-300'"
@@ -2082,7 +2101,8 @@
                                 :class="{ 'border-green-300 shadow-sm': seleccionados.length === 2 }">
                                 <div class="flex items-center gap-1.5 mb-1">
                                     <i class="ti ti-corner-right-up text-[9px] text-default-300"></i>
-                                    <span class="text-[9px] uppercase tracking-wide font-bold text-default-400">Comparado</span>
+                                    <span
+                                        class="text-[9px] uppercase tracking-wide font-bold text-default-400">Comparado</span>
                                 </div>
                                 <p class="text-sm font-semibold mt-0.5"
                                     :class="seleccionados[1] ? 'text-default-800' : 'text-default-300'"
@@ -2124,7 +2144,8 @@
                             </div>
                             <div>
                                 <p class="text-[10px] uppercase font-bold text-green-700 leading-tight">Persisten</p>
-                                <p class="text-2xl font-bold text-green-800 mt-0.5" x-text="resultado.totales.persisten"></p>
+                                <p class="text-2xl font-bold text-green-800 mt-0.5"
+                                    x-text="resultado.totales.persisten"></p>
                             </div>
                         </div>
                         <div class="rounded-xl border border-red-200 bg-red-50 p-3 flex items-center gap-3">
@@ -2133,7 +2154,8 @@
                             </div>
                             <div>
                                 <p class="text-[10px] uppercase font-bold text-red-700 leading-tight">Ya no están</p>
-                                <p class="text-2xl font-bold text-red-800 mt-0.5" x-text="resultado.totales.ya_no_estan"></p>
+                                <p class="text-2xl font-bold text-red-800 mt-0.5"
+                                    x-text="resultado.totales.ya_no_estan"></p>
                             </div>
                         </div>
                         <div class="rounded-xl border border-blue-200 bg-blue-50 p-3 flex items-center gap-3">
@@ -2142,7 +2164,8 @@
                             </div>
                             <div>
                                 <p class="text-[10px] uppercase font-bold text-blue-700 leading-tight">Nuevos</p>
-                                <p class="text-2xl font-bold text-blue-800 mt-0.5" x-text="resultado.totales.nuevos"></p>
+                                <p class="text-2xl font-bold text-blue-800 mt-0.5" x-text="resultado.totales.nuevos">
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -2151,7 +2174,8 @@
                     <div class="flex flex-col gap-3">
                         <!-- Buscador dentro del resultado -->
                         <div class="relative">
-                            <i class="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
+                            <i
+                                class="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-default-400 pointer-events-none"></i>
                             <input x-model="busquedaResultado" placeholder="Buscar por nombre o DNI..."
                                 class="w-full pl-8 pr-3 py-2 text-sm border border-default-200 rounded-lg !bg-white !text-default-700 placeholder:text-default-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                         </div>
@@ -2188,10 +2212,14 @@
                                     </div>
                                 </template>
                                 <template x-for="item in persistenFiltrados">
-                                    <div class="px-4 py-2.5 flex items-center gap-3 hover:bg-default-50 transition-colors">
+                                    <div
+                                        class="px-4 py-2.5 flex items-center gap-3 hover:bg-default-50 transition-colors">
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-sm font-medium text-default-700 truncate" x-text="item.NOMBRE_COMPLETO"></p>
-                                            <p class="text-[11px] text-default-400">DNI: <span class="font-mono font-medium text-default-500" x-text="item.NRO_DOCU_IDEN"></span></p>
+                                            <p class="text-sm font-medium text-default-700 truncate"
+                                                x-text="item.NOMBRE_COMPLETO"></p>
+                                            <p class="text-[11px] text-default-400">DNI: <span
+                                                    class="font-mono font-medium text-default-500"
+                                                    x-text="item.NRO_DOCU_IDEN"></span></p>
                                         </div>
                                         <i class="ti ti-check text-green-400 text-sm shrink-0"></i>
                                     </div>
@@ -2210,10 +2238,14 @@
                                     </div>
                                 </template>
                                 <template x-for="item in yaNoEstanFiltrados">
-                                    <div class="px-4 py-2.5 flex items-center gap-3 hover:bg-default-50 transition-colors">
+                                    <div
+                                        class="px-4 py-2.5 flex items-center gap-3 hover:bg-default-50 transition-colors">
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-sm font-medium text-default-700 truncate" x-text="item.NOMBRE_COMPLETO"></p>
-                                            <p class="text-[11px] text-default-400">DNI: <span class="font-mono font-medium text-default-500" x-text="item.NRO_DOCU_IDEN"></span></p>
+                                            <p class="text-sm font-medium text-default-700 truncate"
+                                                x-text="item.NOMBRE_COMPLETO"></p>
+                                            <p class="text-[11px] text-default-400">DNI: <span
+                                                    class="font-mono font-medium text-default-500"
+                                                    x-text="item.NRO_DOCU_IDEN"></span></p>
                                         </div>
                                         <i class="ti ti-x text-red-400 text-sm shrink-0"></i>
                                     </div>
@@ -2232,10 +2264,14 @@
                                     </div>
                                 </template>
                                 <template x-for="item in nuevosFiltrados">
-                                    <div class="px-4 py-2.5 flex items-center gap-3 hover:bg-default-50 transition-colors">
+                                    <div
+                                        class="px-4 py-2.5 flex items-center gap-3 hover:bg-default-50 transition-colors">
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-sm font-medium text-default-700 truncate" x-text="item.NOMBRE_COMPLETO"></p>
-                                            <p class="text-[11px] text-default-400">DNI: <span class="font-mono font-medium text-default-500" x-text="item.NRO_DOCU_IDEN"></span></p>
+                                            <p class="text-sm font-medium text-default-700 truncate"
+                                                x-text="item.NOMBRE_COMPLETO"></p>
+                                            <p class="text-[11px] text-default-400">DNI: <span
+                                                    class="font-mono font-medium text-default-500"
+                                                    x-text="item.NRO_DOCU_IDEN"></span></p>
                                         </div>
                                         <i class="ti ti-plus text-blue-400 text-sm shrink-0"></i>
                                     </div>
@@ -2264,9 +2300,7 @@
                     </button>
                 </template>
                 <template x-if="!cargando && !resultado">
-                    <button type="button"
-                        @click="realizarComparativa()"
-                        :disabled="seleccionados.length !== 2"
+                    <button type="button" @click="realizarComparativa()" :disabled="seleccionados.length !== 2"
                         :class="seleccionados.length === 2
                             ? 'px-4 h-9 rounded-lg text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all inline-flex items-center gap-1.5 active:scale-[0.97]'
                             : 'px-4 h-9 rounded-lg text-sm font-semibold bg-default-100 text-default-400 cursor-not-allowed inline-flex items-center gap-1.5'">
@@ -2363,7 +2397,8 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute(
+                                'content')
                         },
                         body: JSON.stringify({
                             nroDoc: nroDoc,
@@ -2499,8 +2534,8 @@
                                 en_curso: 0,
                             };
                             const est = this.curso.estadisticas;
-                            this.curso.total = Number(est.total)
-                                || (est.aprobados + est.desaprobados + est.sin_acceder + est.en_curso);
+                            this.curso.total = Number(est.total) ||
+                                (est.aprobados + est.desaprobados + est.sin_acceder + est.en_curso);
                         }
                     })
                     .catch(error => {
@@ -2749,27 +2784,27 @@
                 this.enviandoRecordatorio[p.nroDoc] = true;
                 this.recordatoriosEnviados[p.nroDoc] = true;
                 fetch(`${VITE_URL_APP}/api/mail/enviar-recordatorio?course_id=${this.cursoId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                    },
-                    body: JSON.stringify({
-                        email: p.correo,
-                        full_name: p.nombreCompleto
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                        },
+                        body: JSON.stringify({
+                            email: p.correo,
+                            full_name: p.nombreCompleto
+                        })
                     })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.success) throw new Error(data.message || 'No se pudo enviar el recordatorio');
-                })
-                .catch(error => {
-                    console.error('Error al enviar recordatorio:', error);
-                    this.recordatoriosEnviados[p.nroDoc] = false;
-                })
-                .finally(() => {
-                    this.enviandoRecordatorio[p.nroDoc] = false;
-                });
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!data.success) throw new Error(data.message || 'No se pudo enviar el recordatorio');
+                    })
+                    .catch(error => {
+                        console.error('Error al enviar recordatorio:', error);
+                        this.recordatoriosEnviados[p.nroDoc] = false;
+                    })
+                    .finally(() => {
+                        this.enviandoRecordatorio[p.nroDoc] = false;
+                    });
             },
 
             limpiarFiltros() {
@@ -2803,7 +2838,7 @@
                 this.enviandoRecordatorio = {};
                 this.recordatoriosEnviados = {};
 
-                fetch(`${VITE_URL_APP}/api/get-estudiantes-curso?course_id=${cursoId}&statusId=${statusId}`)
+                fetch(`${VITE_URL_APP}/api/detalle-estudiantes?course_id=${cursoId}&statusId=${statusId}`)
                     .then(response => {
                         if (!response.ok) throw new Error('Error en la respuesta del servidor');
                         return response.json();
@@ -2952,7 +2987,8 @@
                     }
                     if (this.filtroAnioCreacion) {
                         const anio = parseInt(this.filtroAnioCreacion);
-                        const val = c.fecha_creacion_curso ? new Date(c.fecha_creacion_curso).getFullYear() : null;
+                        const val = c.fecha_creacion_curso ? new Date(c.fecha_creacion_curso)
+                            .getFullYear() : null;
                         if (val !== anio) return false;
                     }
                     return true;
@@ -3122,7 +3158,8 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute(
+                                'content')
                         },
                         body: JSON.stringify({
                             nroDoc: this.personal.dni,

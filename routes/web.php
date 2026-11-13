@@ -201,6 +201,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-cursos-alumno-new', [SeguimientoMatriculasNewController::class, 'obtenerEstadoCursosAlumnoNew']);
         Route::post('/notificar-cursos-pendientes-new', [SeguimientoMatriculasNewController::class, 'notificarCursosPendientesNew']);
         Route::post('/enviar-memo-personal-new', [SeguimientoMatriculasNewController::class, 'enviarMemoNew']);
+        Route::get('/detalle-estudiantes', [SeguimientoMatriculasNewController::class, 'obtenerEstudiantesCursoNew']);
         Route::post('/comparar-memos', [CapacitacionController::class, 'compararMemos']);
         Route::post('/cursos/aplazar-curso', [CapacitacionController::class, 'aplazarCurso']);
         Route::get('/cursos/obtener-prog-actual/{courseId}', [CapacitacionController::class, 'obtenerProgActual']);

@@ -521,4 +521,69 @@ class SeguimientoMatriculasNewController extends Controller
                 );
         }
     }
+
+    /**
+     * Obtención de estudiantes con estado de un curso
+     */
+    public function obtenerEstudiantesCursoNew(Request $request): JsonResponse
+    {
+        try {
+            $courseId = (int) $request->course_id;
+            $statusId = (int) $request->statusId; // 0: Todos | 1: Aprobados | 2: Desaprobados | 3: Sin acceder | 4: En curso
+
+            if ($courseId <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El curso indicado no es valido.',
+                ], 422);
+            }
+
+            $estados = [
+                1 => 'aprobado',
+                2 => 'desaprobado',
+                3 => 'sin_acceder',
+                4 => 'en_curso',
+            ];
+
+            $local = collect(
+                DB::connection('sqlsrv')->select('EXEC SP_OBTENER_PERSONAL_BETA @VIGENTE = 1')
+            )->keyBy(fn($p) => trim((string) ($p->NRO_DOC ?? '')));
+
+            $personales = collect(app(MoodleCursoService::class)->obtenerEstadoParticipantes($courseId))
+                ->filter(fn(array $p) => $local->has($p['dni']))
+                ->when(isset($estados[$statusId]), fn($c) => $c->where('estado', $estados[$statusId]))
+                ->map(function (array $p) use ($local) {
+                    $l = $local->get($p['dni']);
+
+                    return [
+                        'nroDoc'          => $p['dni'],
+                        'nombreCompleto'  => trim($l->NOMBRE_COMPLETO ?? '') ?: $p['fullname'],
+                        'correo'          => trim($l->CORREO ?? '') ?: $p['email'],
+                        'nota_final'      => $p['nota'],
+                        'ultimo_acceso'   => $p['ultimo_acceso'],
+                        'tipo_trabajador' => trim($l->TIPO_TRABAJADOR ?? ''),
+                        'cargo'           => trim($l->CARGO ?? ''),
+                        'sucursal'        => trim($l->SUCURSAL ?? ''),
+                        'cliente'         => $l->CLIENTE ?? 'Sin cliente',
+                    ];
+                })
+                ->values();
+
+            return response()->json([
+                'success'    => true,
+                'Total'      => $personales->count(),
+                'Personales' => $personales,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@obtenerEstudiantesCursoNew', [
+                'error' => $e->getMessage(),
+                'line'  => $e->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener los usuarios del curso',
+            ], 500);
+        }
+    }
 }

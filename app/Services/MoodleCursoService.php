@@ -421,10 +421,12 @@ class MoodleCursoService
             ->where('u.suspended', 0)
             ->where('u.deleted', 0)
             ->groupBy('u.id')
-            ->groupBy('u.id', 'u.username', 'u.idnumber')
+            ->groupBy('u.id', 'u.username', 'u.idnumber', 'u.firstname', 'u.lastname', 'u.email')
             ->select([
                 'u.username',
                 'u.idnumber',
+                'u.email',
+                DB::raw("CONCAT(u.firstname, ' ', u.lastname) as fullname"),
                 DB::raw('MAX(gg.finalgrade) as nota'),
                 DB::raw('MAX(gi.gradepass) as nota_minima'),
                 DB::raw('MAX(la.timeaccess) as ultimo_acceso'),
@@ -442,7 +444,16 @@ class MoodleCursoService
                 $estado = 'sin_acceder';
             }
 
-            return ['dni' => $dni, 'estado' => $estado];
+            return [
+                'dni'           => $dni,
+                'estado'        => $estado,
+                'fullname'      => $row->fullname,
+                'email'         => $row->email,
+                'nota'          => $row->nota !== null ? (float) $row->nota : null,
+                'ultimo_acceso' => (int) $row->ultimo_acceso > 0
+                    ? \Carbon\Carbon::createFromTimestamp((int) $row->ultimo_acceso, 'America/Lima')->format('Y-m-d H:i:s')
+                    : null,
+            ];
         })->values()->all();
     }
 
