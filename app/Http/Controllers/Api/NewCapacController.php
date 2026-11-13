@@ -712,6 +712,12 @@ class NewCapacController extends Controller
                 ], 404);
             }
 
+            $oldNombre = (string) $curso->SW_CURS_NOMBRE;
+            $oldDescripcion = (string) $curso->SW_CURS_DESCRIPCION;
+            $oldArea = (int) $curso->SW_CURS_AREA_COD;
+            $oldResponsable = (string) $curso->SW_CURS_RESP_COD;
+            $moodleCourseId = (int) $curso->SW_CURS_AV_COD;
+
             $usuario = auth()->user()?->usuario ?? 'SISTEMA';
             $ahora = Carbon::now()->format('Y-m-d H:i:s');
 
@@ -764,9 +770,72 @@ class NewCapacController extends Controller
 
             $curso->update($data);
 
+            $warnings = [];
+
+            if ($moodleCourseId > 0) {
+                $nuevoNombre = array_key_exists('SW_CURS_NOMBRE', $data)
+                    ? (string) $data['SW_CURS_NOMBRE']
+                    : null;
+                $nuevaDescripcion = array_key_exists('SW_CURS_DESCRIPCION', $data)
+                    ? (string) $data['SW_CURS_DESCRIPCION']
+                    : null;
+                $nuevaArea = array_key_exists('SW_CURS_AREA_COD', $data)
+                    ? (int) $data['SW_CURS_AREA_COD']
+                    : null;
+                $nuevoResponsable = array_key_exists('SW_CURS_RESP_COD', $data)
+                    ? (string) $data['SW_CURS_RESP_COD']
+                    : null;
+
+                $cambiaNombre = $nuevoNombre !== null && $nuevoNombre !== $oldNombre;
+                $cambiaDescripcion = $nuevaDescripcion !== null && $nuevaDescripcion !== $oldDescripcion;
+                $cambiaArea = $nuevaArea !== null && $nuevaArea !== $oldArea;
+                $cambiaResponsable = $nuevoResponsable !== null
+                    && (int) $nuevoResponsable !== (int) $oldResponsable;
+
+                $codMoodleArea = null;
+
+                if ($cambiaArea) {
+                    $codMoodleArea = DB::table('sw_cursos_area')
+                        ->where('codigo', $nuevaArea)
+                        ->value('codigo_moodle');
+
+                    if ($codMoodleArea === null || $codMoodleArea === '' || (int) $codMoodleArea <= 0) {
+                        $warnings[] = 'El área seleccionada no tiene una categoría válida configurada en el Aula Virtual.';
+                        $codMoodleArea = null;
+                    }
+                }
+
+                if (
+                    $cambiaNombre
+                    || $cambiaDescripcion
+                    || ($cambiaArea && $codMoodleArea !== null)
+                    || $cambiaResponsable
+                ) {
+                    $warnings = array_merge(
+                        $warnings,
+                        app(MoodleCursoService::class)->actualizarDatosCurso(
+                            $moodleCourseId,
+                            $cambiaNombre ? $nuevoNombre : null,
+                            $cambiaDescripcion ? $nuevaDescripcion : null,
+                            $cambiaArea && $codMoodleArea !== null ? (int) $codMoodleArea : null,
+                            $cambiaResponsable ? $nuevoResponsable : null,
+                            $cambiaResponsable ? $oldResponsable : null,
+                        )
+                    );
+                }
+            }
+
+            $warnings = array_values(array_unique($warnings));
+            $message = 'Curso actualizado correctamente.';
+
+            if (! empty($warnings)) {
+                $message .= ' ' . implode(' ', $warnings);
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'Curso actualizado correctamente.',
+                'message' => $message,
+                'warnings' => $warnings,
                 'codigo' => $curso->CODIGO,
                 'codigo_curso' => $curso->SW_CURS_COD,
             ], 200);

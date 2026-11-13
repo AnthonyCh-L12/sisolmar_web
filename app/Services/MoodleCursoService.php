@@ -81,6 +81,167 @@ class MoodleCursoService
     }
 
     /**
+     * Actualiza en Moodle los datos maestros del curso que sí existen allá:
+     * nombre, descripción, categoría (área) y responsable (editingteacher).
+     *
+     * Devuelve una lista de advertencias; vacía si todo se sincronizó bien.
+     */
+    public function actualizarDatosCurso(
+        int $courseId,
+        ?string $nombre = null,
+        ?string $descripcion = null,
+        ?int $codMoodleArea = null,
+        ?string $codResponsableNuevo = null,
+        ?string $codResponsableAnterior = null
+    ): array {
+        $warnings = [];
+
+        if ($courseId <= 0) {
+            return ['El curso no tiene un ID válido en el Aula Virtual.'];
+        }
+
+        // ====== Nombre, descripción y categoría (área) ======
+        if ($nombre !== null || $descripcion !== null || $codMoodleArea !== null) {
+            try {
+                $params = [
+                    'wstoken' => config('services.moodle.ws_token'),
+                    'wsfunction' => 'core_course_update_courses',
+                    'moodlewsrestformat' => 'json',
+                    'courses[0][id]' => $courseId,
+                ];
+
+                if ($nombre !== null) {
+                    $params['courses[0][fullname]'] = $nombre;
+                }
+
+                if ($descripcion !== null) {
+                    $params['courses[0][summary]'] = $descripcion;
+                    $params['courses[0][summaryformat]'] = 1;
+                }
+
+                if ($codMoodleArea !== null) {
+                    $params['courses[0][categoryid]'] = $codMoodleArea;
+                }
+
+                $http = app()->isProduction()
+                    ? Http::asForm()
+                    : Http::withoutVerifying()->asForm();
+
+                $response = $http->post(
+                    config('services.moodle.url') . '/webservice/rest/server.php',
+                    $params
+                );
+
+                $json = $response->json();
+
+                $moodleWarnings = [];
+
+                if (is_array($json)) {
+                    if (isset($json['exception'])) {
+                        $moodleWarnings[] = $json['message'] ?? 'Error devuelto por Moodle.';
+                    } elseif (! empty($json)) {
+                        $moodleWarnings = $json;
+                    }
+                }
+
+                if (! $response->successful() || ! empty($moodleWarnings)) {
+                    Log::warning('No se pudieron actualizar los datos del curso en Moodle', [
+                        'courseId' => $courseId,
+                        'status' => $response->status(),
+                        'response' => $json,
+                    ]);
+
+                    $warnings[] = 'No se pudieron actualizar el nombre, la descripción o el área del curso en el Aula Virtual.';
+                }
+            } catch (\Throwable $e) {
+                Log::error('Error al actualizar los datos del curso en Moodle', [
+                    'error' => $e->getMessage(),
+                    'courseId' => $courseId,
+                ]);
+
+                $warnings[] = 'Error al actualizar el nombre, la descripción o el área del curso en el Aula Virtual.';
+            }
+        }
+
+        // ====== Responsable (editingteacher) ======
+        if (
+            $codResponsableNuevo !== null
+            && $codResponsableNuevo !== $codResponsableAnterior
+        ) {
+            try {
+                $nuevoUserId = $this->getOrCreateMoodleUser($codResponsableNuevo);
+
+                if (! $nuevoUserId) {
+                    $warnings[] = 'No se pudo obtener el usuario del nuevo responsable en el Aula Virtual.';
+                } else {
+                    $context = DB::connection('mysql_grupoihb')
+                        ->table('mdl_context')
+                        ->where('contextlevel', 50)
+                        ->where('instanceid', $courseId)
+                        ->first();
+
+                    if (! $context) {
+                        $warnings[] = 'No se encontró el contexto del curso en el Aula Virtual.';
+                    } else {
+                        $conn = DB::connection('mysql_grupoihb');
+
+                        $conn->transaction(function () use ($conn, $context, $nuevoUserId, $codResponsableAnterior) {
+                            if ($codResponsableAnterior) {
+                                $anteriorUserId = $this->buscarUsuarioMoodleExistente($codResponsableAnterior);
+
+                                if ($anteriorUserId && $anteriorUserId !== $nuevoUserId) {
+                                    $conn->table('mdl_role_assignments')
+                                        ->where('roleid', 3)
+                                        ->where('contextid', $context->id)
+                                        ->where('userid', $anteriorUserId)
+                                        ->delete();
+                                }
+                            }
+
+                            // El nuevo responsable no debe quedar como alumno del curso.
+                            $conn->table('mdl_role_assignments')
+                                ->where('roleid', 5)
+                                ->where('contextid', $context->id)
+                                ->where('userid', $nuevoUserId)
+                                ->delete();
+
+                            $existeRol = $conn->table('mdl_role_assignments')
+                                ->where('roleid', 3)
+                                ->where('contextid', $context->id)
+                                ->where('userid', $nuevoUserId)
+                                ->exists();
+
+                            if (! $existeRol) {
+                                $conn->table('mdl_role_assignments')->insert([
+                                    'roleid' => 3,
+                                    'contextid' => $context->id,
+                                    'userid' => $nuevoUserId,
+                                    'timemodified' => now()->timestamp,
+                                    'modifierid' => 0,
+                                    'component' => '',
+                                    'itemid' => 0,
+                                    'sortorder' => 0,
+                                ]);
+                            }
+                        });
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error('Error al actualizar el responsable del curso en Moodle', [
+                    'error' => $e->getMessage(),
+                    'courseId' => $courseId,
+                    'responsable_anterior' => $codResponsableAnterior,
+                    'responsable_nuevo' => $codResponsableNuevo,
+                ]);
+
+                $warnings[] = 'No se pudo actualizar el responsable del curso en el Aula Virtual.';
+            }
+        }
+
+        return $warnings;
+    }
+
+    /**
      * Actualiza las fechas de inicio y fin del curso en Moodle.
      */
     public function actualizarFechasCurso(int $courseId, int $inicio, int $fin): bool
@@ -948,10 +1109,58 @@ class MoodleCursoService
     }
 
     /**
+     * Normaliza el código de personal al formato usado en CODI_PERS (5 dígitos).
+     */
+    private function formatearCodigoPersonal(?string $codigo): ?string
+    {
+        $codigo = trim((string) $codigo);
+
+        if ($codigo === '') {
+            return null;
+        }
+
+        return str_pad($codigo, 5, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Busca el id del usuario Moodle del responsable sin crearlo.
+     */
+    private function buscarUsuarioMoodleExistente(?string $codResponsable): ?int
+    {
+        $codResponsable = $this->formatearCodigoPersonal($codResponsable);
+
+        if ($codResponsable === null) {
+            return null;
+        }
+
+        $personal = Personal::where('CODI_PERS', $codResponsable)->first();
+
+        if (! $personal) {
+            return null;
+        }
+
+        $dni = trim((string) ($personal->NRO_DOCU_IDEN ?? ''));
+
+        if ($dni === '') {
+            return null;
+        }
+
+        $moodleUser = DB::connection('mysql_grupoihb')
+            ->table('mdl_user')
+            ->where('username', $dni)
+            ->orWhere('idnumber', $dni)
+            ->first();
+
+        return $moodleUser ? (int) $moodleUser->id : null;
+    }
+
+    /**
      * Devuelve el id del usuario Moodle del responsable; lo crea si no existe.
      */
     private function getOrCreateMoodleUser(?string $codResponsable): ?int
     {
+        $codResponsable = $this->formatearCodigoPersonal($codResponsable);
+
         if (empty($codResponsable)) {
             return null;
         }

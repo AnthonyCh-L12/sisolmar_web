@@ -1287,7 +1287,12 @@ window.formCursoEditNew = function () {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
                 if (res.data?.success) {
-                    Swal.fire("Éxito", res.data.message || "Curso actualizado correctamente", "success");
+                    const warnings = Array.isArray(res.data?.warnings) ? res.data.warnings : [];
+                    if (warnings.length) {
+                        Swal.fire("Actualizado con observaciones", res.data.message || warnings.join(" "), "warning");
+                    } else {
+                        Swal.fire("Éxito", res.data.message || "Curso actualizado correctamente", "success");
+                    }
                     this.cerrar();
                     if (window.tablaCursosNew) {
                         try {
