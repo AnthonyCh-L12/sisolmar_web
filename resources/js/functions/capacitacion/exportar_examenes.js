@@ -277,6 +277,56 @@ function _calcularEscala(jsPDF, detalle, ctxBase) {
     return ESCALA_MIN;
 }
 
+function _agregarPiePagina(doc, fechaGeneracion) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const totalPaginas = doc.getNumberOfPages();
+
+    for (let p = 1; p <= totalPaginas; p++) {
+        doc.setPage(p);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(140, 140, 140);
+        doc.text(
+            `Generado por Sisolmar Web · ${fechaGeneracion}`,
+            MARGEN,
+            pageHeight - 3,
+        );
+        doc.text(
+            `Página ${p} de ${totalPaginas}`,
+            pageWidth - MARGEN,
+            pageHeight - 3,
+            { align: "right" },
+        );
+    }
+}
+
+function _crearPdfPersona(jsPDF, detalle, logoSol, logoAV, fechaGeneracion) {
+    const doc = new jsPDF({
+        orientation: ORIENTACION,
+        unit: "mm",
+        format: "a4",
+    });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const anchoTabla = pageWidth - MARGEN * 2;
+
+    const ctx = {
+        pageWidth,
+        margen: MARGEN,
+        anchoTabla,
+        anchoMitad: anchoTabla / 2,
+        logoSol,
+        logoAV,
+        medir: false,
+    };
+
+    const esc = _calcularEscala(jsPDF, detalle, ctx);
+    _dibujarDetalle(doc, detalle, esc, ctx);
+    _agregarPiePagina(doc, fechaGeneracion);
+
+    return { doc, esc };
+}
+
 export default document.addEventListener("alpine:init", () => {
     Alpine.data("exportExamenes", () => ({
         cursos: [],
@@ -902,97 +952,70 @@ export default document.addEventListener("alpine:init", () => {
 
             const primerDetalle = detalles[0] || {};
             const courseName =
-                sanitizar(primerDetalle.course_name || "CURSO").replace(
-                    /\s+/g,
-                    "_",
-                ) || "CURSO";
+                sanitizar(primerDetalle.course_name || "CURSO")
+                    .replace(/\s+/g, " ")
+                    .trim() || "CURSO";
 
             try {
                 const zip = new JSZip();
                 const nombresUsados = new Set();
-                let previewBlob = null;
-                let previewDoc = null;
+
+                // Vista previa: un solo PDF con todos los exámenes
+                const previewDoc = new jsPDF({
+                    orientation: ORIENTACION,
+                    unit: "mm",
+                    format: "a4",
+                });
+                const previewPageWidth =
+                    previewDoc.internal.pageSize.getWidth();
+                const previewAnchoTabla = previewPageWidth - MARGEN * 2;
+                const previewCtx = {
+                    pageWidth: previewPageWidth,
+                    margen: MARGEN,
+                    anchoTabla: previewAnchoTabla,
+                    anchoMitad: previewAnchoTabla / 2,
+                    logoSol,
+                    logoAV,
+                    medir: false,
+                };
 
                 detalles.forEach((detalle, index) => {
-                    // Un PDF independiente por persona
-                    const doc = new jsPDF({
-                        orientation: ORIENTACION,
-                        unit: "mm",
-                        format: "a4",
-                    });
-                    const pageWidth = doc.internal.pageSize.getWidth();
-                    const pageHeight = doc.internal.pageSize.getHeight();
-                    const margen = MARGEN;
-                    const anchoTabla = pageWidth - margen * 2;
-                    const anchoMitad = anchoTabla / 2;
-
-                    const ctx = {
-                        pageWidth,
-                        margen,
-                        anchoTabla,
-                        anchoMitad,
+                    // Un PDF independiente por persona para el ZIP
+                    const { doc: pdfPersona, esc } = _crearPdfPersona(
+                        jsPDF,
+                        detalle,
                         logoSol,
                         logoAV,
-                        medir: false,
-                    };
-
-                    const esc = _calcularEscala(jsPDF, detalle, ctx);
-                    _dibujarDetalle(doc, detalle, esc, ctx);
-
-                    // ====== PIE DE PÁGINA ======
-                    const totalPaginas = doc.getNumberOfPages();
-                    for (let p = 1; p <= totalPaginas; p++) {
-                        doc.setPage(p);
-                        doc.setFont("helvetica", "normal");
-                        doc.setFontSize(6.5);
-                        doc.setTextColor(140, 140, 140);
-                        doc.text(
-                            `Generado por Sisolmar Web · ${fechaGeneracion}`,
-                            margen,
-                            pageHeight - 3,
-                        );
-                        doc.text(
-                            `Página ${p} de ${totalPaginas}`,
-                            pageWidth - margen,
-                            pageHeight - 3,
-                            { align: "right" },
-                        );
-                    }
-
-                    const blob = doc.output("blob");
-                    if (!previewBlob) {
-                        previewBlob = blob;
-                        previewDoc = doc;
-                    }
+                        fechaGeneracion,
+                    );
 
                     // ====== NOMBRE DEL PDF DENTRO DEL ZIP ======
-                    const nombreBase =
+                    const nombreCompleto =
                         sanitizar(
                             detalle.full_name ||
                                 detalle.nombre_completo ||
-                                `PERSONAL_${index + 1}`,
+                                `PERSONAL ${index + 1}`,
                         )
-                            .toUpperCase()
-                            .replace(/\s+/g, "_") ||
-                        `PERSONAL_${index + 1}`;
-                    const dni = sanitizar(detalle.dni || "").replace(
-                        /\s+/g,
-                        "",
-                    );
-                    const partes = [nombreBase];
-                    if (dni) partes.push(`DNI_${dni}`);
-                    partes.push(courseName, fechaStr);
+                            .replace(/\s+/g, " ")
+                            .trim() || `PERSONAL ${index + 1}`;
 
-                    let nombrePdf = `${partes.join(" - ")}.pdf`;
+                    let nombrePdf = `${nombreCompleto} - ${courseName}.pdf`;
                     let intento = 2;
                     while (nombresUsados.has(nombrePdf.toLowerCase())) {
-                        nombrePdf = `${partes.join(" - ")} (${intento}).pdf`;
+                        nombrePdf = `${nombreCompleto} (${intento}) - ${courseName}.pdf`;
                         intento++;
                     }
                     nombresUsados.add(nombrePdf.toLowerCase());
 
-                    zip.file(nombrePdf, blob);
+                    zip.file(nombrePdf, pdfPersona.output("blob"));
+
+                    // ====== VISTA PREVIA: TODOS LOS EXÁMENES ======
+                    if (index > 0) previewDoc.addPage();
+                    _dibujarDetalle(previewDoc, detalle, esc, previewCtx);
                 });
+
+                _agregarPiePagina(previewDoc, fechaGeneracion);
+                const previewBlob = previewDoc.output("blob");
 
                 const zipBlob = await zip.generateAsync({
                     type: "blob",
@@ -1006,14 +1029,14 @@ export default document.addEventListener("alpine:init", () => {
                             primerDetalle.nombre_completo ||
                             "PERSONAL",
                     )
-                        .toUpperCase()
-                        .replace(/\s+/g, "_") || "PERSONAL";
+                        .replace(/\s+/g, " ")
+                        .trim() || "PERSONAL";
                 const nombreZip =
                     detalles.length === 1
                         ? `${nombrePersonaZip} - ${courseName} - ${fechaStr}.zip`
                         : `REPORTE_EXAMENES - ${courseName} - ${fechaStr}.zip`;
 
-                // ====== PREVIEW (primer PDF) ======
+                // ====== PREVIEW ======
                 if (this.pdfUrl) URL.revokeObjectURL(this.pdfUrl);
                 this.pdfUrl = URL.createObjectURL(previewBlob);
                 this.pdfNombre = nombreZip;

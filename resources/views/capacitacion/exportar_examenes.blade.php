@@ -702,7 +702,7 @@
                     <div class="min-w-0">
                         <h3 class="text-base font-bold text-default-900 leading-tight">Vista previa del reporte</h3>
                         <p class="text-xs text-default-500 truncate" x-text="pdfNombre"></p>
-                        <p class="text-[11px] text-default-400">Vista previa del primer PDF · se descargará un ZIP con un PDF por persona</p>
+                        <p class="text-[11px] text-default-400">Vista previa de todos los exámenes · se descargará un ZIP con un PDF por persona</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
