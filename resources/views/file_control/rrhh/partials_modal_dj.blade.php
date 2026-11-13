@@ -768,9 +768,8 @@
                                             <div>
                                                 <label class="dj-label">Fecha Ingreso a Solmar</label>
                                                 <input type="date" id="fecha_ingreso_solmar" name="fecha_ingreso_solmar"
-                                                    class="dj-input"
-                                                    {{ session('tipo_rol') == 17 ? '' : 'readonly' }}
-                                                    style="{{ session('tipo_rol') == 17 ? '' : 'background:#f3f4f6;color:#6b7280;cursor:not-allowed;' }}">
+                                                    class="dj-input" readonly
+                                                    style="background:#f3f4f6;color:#6b7280;cursor:not-allowed;">
                                             </div>
                                             <div id="wrap_fecha_cese" style="display:none;">
                                                 <label class="dj-label">Fecha de Cese</label>

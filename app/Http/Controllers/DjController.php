@@ -1392,13 +1392,9 @@ class DjController extends Controller
             }
 
             // ✅ 2. INSERTAR/ACTUALIZAR DIRECTAMENTE en DJ2026_PERSONAL
-            // Fecha Ingreso a Solmar: editable SOLO para Admins RRHH (tipo_rol 17);
-            // otros roles conservan el valor actual. Fecha de Cese: bloqueada para todos.
-            if (session('tipo_rol') == 17 && !empty(trim((string) ($data['fecha_ingreso_solmar'] ?? '')))) {
-                $data['FECH_INGRE'] = trim((string) $data['fecha_ingreso_solmar']);
-            } else {
-                unset($data['FECH_INGRE'], $data['fecha_ingreso_solmar']);
-            }
+            // La fecha de ingreso solo se establece al registrar o recontratar.
+            // En una DJ existente se preserva sin aceptar cambios del formulario.
+            unset($data['FECH_INGRE'], $data['FECH_INGRE_PLANILLA'], $data['fecha_ingreso_solmar']);
             unset($data['FECH_CESE'], $data['fecha_cese']);
             // Cargo: solo el rol ADMINS RRHH (tipo_rol 17) puede modificarlo;
             // los demás roles conservan el CODI_CARG actual (el select viene bloqueado en UI)
@@ -1413,10 +1409,11 @@ class DjController extends Controller
             );
             $resultadoAsigFami = $this->aplicarAsigFami($codiPers, $data, (string) ($asigFamiAnterior->ASIG_FAMI ?? ''));
             $this->aplicarConHijos($codiPers, $data);
-            $this->insertOrUpdateDJ2026Personal($codiPers, $data, $source);
+            $fechasIngresoProtegidas = ['FECH_INGRE'];
+            $this->insertOrUpdateDJ2026Personal($codiPers, $data, $source, $fechasIngresoProtegidas);
 
             // ✅ 2.5. SINCRONIZAR DJ2026_PERSONAL → PERSONAL (solo columnas con valor NO NULL)
-            $this->syncDJ2026ToPersonal($codiPers);
+            $this->syncDJ2026ToPersonal($codiPers, $fechasIngresoProtegidas);
 
             // ✅ 3. GUARDAR FAMILIARES en tablas temporales
             $this->saveFamiliaresTemp($codiPers, $data);
@@ -1684,7 +1681,7 @@ class DjController extends Controller
         }
     }
 
-    private function insertOrUpdateDJ2026Personal($codiPers, $data, $source = 'migracion')
+    private function insertOrUpdateDJ2026Personal($codiPers, $data, $source = 'migracion', array $camposProtegidos = [])
     {
         // ✅ 1. Obtener datos base de sw_MIGRA_PERSONAL
         $migraData = DB::select(
@@ -1705,7 +1702,6 @@ class DjController extends Controller
 
         // ✅ 3. Definir campos por tipo
         $datetimeFields = [
-            'FECH_INGRE_PLANILLA',
             'FECH_INGRE',
             'FECH_NACI',
             'FECH_CESE',
@@ -2099,8 +2095,11 @@ class DjController extends Controller
             'CODI_AREA' => $getValue('CODI_AREA', 'CODI_AREA'),
             'CODI_MONE_BASI' => '01',
             'SUEL_BASI' => $getValue('SUEL_BASI', 'SUEL_BASI'),
-            'FECH_INGRE_PLANILLA' => $getValue('FECH_INGRE_PLANILLA', 'FECH_INGRE_PLANILLA'),
-            'FECH_INGRE' => $getValue('FECH_INGRE', 'FECH_INGRE'),
+            // FECH_INGRE solo cambia al registrar una DJ nueva o recontratar.
+            // FECH_INGRE_PLANILLA queda fuera de la DJ.
+            'FECH_INGRE' => in_array($source, ['nueva_dj', 'recontratacion'], true)
+                ? $getValue('fecha_ingreso_solmar', 'FECH_INGRE', 'FECH_INGRE')
+                : $getValue('FECH_INGRE', 'FECH_INGRE'),
             'CARN_ESSALUD' => $getValue('CARN_ESSALUD', 'CARN_ESSALUD'),
             'ESTA_CIVI' => $getValue('ESTA_CIVI', 'ESTA_CIVI'),
             'ASIG_FAMI' => $getValue('ASIG_FAMI', 'ASIG_FAMI'),
@@ -2233,6 +2232,10 @@ class DjController extends Controller
         // Si No Caduca está marcado, limpiar PERS_FECHCADUCADNI
         if (($data['no_caduca_dni'] ?? '0') === '1') {
             $updates['PERS_FECHCADUCADNI'] = null;
+        }
+
+        foreach ($camposProtegidos as $campoProtegido) {
+            unset($updates[$campoProtegido]);
         }
 
         foreach ($updates as $field => $value) {
@@ -2434,7 +2437,7 @@ class DjController extends Controller
         }
     }
 
-    private function syncDJ2026ToPersonal($codiPers)
+    private function syncDJ2026ToPersonal($codiPers, array $columnasExcluidas = [])
     {
         // 1. Obtener el registro recién guardado en DJ2026_PERSONAL
         $djData = DB::select(
@@ -2465,7 +2468,6 @@ class DjController extends Controller
 
         // 3. Campos datetime que necesitan sanitización de formato
         $datetimeFields = [
-            'FECH_INGRE_PLANILLA',
             'FECH_INGRE',
             'FECH_NACI',
             'FECH_CESE',
@@ -2500,7 +2502,6 @@ class DjController extends Controller
             'CODI_AREA',
             'CODI_MONE_BASI',
             'SUEL_BASI',
-            'FECH_INGRE_PLANILLA',
             'FECH_INGRE',
             'ESSALUD',
             'CARN_ESSALUD',
@@ -2684,6 +2685,10 @@ class DjController extends Controller
         $params = [];
 
         foreach ($columnsToSync as $col) {
+            if (in_array($col, $columnasExcluidas, true)) {
+                continue;
+            }
+
             // Solo actualizar si DJ2026_PERSONAL tiene valor (no importa si PERSONAL ya tiene dato)
             if (array_key_exists($col, $djRecord) && !is_null($djRecord[$col])) {
                 $value = $djRecord[$col];
