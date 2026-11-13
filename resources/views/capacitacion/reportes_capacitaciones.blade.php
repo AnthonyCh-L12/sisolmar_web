@@ -330,6 +330,10 @@
                     </li>
                     <li class="flex items-start gap-2">
                         <i class="ti ti-check mt-0.5 shrink-0 text-xs text-violet-500"></i>
+                        <span class="text-xs leading-relaxed text-default-600">Exponga al personal no matriculado en el curso</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <i class="ti ti-check mt-0.5 shrink-0 text-xs text-violet-500"></i>
                         <span class="text-xs leading-relaxed text-default-600">Exporte a Excel y PDF</span>
                     </li>
                 </ul>
@@ -2312,13 +2316,14 @@
                         </div>
 
                         <div>
-                            <select x-model="selectedEstado" @change="filtrarCursos()"
+                            <select x-model="selectedEstado"
                                 class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
                                 <option value="">Todos los estados</option>
                                 <option value="APROBADO">Aprobado</option>
                                 <option value="DESAPROBADO">Desaprobado</option>
                                 <option value="SIN ACCEDER">Sin acceder</option>
                                 <option value="EN CURSO">En curso</option>
+                                <option value="NO MATRICULADO">No matriculado</option>
                             </select>
                         </div>
 

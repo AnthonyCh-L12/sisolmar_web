@@ -4613,10 +4613,6 @@ export default document.addEventListener("alpine:init", () => {
                         ).getTime() / 1000;
                     if (c.Fecha_Creacion > hastaTs) return false;
                 }
-                if (this.selectedEstado) {
-                    const estadoCurso = (c.Estado || "").toUpperCase();
-                    if (estadoCurso !== this.selectedEstado) return false;
-                }
                 if (this.searchCurso) {
                     const term = this.searchCurso.toLowerCase();
                     if (!(c.Nombre || "").toLowerCase().includes(term))
