@@ -376,8 +376,8 @@
 
                 <div class="mb-3 flex items-center gap-2">
                     <div class="relative flex-1 max-w-xs">
-                        <input type="text" x-model="busquedaPersonal" placeholder="Buscar por nombre o DNI"
-                            @input="personalPage = 1"
+                        <input type="text" x-model.debounce.250ms="busquedaPersonal" placeholder="Buscar por nombre o DNI"
+                            @input.debounce.250ms="personalPage = 1"
                             class="w-full h-10 pl-10 pr-3 text-sm bg-default-50 border border-default-200 rounded-xl text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" />
                     </div>
                     <select x-model="filtroVigencia" @change="personalPage = 1"

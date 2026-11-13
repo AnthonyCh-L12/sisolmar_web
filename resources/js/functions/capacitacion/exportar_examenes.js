@@ -606,20 +606,29 @@ export default document.addEventListener("alpine:init", () => {
                 lista = lista.filter((p) => p.vigente === false);
             }
 
-            const idxSeleccionados = new Map();
-            lista.forEach((p, i) =>
-                idxSeleccionados.set(this.clavePersonal(p), i),
-            );
+            // Sin selección no hace falta ordenar ni calcular claves.
+            if (this.seleccionadosPersonal.length === 0) return lista;
 
-            return lista.slice().sort((a, b) => {
-                const aSel = this.estaSeleccionado(a) ? 0 : 1;
-                const bSel = this.estaSeleccionado(b) ? 0 : 1;
-                if (aSel !== bSel) return aSel - bSel;
-                return (
-                    (idxSeleccionados.get(this.clavePersonal(a)) ?? 0) -
-                    (idxSeleccionados.get(this.clavePersonal(b)) ?? 0)
-                );
-            });
+            const seleccionados = new Set(this.seleccionadosPersonal);
+            let haySeleccionados = false;
+            for (const p of lista) {
+                if (seleccionados.has(this.clavePersonal(p))) {
+                    haySeleccionados = true;
+                    break;
+                }
+            }
+            if (!haySeleccionados) return lista;
+
+            // Se calcula la clave una sola vez por persona para evitar
+            // comparaciones costosas durante el sort.
+            const ordenados = lista.map((p, i) => ({
+                p,
+                i,
+                sel: seleccionados.has(this.clavePersonal(p)) ? 0 : 1,
+            }));
+
+            ordenados.sort((a, b) => a.sel - b.sel || a.i - b.i);
+            return ordenados.map((x) => x.p);
         },
 
         get personalPaginado() {
@@ -729,8 +738,10 @@ export default document.addEventListener("alpine:init", () => {
         // true si todos los personales filtrados (de todas las páginas) ya están seleccionados
         get todosFiltradosSeleccionados() {
             const lista = this.personalFiltrado;
-            return (
-                lista.length > 0 && lista.every((p) => this.estaSeleccionado(p))
+            if (lista.length === 0) return false;
+            const seleccionados = new Set(this.seleccionadosPersonal);
+            return lista.every((p) =>
+                seleccionados.has(this.clavePersonal(p)),
             );
         },
 
@@ -739,25 +750,27 @@ export default document.addEventListener("alpine:init", () => {
             const lista = this.personalFiltrado;
             if (!lista.length) return;
 
-            if (this.todosFiltradosSeleccionados) {
-                const claves = new Set(lista.map((p) => this.clavePersonal(p)));
+            const claves = lista.map((p) => this.clavePersonal(p));
+            const actuales = new Set(this.seleccionadosPersonal);
+            const todosSeleccionados = claves.every((c) => actuales.has(c));
+
+            if (todosSeleccionados) {
+                const setClaves = new Set(claves);
                 this.seleccionadosPersonal = this.seleccionadosPersonal.filter(
-                    (c) => !claves.has(c),
+                    (c) => !setClaves.has(c),
                 );
                 this.importados = this.importados.filter(
-                    (i) => !claves.has(this.clavePersonal(i)),
+                    (i) => !setClaves.has(this.clavePersonal(i)),
                 );
                 return;
             }
 
-            const actuales = new Set(this.seleccionadosPersonal);
-            lista.forEach((p) => {
-                const clave = this.clavePersonal(p);
-                if (!actuales.has(clave)) {
-                    this.seleccionadosPersonal.push(clave);
-                    actuales.add(clave);
-                }
-            });
+            const nuevas = claves.filter((c) => !actuales.has(c));
+            if (nuevas.length === 0) return;
+            this.seleccionadosPersonal = [
+                ...this.seleccionadosPersonal,
+                ...nuevas,
+            ];
         },
 
         personalCompleto() {
@@ -781,17 +794,23 @@ export default document.addEventListener("alpine:init", () => {
         },
 
         get personalSeleccionadoDetalle() {
-            return this.seleccionadosPersonal
-                .map(
-                    (clave) =>
-                        this.personal.find(
-                            (p) => this.clavePersonal(p) === clave,
-                        ) ||
-                        this.importados.find(
-                            (p) => this.clavePersonal(p) === clave,
-                        ),
-                )
-                .filter(Boolean);
+            if (this.seleccionadosPersonal.length === 0) return [];
+
+            const porClave = new Map();
+            for (const p of this.personal) {
+                porClave.set(this.clavePersonal(p), p);
+            }
+            for (const p of this.importados) {
+                const clave = this.clavePersonal(p);
+                if (!porClave.has(clave)) porClave.set(clave, p);
+            }
+
+            const detalle = [];
+            for (const clave of this.seleccionadosPersonal) {
+                const p = porClave.get(clave);
+                if (p) detalle.push(p);
+            }
+            return detalle;
         },
 
         get puedeExportar() {
