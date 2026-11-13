@@ -413,7 +413,6 @@
 
     {{-- Modal Reporte Por Capacitacion --}}
     <div id="modal-reporte-por-capacitacion" x-data="modalReportePorCapacitacion" x-show="open" x-cloak
-        @dnis-importados.window="aplicarDnisImportados($event.detail)"
         @keydown.escape.window="cerrar()" class="fixed inset-0 z-[80] flex items-center justify-center p-4"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
         x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
@@ -530,49 +529,6 @@
                         <option value="3">Sin acceder</option>
                         <option value="4">En curso</option>
                     </select>
-                </div>
-
-                {{-- Filtro de personal por Excel (opcional) --}}
-                <div>
-                    <div class="flex items-center justify-between gap-2 mb-1.5">
-                        <label class="text-xs font-medium text-default-700 block">
-                            Personal <span class="text-default-400 font-normal">(opcional, filtra el reporte)</span>
-                        </label>
-                        <button type="button"
-                            @click="$dispatch('abrir-importar-dnis', { target: 'reporte', cursoSeleccionado: courseIds.length > 0 })"
-                            class="inline-flex items-center gap-1 px-2 h-6 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold hover:bg-emerald-100 transition-colors cursor-pointer shrink-0">
-                            <i class="ti ti-file-spreadsheet text-[11px]"></i>
-                            Importar Excel
-                        </button>
-                    </div>
-
-                    <template x-if="importados.length > 0">
-                        <div class="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
-                                    <i class="ti ti-file-spreadsheet text-xs"></i>
-                                    <span x-text="importados.length"></span> importado(s) desde Excel
-                                </span>
-                                <button type="button" @click="quitarImportados()"
-                                    class="text-[11px] font-medium text-danger hover:text-danger/80 transition-colors cursor-pointer">
-                                    Quitar
-                                </button>
-                            </div>
-                            <div class="mt-1.5 flex flex-wrap gap-1 max-h-14 overflow-y-auto custom-scrollbar">
-                                <template x-for="imp in importados" :key="'importado-reporte-' + imp.dni">
-                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-default-200 text-[10px] text-default-600"
-                                        :title="(imp.nombre_completo || '') + ' · ' + imp.dni">
-                                        <span class="font-mono" x-text="imp.dni"></span>
-                                        <span class="text-default-400 truncate max-w-[90px]" x-text="imp.nombre_completo || ''"></span>
-                                    </span>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
-
-                    <template x-if="importados.length === 0">
-                        <p class="text-xs text-default-400 italic">Todos los personales de los cursos seleccionados.</p>
-                    </template>
                 </div>
 
                 {{-- Selección de cursos --}}
@@ -1487,6 +1443,12 @@
                                         <i class="ti ti-file-spreadsheet text-[11px]"></i>
                                         Importar Excel
                                     </button>
+                                    <button type="button" @click="$dispatch('descargar-formato-dnis')"
+                                        title="Descargar formato Excel"
+                                        class="inline-flex items-center gap-1 px-2 h-6 rounded-md bg-default-100 text-default-600 border border-default-200 text-[11px] font-semibold hover:bg-default-200 transition-colors cursor-pointer shrink-0">
+                                        <i class="ti ti-download text-[11px]"></i>
+                                        Formato
+                                    </button>
                                 </div>
                                 <button type="button" @click="toggleAllPersonal()"
                                     class="text-xs text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer shrink-0"
@@ -2230,6 +2192,12 @@
                                         class="inline-flex items-center gap-1 px-2 h-6 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold hover:bg-emerald-100 transition-colors cursor-pointer shrink-0">
                                         <i class="ti ti-file-spreadsheet text-[11px]"></i>
                                         Importar Excel
+                                    </button>
+                                    <button type="button" @click="$dispatch('descargar-formato-dnis')"
+                                        title="Descargar formato Excel"
+                                        class="inline-flex items-center gap-1 px-2 h-6 rounded-md bg-default-100 text-default-600 border border-default-200 text-[11px] font-semibold hover:bg-default-200 transition-colors cursor-pointer shrink-0">
+                                        <i class="ti ti-download text-[11px]"></i>
+                                        Formato
                                     </button>
                                 </div>
                                 <button type="button" @click="toggleAllPersonal()"
@@ -3388,6 +3356,12 @@
                                         <i class="ti ti-file-spreadsheet text-[11px]"></i>
                                         Importar Excel
                                     </button>
+                                    <button type="button" @click="$dispatch('descargar-formato-dnis')"
+                                        title="Descargar formato Excel"
+                                        class="inline-flex items-center gap-1 px-2 h-6 rounded-md bg-default-100 text-default-600 border border-default-200 text-[11px] font-semibold hover:bg-default-200 transition-colors cursor-pointer shrink-0">
+                                        <i class="ti ti-download text-[11px]"></i>
+                                        Formato
+                                    </button>
                                 </div>
                                 <button type="button" @click="toggleAllPersonal()"
                                     class="text-xs text-primary hover:text-primary/80 font-medium transition-colors cursor-pointer shrink-0"
@@ -3705,7 +3679,8 @@
     </div>
 
     {{-- Modal Importar DNIs desde Excel --}}
-    <div x-data="modalImportarDnis" @abrir-importar-dnis.window="abrir($event.detail || {})">
+    <div x-data="modalImportarDnis" @abrir-importar-dnis.window="abrir($event.detail || {})"
+        @descargar-formato-dnis.window="descargarFormato()">
         <input type="file" x-ref="archivo" accept=".xlsx" class="sr-only" tabindex="-1" @change="onFile($event)">
 
         <div x-show="open" x-cloak @keydown.escape.window="cerrar()"
@@ -3896,18 +3871,25 @@
                 </template>
 
                 {{-- Footer --}}
-                <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-default-100">
-                    <button type="button" @click="cerrar()" :disabled="procesando"
-                        class="px-4 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-default-600 bg-default-100 hover:bg-default-200 hover:text-default-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                        Cancelar
+                <div class="flex items-center justify-between gap-2 px-6 py-4 border-t border-default-100">
+                    <button type="button" @click="descargarFormato()" :disabled="procesando"
+                        class="px-3 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="ti ti-download text-sm"></i>
+                        Descargar formato
                     </button>
-                    <template x-if="stage === 'resultado'">
-                        <button type="button" @click="confirmar()" :disabled="encontrados.length === 0"
-                            class="px-5 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                            <i class="ti ti-download text-sm"></i>
-                            <span x-text="'Agregar ' + encontrados.length + ' DNI(s)'"></span>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="cerrar()" :disabled="procesando"
+                            class="px-4 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-default-600 bg-default-100 hover:bg-default-200 hover:text-default-800 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                            Cancelar
                         </button>
-                    </template>
+                        <template x-if="stage === 'resultado'">
+                            <button type="button" @click="confirmar()" :disabled="encontrados.length === 0"
+                                class="px-5 h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="ti ti-download text-sm"></i>
+                                <span x-text="'Agregar ' + encontrados.length + ' DNI(s)'"></span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>

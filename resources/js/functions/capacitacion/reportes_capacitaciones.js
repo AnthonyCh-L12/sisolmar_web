@@ -513,7 +513,6 @@ export default document.addEventListener("alpine:init", () => {
         selectedEstado: 0,
         selectedSucursal: "",
         personalVigente: "1",
-        importados: [],
 
         cursos: [],
         todosLosCursos: [],
@@ -699,7 +698,6 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedEstado = 0;
             this.selectedSucursal = "";
             this.personalVigente = "1";
-            this.importados = [];
 
             this.cursos = [...this.todosLosCursos];
             this.periodos = [];
@@ -794,69 +792,6 @@ export default document.addEventListener("alpine:init", () => {
         seleccionarSucursal(idx) {
             this.selectedSucursalIdx = idx;
             this.currentPage = 1;
-        },
-
-        dnisImportadosSet() {
-            return new Set(
-                this.importados
-                    .map((i) => String(i.dni ?? "").trim())
-                    .filter(Boolean),
-            );
-        },
-
-        _filtrarDnisPersonal(datos) {
-            const dnis = this.dnisImportadosSet();
-            if (dnis.size === 0 || !Array.isArray(datos)) return datos;
-
-            const esAgrupado =
-                datos.length > 0 && datos[0]?.Personales !== undefined;
-
-            if (esAgrupado) {
-                return datos
-                    .map((grupo) => ({
-                        ...grupo,
-                        Personales: (grupo.Personales || []).filter((p) =>
-                            dnis.has(String(p.NroDoc ?? "").trim()),
-                        ),
-                    }))
-                    .filter((grupo) => grupo.Personales.length > 0);
-            }
-
-            return datos.filter((p) =>
-                dnis.has(String(p.NroDoc ?? "").trim()),
-            );
-        },
-
-        _contarDnisPersonal(datos) {
-            if (!Array.isArray(datos)) return 0;
-            if (datos.length > 0 && datos[0]?.Personales !== undefined) {
-                return datos.reduce(
-                    (sum, grupo) => sum + (grupo.Personales?.length ?? 0),
-                    0,
-                );
-            }
-            return datos.length;
-        },
-
-        aplicarDnisImportados(detalle) {
-            if (!detalle || detalle.target !== "reporte") return;
-
-            const encontrados = Array.isArray(detalle.encontrados)
-                ? detalle.encontrados
-                : [];
-
-            if (encontrados.length === 0) return;
-
-            const mapa = new Map(this.importados.map((i) => [i.dni, i]));
-            encontrados.forEach((persona) => {
-                if (!persona?.dni) return;
-                mapa.set(persona.dni, persona);
-            });
-            this.importados = [...mapa.values()];
-        },
-
-        quitarImportados() {
-            this.importados = [];
         },
 
         get nombreCurso() {
@@ -1533,8 +1468,8 @@ export default document.addEventListener("alpine:init", () => {
 
             if (this.cacheReportes[cacheKey]) {
                 const cached = this.cacheReportes[cacheKey];
-                this.personal = this._filtrarDnisPersonal(cached.personal);
-                this.totalPersonal = this._contarDnisPersonal(this.personal);
+                this.personal = cached.personal;
+                this.totalPersonal = cached.total;
                 this.currentPage = 1;
                 this.selectedCursoIndex = -1;
                 this.selectedSucursalIdx = 0;
@@ -1562,16 +1497,17 @@ export default document.addEventListener("alpine:init", () => {
                     const cursos = response.data.Cursos || [];
                     this._cursosExportData = cursos;
 
-                    this.personal = this._filtrarDnisPersonal(cursos);
-                    this.totalPersonal = this._contarDnisPersonal(
-                        this.personal,
+                    this.personal = cursos;
+                    this.totalPersonal = cursos.reduce(
+                        (sum, c) => sum + (c.Personales?.length ?? 0),
+                        0,
                     );
 
                     this.selectedCursoIndex = this.personal.length > 0 ? 0 : -1;
                     this.selectedSucursalIdx = 0;
 
                     this.cacheReportes[cacheKey] = {
-                        personal: cursos,
+                        personal: this.personal,
                         total: this.totalPersonal,
                     };
 
@@ -1602,10 +1538,8 @@ export default document.addEventListener("alpine:init", () => {
             ].join("_");
 
             if (this.cacheReportes[cacheKey]) {
-                this.personal = this._filtrarDnisPersonal(
-                    this.cacheReportes[cacheKey].personal,
-                );
-                this.totalPersonal = this._contarDnisPersonal(this.personal);
+                this.personal = this.cacheReportes[cacheKey].personal;
+                this.totalPersonal = this.cacheReportes[cacheKey].total;
                 return true;
             }
 
@@ -1625,12 +1559,12 @@ export default document.addEventListener("alpine:init", () => {
                 if (response.data.success) {
                     const cursos = response.data.Cursos || [];
                     this._cursosExportData = cursos;
-                    this.personal = this._filtrarDnisPersonal(cursos);
-                    this.totalPersonal = this._contarDnisPersonal(
-                        this.personal,
+                    this.personal = cursos.flatMap(
+                        (curso) => curso.Personales || [],
                     );
+                    this.totalPersonal = this.personal.length;
                     this.cacheReportes[cacheKey] = {
-                        personal: cursos,
+                        personal: this.personal,
                         total: this.totalPersonal,
                     };
                     return true;
@@ -6810,6 +6744,38 @@ export default document.addEventListener("alpine:init", () => {
                     error.message ||
                     "No se pudo procesar el archivo.";
                 this.stage = "error";
+            }
+        },
+
+        async descargarFormato() {
+            try {
+                const workbook = new ExcelJS.Workbook();
+                const sheet = workbook.addWorksheet("Personal");
+
+                sheet.columns = [
+                    { header: "Nro", key: "nro", width: 10 },
+                    { header: "DNI", key: "dni", width: 22 },
+                ];
+
+                const headerRow = sheet.getRow(1);
+                headerRow.height = 20;
+                headerRow.eachCell((cell) => _estiloEncabezadoExcel(cell));
+
+                sheet.getColumn(2).numFmt = "@";
+                sheet.views = [{ state: "frozen", ySplit: 1 }];
+
+                const buffer = await workbook.xlsx.writeBuffer();
+                saveAs(
+                    _blobExcel(buffer),
+                    "FORMATO_IMPORTACION_PERSONAL.xlsx",
+                );
+            } catch (error) {
+                console.error(error);
+                Swal.fire(
+                    "Error",
+                    "No se pudo descargar el formato.",
+                    "error",
+                );
             }
         },
 
