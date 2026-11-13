@@ -1,5 +1,7 @@
 import axios from "axios";
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 function _assetUrl(path) {
     const env = typeof APP_ENV !== "undefined" ? APP_ENV : (typeof window !== "undefined" ? window.APP_ENV : undefined);
@@ -311,6 +313,7 @@ export default document.addEventListener("alpine:init", () => {
         pdfUrl: null,
         pdfNombre: null,
         pdfDoc: null,
+        zipBlob: null,
 
         // Aviso previo: personal que no desarrolló el examen
         mostrarModalPendientes: false,
@@ -867,112 +870,169 @@ export default document.addEventListener("alpine:init", () => {
                 return;
             }
 
-            const doc = new jsPDF({
-                orientation: ORIENTACION,
-                unit: "mm",
-                format: "a4",
-            });
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-
-            const margen = MARGEN;
-            const anchoTabla = pageWidth - margen * 2;
-            const anchoMitad = anchoTabla / 2;
+            if (!Array.isArray(detalles) || detalles.length === 0) return;
 
             const logoSol = await _cargarImagen(
                 _assetUrl("/images/logo_sol.png"),
             );
             const logoAV = await _cargarImagen(_assetUrl("/images/AV.png"));
 
-            const ctx = {
-                pageWidth,
-                margen,
-                anchoTabla,
-                anchoMitad,
-                logoSol,
-                logoAV,
-                medir: false,
-            };
-
-            // Una hoja por persona: se calcula la mayor escala que cabe en 1 página
-            detalles.forEach((detalle, index) => {
-                if (index > 0) doc.addPage();
-                const esc = _calcularEscala(jsPDF, detalle, ctx);
-                _dibujarDetalle(doc, detalle, esc, ctx);
-            });
-
-            // ====== PIE DE PÁGINA ======
-            const totalPaginas = doc.getNumberOfPages();
-            for (let i = 1; i <= totalPaginas; i++) {
-                doc.setPage(i);
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(6.5);
-                doc.setTextColor(140, 140, 140);
-
-                const fechaGeneracion = new Date().toLocaleString("es-PE", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                    hour12: true,
-                });
-
-                doc.text(
-                    `Generado por Sisolmar Web · ${fechaGeneracion}`,
-                    margen,
-                    pageHeight - 3,
-                );
-                doc.text(
-                    `Página ${i} de ${totalPaginas}`,
-                    pageWidth - margen,
-                    pageHeight - 3,
-                    { align: "right" },
-                );
-            }
-
-            // ====== NOMBRE DINÁMICO DEL ARCHIVO ======
             const hoy = new Date();
             const dd = String(hoy.getDate()).padStart(2, "0");
             const mm = String(hoy.getMonth() + 1).padStart(2, "0");
             const yyyy = hoy.getFullYear();
             const fechaStr = `${dd}-${mm}-${yyyy}`;
 
+            const fechaGeneracion = hoy.toLocaleString("es-PE", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true,
+            });
+
             const sanitizar = (str) =>
-                (str || "")
+                String(str ?? "")
                     .normalize("NFD")
                     .replace(/[\u0300-\u036f]/g, "")
                     .replace(/[\\/:*?"<>|]/g, "")
                     .trim();
 
             const primerDetalle = detalles[0] || {};
-            const courseName = sanitizar(primerDetalle.course_name || "CURSO");
+            const courseName =
+                sanitizar(primerDetalle.course_name || "CURSO").replace(
+                    /\s+/g,
+                    "_",
+                ) || "CURSO";
 
-            let nombreArchivo;
-            if (detalles.length === 1) {
-                const fullName = sanitizar(
-                    primerDetalle.full_name || "PERSONAL",
-                )
-                    .toUpperCase()
-                    .replace(/\s+/g, "_");
-                nombreArchivo = `${fullName} - ${courseName} - ${fechaStr}.pdf`;
-            } else {
-                nombreArchivo = `REPORTE_EXAMENES - ${courseName} - ${fechaStr}.pdf`;
+            try {
+                const zip = new JSZip();
+                const nombresUsados = new Set();
+                let previewBlob = null;
+                let previewDoc = null;
+
+                detalles.forEach((detalle, index) => {
+                    // Un PDF independiente por persona
+                    const doc = new jsPDF({
+                        orientation: ORIENTACION,
+                        unit: "mm",
+                        format: "a4",
+                    });
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    const margen = MARGEN;
+                    const anchoTabla = pageWidth - margen * 2;
+                    const anchoMitad = anchoTabla / 2;
+
+                    const ctx = {
+                        pageWidth,
+                        margen,
+                        anchoTabla,
+                        anchoMitad,
+                        logoSol,
+                        logoAV,
+                        medir: false,
+                    };
+
+                    const esc = _calcularEscala(jsPDF, detalle, ctx);
+                    _dibujarDetalle(doc, detalle, esc, ctx);
+
+                    // ====== PIE DE PÁGINA ======
+                    const totalPaginas = doc.getNumberOfPages();
+                    for (let p = 1; p <= totalPaginas; p++) {
+                        doc.setPage(p);
+                        doc.setFont("helvetica", "normal");
+                        doc.setFontSize(6.5);
+                        doc.setTextColor(140, 140, 140);
+                        doc.text(
+                            `Generado por Sisolmar Web · ${fechaGeneracion}`,
+                            margen,
+                            pageHeight - 3,
+                        );
+                        doc.text(
+                            `Página ${p} de ${totalPaginas}`,
+                            pageWidth - margen,
+                            pageHeight - 3,
+                            { align: "right" },
+                        );
+                    }
+
+                    const blob = doc.output("blob");
+                    if (!previewBlob) {
+                        previewBlob = blob;
+                        previewDoc = doc;
+                    }
+
+                    // ====== NOMBRE DEL PDF DENTRO DEL ZIP ======
+                    const nombreBase =
+                        sanitizar(
+                            detalle.full_name ||
+                                detalle.nombre_completo ||
+                                `PERSONAL_${index + 1}`,
+                        )
+                            .toUpperCase()
+                            .replace(/\s+/g, "_") ||
+                        `PERSONAL_${index + 1}`;
+                    const dni = sanitizar(detalle.dni || "").replace(
+                        /\s+/g,
+                        "",
+                    );
+                    const partes = [nombreBase];
+                    if (dni) partes.push(`DNI_${dni}`);
+                    partes.push(courseName, fechaStr);
+
+                    let nombrePdf = `${partes.join(" - ")}.pdf`;
+                    let intento = 2;
+                    while (nombresUsados.has(nombrePdf.toLowerCase())) {
+                        nombrePdf = `${partes.join(" - ")} (${intento}).pdf`;
+                        intento++;
+                    }
+                    nombresUsados.add(nombrePdf.toLowerCase());
+
+                    zip.file(nombrePdf, blob);
+                });
+
+                const zipBlob = await zip.generateAsync({
+                    type: "blob",
+                    compression: "DEFLATE",
+                    compressionOptions: { level: 6 },
+                });
+
+                const nombrePersonaZip =
+                    sanitizar(
+                        primerDetalle.full_name ||
+                            primerDetalle.nombre_completo ||
+                            "PERSONAL",
+                    )
+                        .toUpperCase()
+                        .replace(/\s+/g, "_") || "PERSONAL";
+                const nombreZip =
+                    detalles.length === 1
+                        ? `${nombrePersonaZip} - ${courseName} - ${fechaStr}.zip`
+                        : `REPORTE_EXAMENES - ${courseName} - ${fechaStr}.zip`;
+
+                // ====== PREVIEW (primer PDF) ======
+                if (this.pdfUrl) URL.revokeObjectURL(this.pdfUrl);
+                this.pdfUrl = URL.createObjectURL(previewBlob);
+                this.pdfNombre = nombreZip;
+                this.pdfDoc = previewDoc;
+                this.zipBlob = zipBlob;
+                this.mostrarPreview = true;
+            } catch (e) {
+                console.error(e);
+                Swal.fire(
+                    "Error",
+                    "No se pudo generar el ZIP con los reportes en PDF.",
+                    "error",
+                );
             }
-
-            // ====== PREVIEW ======
-            const blob = doc.output("blob");
-            if (this.pdfUrl) URL.revokeObjectURL(this.pdfUrl);
-            this.pdfUrl = URL.createObjectURL(blob);
-            this.pdfNombre = nombreArchivo;
-            this.pdfDoc = doc;
-            this.mostrarPreview = true;
         },
 
-        descargarPdf() {
-            if (!this.pdfDoc) return;
-            this.pdfDoc.save(this.pdfNombre || "reporte.pdf");
+        descargarZip() {
+            if (!this.zipBlob) return;
+            saveAs(this.zipBlob, this.pdfNombre || "reporte_examenes.zip");
         },
 
         cerrarPreview() {
@@ -983,6 +1043,7 @@ export default document.addEventListener("alpine:init", () => {
             }
             this.pdfDoc = null;
             this.pdfNombre = null;
+            this.zipBlob = null;
         },
 
         // ====== AVISO: PERSONAL QUE NO DESARROLLÓ EL EXAMEN ======

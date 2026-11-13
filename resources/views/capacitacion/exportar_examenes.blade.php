@@ -652,7 +652,7 @@
                 <div class="flex items-start gap-2 rounded-xl bg-amber-500/10 px-3.5 py-2.5">
                     <i class="ti ti-info-circle text-sm text-amber-600 mt-0.5 shrink-0"></i>
                     <p class="text-[11px] text-amber-700 leading-5">
-                        Ningún personal seleccionado desarrolló el examen, por lo que no se generará la vista previa del PDF.
+                        Ningún personal seleccionado desarrolló el examen, por lo que no se generará el ZIP con los PDF.
                     </p>
                 </div>
             </div>
@@ -697,18 +697,19 @@
             <div class="flex items-center justify-between px-6 py-4 border-b border-default-200 shrink-0">
                 <div class="flex items-center gap-3 min-w-0">
                     <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <i class="ti ti-file-type-pdf text-xl text-primary"></i>
+                        <i class="ti ti-file-zip text-xl text-primary"></i>
                     </div>
                     <div class="min-w-0">
                         <h3 class="text-base font-bold text-default-900 leading-tight">Vista previa del reporte</h3>
                         <p class="text-xs text-default-500 truncate" x-text="pdfNombre"></p>
+                        <p class="text-[11px] text-default-400">Vista previa del primer PDF · se descargará un ZIP con un PDF por persona</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <button type="button" @click="descargarPdf()"
+                    <button type="button" @click="descargarZip()"
                         class="inline-flex items-center gap-2 px-4 h-10 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold transition-all shadow-md shadow-primary/25 active:scale-[0.98]">
-                        <i class="ti ti-download text-base"></i>
-                        Descargar PDF
+                        <i class="ti ti-file-zip text-base"></i>
+                        Descargar ZIP
                     </button>
                     <button type="button" @click="cerrarPreview()"
                         class="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-default-200 text-default-500 hover:bg-default-100 transition-colors">
