@@ -110,6 +110,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/get-folios/{codCliente}/{codCargo}', [FileController::class, 'getFoliosXLegajo']);
         Route::get('/get-folios-cliente-cargo', [FileController::class, 'getFoliosClienteCargo']);
         Route::get('/get-folios', [FileController::class, 'getFolios']);
+        Route::get('/get-folios-categoria/{codCategoria}', [FileController::class, 'getFoliosPorCategoria']);
         Route::get('/get-folios-vigentes', [ConsultaController::class, 'getFoliosVigentes']);
         Route::get('/get-folios-pendientes', [ConsultaController::class, 'getFoliosPendientes']);
         Route::get('/folios/proximos-vencer', [ConsultaController::class, 'getFoliosProximosVencer']);

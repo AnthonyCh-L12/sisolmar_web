@@ -1446,6 +1446,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 const data = Object.fromEntries(formData.entries());
                 console.log('📦 data object:', data);
 
+                // Construir los arrays familiares por fila evita que nombres,
+                // parentescos, fechas e IDs pierdan su correspondencia entre sí.
+                const filasFamiliaresPayload = [...document.querySelectorAll('#familyContainer .family-row')];
+                const familiaresPayload = {
+                    FAM_PARENTESCO: filasFamiliaresPayload.map(fila => fila.querySelector('select[name="parentesco[]"]')?.value ?? ''),
+                    FAM_NOMBRES: filasFamiliaresPayload.map(fila => fila.querySelector('input[name="apellidosNombres[]"]')?.value ?? ''),
+                    FAM_FECHA_NACI: filasFamiliaresPayload.map(fila => fila.querySelector('input[name="fechaNacimiento[]"]')?.value ?? ''),
+                    FAM_ID: filasFamiliaresPayload.map(fila => fila.querySelector('input[name="familiar_id[]"]')?.value ?? ''),
+                };
+
                 const tabActiva = document.querySelector('.tab-btn.border-b-white')?.dataset?.tab ?? 'pendiente';
 
                 const hijoSinFecha = [...document.querySelectorAll('#familyContainer .family-row')]
@@ -1520,10 +1530,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     desactivar_asignacion_familiar: desactivarAsignacionFamiliar ? '1' : '0',
                     mantener_asignacion_familiar: mantenerAsignacionFamiliar ? '1' : '0',
                     no_caduca_dni: data.no_caduca_dni === 'on' ? '1' : '0',
-                    FAM_PARENTESCO: formData.getAll('parentesco[]'),
-                    FAM_NOMBRES: formData.getAll('apellidosNombres[]'),
-                    FAM_FECHA_NACI: formData.getAll('fechaNacimiento[]'),
-                    FAM_ID: formData.getAll('familiar_id[]'),
+                    ...familiaresPayload,
                     // Señala que el listado completo fue enviado, incluso si el usuario
                     // quitó todos los familiares y los arrays quedan vacíos.
                     FAM_PRESENTE: '1',
@@ -1621,6 +1628,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     // Invalidar cache para que la recarga traiga datos frescos
                     _personalCache.SI = null; _personalCache.NO = null; _personalCache.TODOS = null;
+                    const codiPersGuardado = String(response.data.codi_pers || data.cod_postulante || codiPersActual || '').trim();
+                    if (codiPersGuardado) {
+                        ['pendiente', 'migracion'].forEach(source => {
+                            const cacheKey = `${codiPersGuardado}_${source}`;
+                            personalDataCache.delete(cacheKey);
+                            personalDataPromise.delete(cacheKey);
+                        });
+                    }
                     getPersonal();
                 }
             } catch (error) {

@@ -96,7 +96,7 @@
                         <label for="filtroTipos" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-category text-gray-400 text-lg'></i>Prioridad</label>
                         <select id="filtroTipos" class="form-select text-sm w-36 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
                             <option value="TODOS" selected>Todos ({{ $todos }})</option>
-                            <option value="PRINCIPAL">Principal ({{ $principal }})</option>
+                            <option value="PRINCIPAL">Obligatorio ({{ $principal }})</option>
                             <option value="ADICIONAL">Adicional ({{ $adicional }})</option>
                         </select>
                     </div>
@@ -255,13 +255,13 @@
                             </span>
                         </div>
 
-                        {{-- Tipo de folio: Principal / Adicional --}}
+                        {{-- Tipo de folio: Obligatorio / Adicional --}}
                         <div class="flex items-center gap-4 mt-2">
                             <span class="text-sm font-bold text-gray-700 whitespace-nowrap">Prioridad:</span>
                             <div class="flex items-center gap-5">
                                 <label class="flex items-center gap-1.5 cursor-pointer">
                                     <input type="radio" class="form-radio text-primary" id="radioPrin" name="tipo_folio" value="PRINCIPAL" checked>
-                                    <span class="text-sm font-medium">Principal</span>
+                                    <span class="text-sm font-medium">Obligatorio</span>
                                 </label>
                                 <label class="flex items-center gap-1.5 cursor-pointer">
                                     <input type="radio" class="form-radio text-primary" id="radioAdi" name="tipo_folio" value="ADICIONAL">

@@ -89,7 +89,8 @@ const tblFolios = new Tabulator("#tblFolios", {
                     color = 'border-indigo-500 bg-indigo-100 text-indigo-800 shadow-sm';
                 }
 
-                return val ? `<span class="inline-flex items-center justify-center rounded-full border ${color} px-3 py-1 text-[11px] font-bold tracking-wider whitespace-nowrap" style="min-width: 95px;">${val}</span>` : '—';
+                const etiqueta = val === 'PRINCIPAL' ? 'OBLIGATORIO' : val;
+                return val ? `<span class="inline-flex items-center justify-center rounded-full border ${color} px-3 py-1 text-[11px] font-bold tracking-wider whitespace-nowrap" style="min-width: 95px;">${etiqueta}</span>` : '—';
             }
         },
         {
@@ -704,7 +705,8 @@ document.getElementById('btnGenerarPDF').addEventListener('click', function () {
                 doc.setFillColor(236, 240, 241);
                 doc.rect(10, yPosition, 190, 6, 'F');
                 doc.setTextColor(44, 62, 80);
-                doc.text(`1.${index + 1} ${prioridad}`, 12, yPosition + 4);
+                const etiquetaPrioridad = prioridad === 'PRINCIPAL' ? 'OBLIGATORIO' : prioridad;
+                doc.text(`1.${index + 1} ${etiquetaPrioridad}`, 12, yPosition + 4);
                 doc.setFont(undefined, 'normal');
                 doc.setTextColor(127, 140, 141);
                 doc.text(`(${folios.length} ${folios.length === 1 ? 'folio' : 'folios'})`, 50, yPosition + 4);

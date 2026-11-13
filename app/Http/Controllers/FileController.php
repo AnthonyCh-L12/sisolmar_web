@@ -50,8 +50,12 @@ class FileController extends Controller
 
         $tipoPerLimitar = session('limitarTipoPer');
         $tipoUsuario = session('tipo_rol');
+        $categoriasFolio = DB::table('sw_folios_categoria')
+            ->where('habilitado', 1)
+            ->orderBy('nombre')
+            ->get(['codigo', 'nombre']);
 
-        return view('file_control.chargefile', compact('personal', 'clientes', 'sucursales', 'tipoPerLimitar', 'tipoUsuario'));
+        return view('file_control.chargefile', compact('personal', 'clientes', 'sucursales', 'tipoPerLimitar', 'tipoUsuario', 'categoriasFolio'));
     }
 
     public function indexGestionDj()
@@ -1287,6 +1291,17 @@ class FileController extends Controller
                                         ? ($categorias->get($extra->cod_categoria) ?? 'SIN CATEGORÍA') 
                                         : 'SIN CATEGORÍA';
         }
+
+        return response()->json($folios);
+    }
+
+    public function getFoliosPorCategoria($codCategoria)
+    {
+        $folios = DB::table('sw_folios')
+            ->where('cod_categoria', $codCategoria)
+            ->where('habilitado', 1)
+            ->orderBy('nombre')
+            ->get(['codigo', 'nombre']);
 
         return response()->json($folios);
     }

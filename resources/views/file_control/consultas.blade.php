@@ -474,7 +474,7 @@
                             </label>
                             <select class="form-select text-sm" id="vig-prioridad">
                                 <option value="">Todas</option>
-                                <option value="PRINCIPAL">Principal</option>
+                                <option value="PRINCIPAL">Obligatorio</option>
                                 <option value="ADICIONAL">Adicional</option>
                             </select>
                         </div>

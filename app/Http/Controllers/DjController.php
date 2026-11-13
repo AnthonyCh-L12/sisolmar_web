@@ -1423,6 +1423,7 @@ class DjController extends Controller
 
             // ✅ 4. Sincronizar familiares existentes usando baja lógica
             $this->migrarFamiliaresConVigencia($codiPers, $data);
+            $this->asegurarFechasNacimientoHijosGuardadas($codiPers, $data);
 
             // ✅ 5. GUARDAR OCUPACIONES en tabla temporal
             //$this->saveOcupacionesTemp($dni, $data);
@@ -3414,15 +3415,19 @@ private function migrarFamiliares_solo_nuevo($codiPers)
 
             [$apel1, $apel2, $nomb1, $nomb2] = $this->separarNombreFamiliar($nombreCompleto);
             $parentesco = strtoupper(trim((string) ($parentescos[$i] ?? '')));
-            $fecha = preg_match('/^HIJ/i', $parentesco) ? trim((string) ($fechas[$i] ?? '')) : '';
+            $fechaTexto = preg_match('/^HIJ/i', $parentesco) ? trim((string) ($fechas[$i] ?? '')) : '';
+            $fecha = $fechaTexto !== ''
+                ? ($this->parsearFechaNacimiento($fechaTexto)?->format('Ymd') ?? '')
+                : '';
 
             DB::update(
                 "UPDATE si_solm.dbo.DERECHO_HABIENTE
                  SET TIPO_RELA = ?, APEL_1 = ?, APEL_2 = ?, NOMB_1 = ?, NOMB_2 = ?,
-                     FECH_NACI = TRY_CONVERT(datetime, NULLIF(?, ''), 23),
+                     FECH_NACI = CASE WHEN NULLIF(?, '') IS NULL THEN FECH_NACI
+                                      ELSE TRY_CONVERT(datetime, NULLIF(?, ''), 112) END,
                      DEHA_VIGENCIA = 'SI', USUA_CODIGO_MOD = ?, USUA_FECHA_MOD = GETDATE()
                  WHERE CODI_DERE_HABI = ? AND CODI_PERS = ?",
-                [$parentesco, $apel1, $apel2, $nomb1, $nomb2, $fecha, $usuario ?: null, $id, $codiPers]
+                [$parentesco, $apel1, $apel2, $nomb1, $nomb2, $fecha, $fecha, $usuario ?: null, $id, $codiPers]
             );
         }
 
@@ -3446,7 +3451,7 @@ private function migrarFamiliares_solo_nuevo($codiPers)
                  APEL_2 = s.APEL_2,
                  NOMB_1 = s.NOMB_1,
                  NOMB_2 = s.NOMB_2,
-                 FECH_NACI = TRY_CONVERT(datetime, s.FECH_NACI),
+                 FECH_NACI = COALESCE(TRY_CONVERT(datetime, s.FECH_NACI), d.FECH_NACI),
                  DEHA_VIGENCIA = 'SI',
                  USUA_CODIGO_MOD = ?,
                  USUA_FECHA_MOD = GETDATE()
@@ -3478,6 +3483,88 @@ private function migrarFamiliares_solo_nuevo($codiPers)
               AND NOT EXISTS (
                   SELECT 1 FROM si_solm.dbo.DERECHO_HABIENTE d WHERE {$coincidencia}
               )", [$usuario ?: null, $codiPers]);
+    }
+
+    /**
+     * Reaplica y verifica las fechas de hijos directamente en DERECHO_HABIENTE.
+     * La sincronización desde la tabla temporal no debe borrar una fecha que ya
+     * se escribió en la fila cuando la copia temporal llegó vacía.
+     */
+    private function asegurarFechasNacimientoHijosGuardadas($codiPers, array $data): void
+    {
+        $nombres = is_array($data['FAM_NOMBRES'] ?? null) ? $data['FAM_NOMBRES'] : [];
+        $parentescos = is_array($data['FAM_PARENTESCO'] ?? null) ? $data['FAM_PARENTESCO'] : [];
+        $fechas = is_array($data['FAM_FECHA_NACI'] ?? null) ? $data['FAM_FECHA_NACI'] : [];
+        $ids = is_array($data['FAM_ID'] ?? null) ? $data['FAM_ID'] : [];
+
+        foreach ($nombres as $i => $nombreCompleto) {
+            $parentesco = mb_strtoupper(trim((string) ($parentescos[$i] ?? '')), 'UTF-8');
+            if (!str_starts_with($parentesco, 'HIJO')) continue;
+
+            $fechaTexto = trim((string) ($fechas[$i] ?? ''));
+            if ($fechaTexto === '') continue;
+
+            $fecha = $this->parsearFechaNacimiento($fechaTexto);
+            if (!$fecha) {
+                throw new \InvalidArgumentException('La fecha de nacimiento de un hijo tiene un formato inválido.');
+            }
+            $nombreCompleto = trim((string) $nombreCompleto);
+            if ($nombreCompleto === '') {
+                throw new \InvalidArgumentException('Falta el nombre del hijo cuya fecha de nacimiento se intenta guardar.');
+            }
+            // Estilo 112 (YYYYMMDD) evita que SQL Server interprete la fecha
+            // como NULL según el idioma o DATEFORMAT de la sesión.
+            $fechaSql = $fecha->format('Ymd');
+            $id = trim((string) ($ids[$i] ?? ''));
+            $guardado = false;
+
+            if ($id !== '' && ctype_digit($id)) {
+                $filasActualizadas = DB::update(
+                    "UPDATE si_solm.dbo.DERECHO_HABIENTE
+                     SET FECH_NACI = TRY_CONVERT(datetime, ?, 112)
+                     WHERE CODI_DERE_HABI = ? AND CODI_PERS = ?",
+                    [$fechaSql, $id, $codiPers]
+                );
+                $guardado = $filasActualizadas > 0 && (bool) DB::selectOne(
+                    "SELECT TOP 1 1 AS existe
+                     FROM si_solm.dbo.DERECHO_HABIENTE
+                     WHERE CODI_DERE_HABI = ? AND CODI_PERS = ?
+                       AND CONVERT(date, FECH_NACI) = TRY_CONVERT(date, ?, 112)",
+                    [$id, $codiPers, $fechaSql]
+                );
+            }
+
+            if (!$guardado) {
+                [$apel1, $apel2, $nomb1, $nomb2] = $this->separarNombreFamiliar($nombreCompleto);
+                $filasActualizadas = DB::update(
+                    "UPDATE TOP (1) dh
+                     SET FECH_NACI = TRY_CONVERT(datetime, ?, 112)
+                     FROM si_solm.dbo.DERECHO_HABIENTE dh
+                     WHERE dh.CODI_PERS = ?
+                       AND UPPER(LTRIM(RTRIM(dh.TIPO_RELA))) LIKE 'HIJO%'
+                       AND UPPER(LTRIM(RTRIM(ISNULL(dh.APEL_1, '')))) = UPPER(?)
+                       AND UPPER(LTRIM(RTRIM(ISNULL(dh.APEL_2, '')))) = UPPER(?)
+                       AND UPPER(LTRIM(RTRIM(ISNULL(dh.NOMB_1, '')))) = UPPER(?)
+                       AND UPPER(LTRIM(RTRIM(ISNULL(dh.NOMB_2, '')))) = UPPER(?)",
+                    [$fechaSql, $codiPers, $apel1, $apel2, $nomb1, $nomb2]
+                );
+                $guardado = $filasActualizadas > 0 && (bool) DB::selectOne(
+                    "SELECT TOP 1 1 AS existe
+                     FROM si_solm.dbo.DERECHO_HABIENTE
+                     WHERE CODI_PERS = ? AND UPPER(LTRIM(RTRIM(TIPO_RELA))) LIKE 'HIJO%'
+                       AND UPPER(LTRIM(RTRIM(ISNULL(APEL_1, '')))) = UPPER(?)
+                       AND UPPER(LTRIM(RTRIM(ISNULL(APEL_2, '')))) = UPPER(?)
+                       AND UPPER(LTRIM(RTRIM(ISNULL(NOMB_1, '')))) = UPPER(?)
+                       AND UPPER(LTRIM(RTRIM(ISNULL(NOMB_2, '')))) = UPPER(?)
+                       AND CONVERT(date, FECH_NACI) = TRY_CONVERT(date, ?, 112)",
+                    [$codiPers, $apel1, $apel2, $nomb1, $nomb2, $fechaSql]
+                );
+            }
+
+            if (!$guardado) {
+                throw new \RuntimeException('No se pudo verificar la fecha de nacimiento de un hijo en DERECHO_HABIENTE; la DJ no se guardó.');
+            }
+        }
     }
 
     private function separarNombreFamiliar(string $nombreCompleto): array
