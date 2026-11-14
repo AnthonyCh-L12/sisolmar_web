@@ -27,7 +27,7 @@ class ExamenesController extends Controller
     public function obtenerDatosReporteAV(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'dnis'   => ['required', 'array', 'min:1', 'max:200'],
+            'dnis'   => ['required', 'array', 'min:1', 'max:1500'],
             'dnis.*' => ['required', 'string'],
             'quizId' => ['required', 'integer'],
         ]);
