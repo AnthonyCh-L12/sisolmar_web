@@ -100,6 +100,7 @@ export default defineConfig({
                 "resources/js/functions/capacitacion/gestion_programacion.js",
                 "resources/js/functions/capacitacion/consulta_matriculas.js",
                 "resources/js/functions/capacitacion/seguimiento_matriculas.js",
+                "resources/js/functions/capacitacion/seguimiento_matriculas_new.js",
                 "resources/js/functions/capacitacion/cursos_externos.js",
                 "resources/js/functions/capacitacion/trabajos_fallidos.js",
                 "resources/js/functions/capacitacion/planes_capacitaciones.js",
