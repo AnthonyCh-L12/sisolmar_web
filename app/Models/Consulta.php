@@ -317,4 +317,44 @@ class Consulta extends Model
             ->unique(fn($row) => (string) $row->cod_curso)
             ->keyBy(fn($row) => (string) $row->cod_curso);
     }
+
+    public static function listarPersonal(
+        string $vigente = '1',
+        ?string $empresaCodigo = null,
+        ?string $sucursalCodigo = null,
+    ) {
+        $rows = DB::connection('sqlsrv')->select(
+            "EXEC [dbo].[SW_LISTAR_PERSONAL_R]
+                @VIGENTE        = ?,
+                @EMPRESA_CODIGO = ?,
+                @SUCU_CODIGO    = ?",
+            [
+                $vigente,
+                $empresaCodigo,
+                $sucursalCodigo,
+            ]
+        );
+
+        return collect($rows)->map(function ($p) {
+            return [
+                'codigo'          => trim($p->CODIGO_PERSONAL ?? ''),
+                'dni'             => trim($p->NRO_DOC ?? ''),
+                'nombre_completo' => trim($p->NOMBRE_COMPLETO ?? ''),
+                'cargo'           => trim($p->CARGO ?? ''),
+                'tipo_trabajador' => trim($p->TIPO_TRABAJADOR ?? ''),
+                'empresa'         => trim($p->EMPRESA ?? 'SIN EMPRESA'),
+                'empresa_codigo'  => trim($p->COD_EMPRESA ?? ''),
+                'cliente'         => trim($p->CLIENTE ?? 'SIN CLIENTE'),
+                'sucursal'        => trim($p->SUCURSAL ?? ''),
+                'sucursal_codigo' => trim($p->SUCU_CODIGO ?? ''),
+                'vigente' => match ($p->VIGENTE ?? null) {
+                    'SI' => true,
+                    'NO' => false,
+                    default => null,
+                },
+                'email'   => trim($p->CORREO ?? 'Sin correo'),
+                'num_tel' => trim($p->TELEFONO ?? 'Sin teléfono'),
+            ];
+        });
+    }
 }
