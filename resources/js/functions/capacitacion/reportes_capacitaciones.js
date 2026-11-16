@@ -1037,6 +1037,8 @@ export default document.addEventListener("alpine:init", () => {
                 );
 
                 let currentRow = 6;
+                let firstHeaderRow = null;
+                let lastDataRow = null;
 
                 this.personal.forEach((grupo, gi) => {
                     if (gi > 0) {
@@ -1099,13 +1101,31 @@ export default document.addEventListener("alpine:init", () => {
                         sheet.mergeCells(`A${currentRow}:G${currentRow}`);
                         currentRow++;
 
+                        const headerRowNumber = currentRow;
                         currentRow = this._agregarFilasPersonalExcel(
                             sheet,
                             sucursalGrupo.Personales,
                             currentRow,
                         );
+                        if (firstHeaderRow === null) {
+                            firstHeaderRow = headerRowNumber;
+                        }
+                        lastDataRow = currentRow - 1;
                     });
                 });
+
+                // Filtro por columnas (Estado, Nombre Completo, Cargo,
+                // Tipo Trabajador, DNI, etc.) sobre la primera cabecera.
+                if (
+                    firstHeaderRow !== null &&
+                    lastDataRow !== null &&
+                    lastDataRow >= firstHeaderRow
+                ) {
+                    sheet.autoFilter = {
+                        from: `A${firstHeaderRow}`,
+                        to: `H${lastDataRow}`,
+                    };
+                }
 
                 sheet.columns = [
                     { width: 5 },
@@ -2188,7 +2208,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 sheet.autoFilter = {
                     from: `A${headerRowNumber}`,
-                    to: `J${headerRowNumber}`,
+                    to: `J${sheet.rowCount}`,
                 };
 
                 const buffer = await workbook.xlsx.writeBuffer();
@@ -3055,7 +3075,8 @@ export default document.addEventListener("alpine:init", () => {
         selectedArea: "",
         selectedCliente: "",
         selectedSucursal: "",
-        selectedTipoTrabajador: "",
+        selectedTiposTrabajador: [],
+        tiposOpen: false,
         selectedCargo: "",
         searchPersonal: "",
         searchCurso: "",
@@ -3412,11 +3433,12 @@ export default document.addEventListener("alpine:init", () => {
                     resultados = [];
                 }
             }
-            if (this.selectedTipoTrabajador) {
-                resultados = resultados.filter(
-                    (p) =>
-                        String(p.tipo_trabajador) ===
-                        String(this.selectedTipoTrabajador),
+            if (this.selectedTiposTrabajador.length > 0) {
+                const tipos = new Set(
+                    this.selectedTiposTrabajador.map((t) => String(t)),
+                );
+                resultados = resultados.filter((p) =>
+                    tipos.has(String(p.tipo_trabajador)),
                 );
             }
             if (this.selectedCargo) {
@@ -3436,6 +3458,28 @@ export default document.addEventListener("alpine:init", () => {
             this.personalesFiltrados = resultados;
             this.personalPage = 1;
             this.recalcularSeleccionPersonal();
+        },
+
+        toggleTipoTrabajador(tipo) {
+            const idx = this.selectedTiposTrabajador.indexOf(tipo);
+            if (idx !== -1) {
+                this.selectedTiposTrabajador.splice(idx, 1);
+            } else if (this.selectedTiposTrabajador.length >= 4) {
+                Swal.fire(
+                    "Atención",
+                    "Puede seleccionar hasta 4 tipos de trabajador.",
+                    "warning",
+                );
+                return;
+            } else {
+                this.selectedTiposTrabajador.push(tipo);
+            }
+            this.filtrarPersonales();
+        },
+
+        limpiarTiposTrabajador() {
+            this.selectedTiposTrabajador = [];
+            this.filtrarPersonales();
         },
 
         toggleCurso(id) {
@@ -3663,7 +3707,8 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedArea = "";
             this.selectedCliente = "";
             this.selectedSucursal = "";
-            this.selectedTipoTrabajador = "";
+            this.selectedTiposTrabajador = [];
+            this.tiposOpen = false;
             this.selectedCargo = "";
             this.searchPersonal = "";
             this.searchCurso = "";
@@ -4364,7 +4409,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 sheet.autoFilter = {
                     from: `A${headerRowNumber}`,
-                    to: `K${headerRowNumber}`,
+                    to: `K${sheet.rowCount}`,
                 };
 
                 const buffer = await workbook.xlsx.writeBuffer();
@@ -4404,7 +4449,8 @@ export default document.addEventListener("alpine:init", () => {
         selectedCliente: "",
         selectedEmpresa: "",
         selectedSucursal: "",
-        selectedTipoTrabajo: "",
+        selectedTiposTrabajo: [],
+        tiposOpen: false,
         selectedCargo: "",
         searchPersonal: "",
         selectedFechaDesde: "",
@@ -4573,11 +4619,12 @@ export default document.addEventListener("alpine:init", () => {
                     );
                 }
             }
-            if (this.selectedTipoTrabajo) {
-                resultados = resultados.filter(
-                    (p) =>
-                        String(p.tipo_trabajador) ===
-                        String(this.selectedTipoTrabajo),
+            if (this.selectedTiposTrabajo.length > 0) {
+                const tipos = new Set(
+                    this.selectedTiposTrabajo.map((t) => String(t)),
+                );
+                resultados = resultados.filter((p) =>
+                    tipos.has(String(p.tipo_trabajador)),
                 );
             }
             if (this.selectedCargo) {
@@ -4597,6 +4644,28 @@ export default document.addEventListener("alpine:init", () => {
 
             this.personalesFiltrados = resultados;
             this.personalPage = 1;
+        },
+
+        toggleTipoTrabajador(tipo) {
+            const idx = this.selectedTiposTrabajo.indexOf(tipo);
+            if (idx !== -1) {
+                this.selectedTiposTrabajo.splice(idx, 1);
+            } else if (this.selectedTiposTrabajo.length >= 4) {
+                Swal.fire(
+                    "Atención",
+                    "Puede seleccionar hasta 4 tipos de trabajador.",
+                    "warning",
+                );
+                return;
+            } else {
+                this.selectedTiposTrabajo.push(tipo);
+            }
+            this.filtrarPersonales();
+        },
+
+        limpiarTiposTrabajador() {
+            this.selectedTiposTrabajo = [];
+            this.filtrarPersonales();
         },
 
         filtrarCursos() {
@@ -5196,7 +5265,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 sheet.getRow(1).height = 50;
 
-                sheet.mergeCells("D1:J1");
+                sheet.mergeCells("D1:K1");
                 const infoCell = sheet.getCell("D1");
                 infoCell.value = "REPORTE GENERAL DE CAPACITACIONES";
                 infoCell.font = {
@@ -5209,7 +5278,7 @@ export default document.addEventListener("alpine:init", () => {
                     horizontal: "right",
                 };
 
-                sheet.mergeCells("D2:J2");
+                sheet.mergeCells("D2:K2");
                 const totalCell = sheet.getCell("D2");
                 totalCell.value = `Total: ${personales.length} personal(es)`;
                 totalCell.font = { size: 11, color: { argb: "FF333333" } };
@@ -5227,6 +5296,7 @@ export default document.addEventListener("alpine:init", () => {
                     "Apellidos y Nombres",
                     "Nro. Doc",
                     "Cargo",
+                    "Tipo Trabajador",
                     "Capacitación",
                     "Estado",
                     "Fecha / Últ. Acceso",
@@ -5248,6 +5318,7 @@ export default document.addEventListener("alpine:init", () => {
                             personal.NombreCompleto || "—",
                             personal.NroDoc || "—",
                             personal.Cargo || "—",
+                            personal.TipoTrabajador || "—",
                             "—",
                             "—",
                             "—",
@@ -5267,6 +5338,7 @@ export default document.addEventListener("alpine:init", () => {
                                 personal.NombreCompleto || "—",
                                 personal.NroDoc || "—",
                                 personal.Cargo || "—",
+                                personal.TipoTrabajador || "—",
                                 curso.Nombre || "—",
                                 curso.Estado || "—",
                                 fechaVal,
@@ -5286,6 +5358,7 @@ export default document.addEventListener("alpine:init", () => {
                     { width: 38 },
                     { width: 16 },
                     { width: 24 },
+                    { width: 18 },
                     { width: 38 },
                     { width: 14 },
                     { width: 18 },
@@ -5294,7 +5367,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 sheet.autoFilter = {
                     from: `A${headerRowNumber}`,
-                    to: `J${headerRowNumber}`,
+                    to: `K${sheet.rowCount}`,
                 };
 
                 const buffer = await workbook.xlsx.writeBuffer();
@@ -5339,7 +5412,8 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedCliente = "";
             this.selectedEmpresa = "";
             this.selectedSucursal = "";
-            this.selectedTipoTrabajo = "";
+            this.selectedTiposTrabajo = [];
+            this.tiposOpen = false;
             this.selectedCargo = "";
             this.searchPersonal = "";
             this.selectedFechaDesde = "";
@@ -5374,7 +5448,8 @@ export default document.addEventListener("alpine:init", () => {
         selectedSucursal: "",
         selectedVigencia: "1",
         selectedCargo: "",
-        selectedTipoTrabajador: "",
+        selectedTiposTrabajador: [],
+        tiposOpen: false,
         selectedCliente: "",
         searchPersonal: "",
 
@@ -5528,11 +5603,12 @@ export default document.addEventListener("alpine:init", () => {
                         String(this.selectedCargo),
                 );
             }
-            if (this.selectedTipoTrabajador) {
-                resultados = resultados.filter(
-                    (p) =>
-                        String((p.tipo_trabajador || "").trim()) ===
-                        String(this.selectedTipoTrabajador),
+            if (this.selectedTiposTrabajador.length > 0) {
+                const tipos = new Set(
+                    this.selectedTiposTrabajador.map((t) => String(t)),
+                );
+                resultados = resultados.filter((p) =>
+                    tipos.has(String((p.tipo_trabajador || "").trim())),
                 );
             }
             if (this.selectedCliente) {
@@ -5556,6 +5632,28 @@ export default document.addEventListener("alpine:init", () => {
             this.personales = resultados;
             this.personalPage = 1;
             this.recalcularSeleccionPersonal();
+        },
+
+        toggleTipoTrabajador(tipo) {
+            const idx = this.selectedTiposTrabajador.indexOf(tipo);
+            if (idx !== -1) {
+                this.selectedTiposTrabajador.splice(idx, 1);
+            } else if (this.selectedTiposTrabajador.length >= 4) {
+                Swal.fire(
+                    "Atención",
+                    "Puede seleccionar hasta 4 tipos de trabajador.",
+                    "warning",
+                );
+                return;
+            } else {
+                this.selectedTiposTrabajador.push(tipo);
+            }
+            this.filtrarPersonales();
+        },
+
+        limpiarTiposTrabajador() {
+            this.selectedTiposTrabajador = [];
+            this.filtrarPersonales();
         },
 
         get cargosDisponibles() {
@@ -6605,7 +6703,8 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedSucursal = "";
             this.selectedVigencia = "1";
             this.selectedCargo = "";
-            this.selectedTipoTrabajador = "";
+            this.selectedTiposTrabajador = [];
+            this.tiposOpen = false;
             this.selectedCliente = "";
             this.searchPersonal = "";
             this.selectedCursoId = null;

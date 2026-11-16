@@ -1385,14 +1385,70 @@
                                     </template>
                                 </select>
                             </div>
-                            <div>
-                                <select x-model="selectedTipoTrabajador" @change="filtrarPersonales()"
-                                    class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
-                                    <option value="">Todos los tipos</option>
-                                    <template x-for="t in tiposTrabajador" :key="t">
-                                        <option :value="t" x-text="t"></option>
-                                    </template>
-                                </select>
+                            <div class="relative" @click.outside="tiposOpen = false">
+                                <button type="button" @click="tiposOpen = !tiposOpen"
+                                    class="w-full min-h-9 px-2 py-1 text-sm bg-white border border-default-200 rounded-lg text-left flex items-center justify-between gap-1.5 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                    <div class="flex flex-wrap items-center gap-1 min-w-0">
+                                        <template x-if="selectedTiposTrabajador.length === 0">
+                                            <span class="text-default-400 px-1">Todos los tipos</span>
+                                        </template>
+                                        <template x-for="t in selectedTiposTrabajador" :key="t">
+                                            <span class="inline-flex items-center gap-1 pl-2 pr-1 h-6 rounded-full bg-primary/10 border border-primary/25 text-primary text-[11px] font-medium max-w-[130px]">
+                                                <span class="truncate" x-text="t"></span>
+                                                <span @click.stop="toggleTipoTrabajador(t)"
+                                                    class="shrink-0 w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center transition-colors cursor-pointer">
+                                                    <i class="ti ti-x text-[9px]"></i>
+                                                </span>
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <i class="ti ti-chevron-down text-default-400 text-xs shrink-0 transition-transform"
+                                        :class="tiposOpen ? 'rotate-180' : ''"></i>
+                                </button>
+
+                                <div x-show="tiposOpen" x-cloak
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0 -translate-y-1"
+                                    x-transition:enter-end="opacity-100 translate-y-0"
+                                    class="absolute z-30 mt-1 w-full bg-white border border-default-200 rounded-lg shadow-lg overflow-hidden">
+                                    <div class="flex items-center justify-between px-3 py-2 border-b border-default-100 bg-default-50/60">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wider text-default-500">
+                                            Hasta 4 tipos
+                                        </span>
+                                        <button type="button" @click="limpiarTiposTrabajador()"
+                                            class="text-[11px] font-medium text-danger hover:text-danger/80 transition-colors cursor-pointer">
+                                            Limpiar
+                                        </button>
+                                    </div>
+                                    <div class="max-h-48 overflow-y-auto custom-scrollbar divide-y divide-default-100">
+                                        <template x-for="t in tiposTrabajador" :key="t">
+                                            <label class="flex items-center gap-2.5 px-3 py-2 select-none transition-colors"
+                                                :class="selectedTiposTrabajador.includes(t)
+                                                    ? 'bg-primary/5 cursor-pointer'
+                                                    : (selectedTiposTrabajador.length >= 4
+                                                        ? 'opacity-40 cursor-not-allowed'
+                                                        : 'hover:bg-default-50 cursor-pointer')">
+                                                <input type="checkbox" :value="t"
+                                                    :checked="selectedTiposTrabajador.includes(t)"
+                                                    :disabled="!selectedTiposTrabajador.includes(t) && selectedTiposTrabajador.length >= 4"
+                                                    @change="toggleTipoTrabajador(t)" class="sr-only">
+                                                <div class="w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-all"
+                                                    :class="selectedTiposTrabajador.includes(t)
+                                                        ? 'bg-primary border-primary'
+                                                        : 'bg-white border-default-300'">
+                                                    <i class="ti ti-check text-white text-[10px]"
+                                                        x-show="selectedTiposTrabajador.includes(t)"></i>
+                                                </div>
+                                                <span class="text-sm transition-colors"
+                                                    :class="selectedTiposTrabajador.includes(t) ? 'text-primary font-medium' : 'text-default-700'"
+                                                    x-text="t"></span>
+                                            </label>
+                                        </template>
+                                        <template x-if="tiposTrabajador.length === 0">
+                                            <p class="px-3 py-4 text-center text-xs text-default-400">Sin tipos disponibles</p>
+                                        </template>
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <select x-model="selectedCargo" @change="filtrarPersonales()"
@@ -2135,14 +2191,70 @@
                                     </template>
                                 </select>
                             </div>
-                            <div>
-                                <select x-model="selectedTipoTrabajo" @change="filtrarPersonales()"
-                                    class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
-                                    <option value="">Todos los tipos</option>
-                                    <template x-for="t in tiposTrabajo" :key="t">
-                                        <option :value="t" x-text="t"></option>
-                                    </template>
-                                </select>
+                            <div class="relative" @click.outside="tiposOpen = false">
+                                <button type="button" @click="tiposOpen = !tiposOpen"
+                                    class="w-full min-h-9 px-2 py-1 text-sm bg-white border border-default-200 rounded-lg text-left flex items-center justify-between gap-1.5 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                    <div class="flex flex-wrap items-center gap-1 min-w-0">
+                                        <template x-if="selectedTiposTrabajo.length === 0">
+                                            <span class="text-default-400 px-1">Todos los tipos</span>
+                                        </template>
+                                        <template x-for="t in selectedTiposTrabajo" :key="t">
+                                            <span class="inline-flex items-center gap-1 pl-2 pr-1 h-6 rounded-full bg-primary/10 border border-primary/25 text-primary text-[11px] font-medium max-w-[130px]">
+                                                <span class="truncate" x-text="t"></span>
+                                                <span @click.stop="toggleTipoTrabajador(t)"
+                                                    class="shrink-0 w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center transition-colors cursor-pointer">
+                                                    <i class="ti ti-x text-[9px]"></i>
+                                                </span>
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <i class="ti ti-chevron-down text-default-400 text-xs shrink-0 transition-transform"
+                                        :class="tiposOpen ? 'rotate-180' : ''"></i>
+                                </button>
+
+                                <div x-show="tiposOpen" x-cloak
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0 -translate-y-1"
+                                    x-transition:enter-end="opacity-100 translate-y-0"
+                                    class="absolute z-30 mt-1 w-full bg-white border border-default-200 rounded-lg shadow-lg overflow-hidden">
+                                    <div class="flex items-center justify-between px-3 py-2 border-b border-default-100 bg-default-50/60">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wider text-default-500">
+                                            Hasta 4 tipos
+                                        </span>
+                                        <button type="button" @click="limpiarTiposTrabajador()"
+                                            class="text-[11px] font-medium text-danger hover:text-danger/80 transition-colors cursor-pointer">
+                                            Limpiar
+                                        </button>
+                                    </div>
+                                    <div class="max-h-48 overflow-y-auto custom-scrollbar divide-y divide-default-100">
+                                        <template x-for="t in tiposTrabajo" :key="t">
+                                            <label class="flex items-center gap-2.5 px-3 py-2 select-none transition-colors"
+                                                :class="selectedTiposTrabajo.includes(t)
+                                                    ? 'bg-primary/5 cursor-pointer'
+                                                    : (selectedTiposTrabajo.length >= 4
+                                                        ? 'opacity-40 cursor-not-allowed'
+                                                        : 'hover:bg-default-50 cursor-pointer')">
+                                                <input type="checkbox" :value="t"
+                                                    :checked="selectedTiposTrabajo.includes(t)"
+                                                    :disabled="!selectedTiposTrabajo.includes(t) && selectedTiposTrabajo.length >= 4"
+                                                    @change="toggleTipoTrabajador(t)" class="sr-only">
+                                                <div class="w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-all"
+                                                    :class="selectedTiposTrabajo.includes(t)
+                                                        ? 'bg-primary border-primary'
+                                                        : 'bg-white border-default-300'">
+                                                    <i class="ti ti-check text-white text-[10px]"
+                                                        x-show="selectedTiposTrabajo.includes(t)"></i>
+                                                </div>
+                                                <span class="text-sm transition-colors"
+                                                    :class="selectedTiposTrabajo.includes(t) ? 'text-primary font-medium' : 'text-default-700'"
+                                                    x-text="t"></span>
+                                            </label>
+                                        </template>
+                                        <template x-if="tiposTrabajo.length === 0">
+                                            <p class="px-3 py-4 text-center text-xs text-default-400">Sin tipos disponibles</p>
+                                        </template>
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <select x-model="selectedCargo" @change="filtrarPersonales()"
@@ -3307,14 +3419,70 @@
                                     </template>
                                 </select>
                             </div>
-                            <div>
-                                <select x-model="selectedTipoTrabajador" @change="filtrarPersonales()"
-                                    class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
-                                    <option value="">Todos los tipos de trabajador</option>
-                                    <template x-for="tipo in tiposTrabajadorDisponibles" :key="tipo">
-                                        <option :value="tipo" x-text="tipo"></option>
-                                    </template>
-                                </select>
+                            <div class="relative" @click.outside="tiposOpen = false">
+                                <button type="button" @click="tiposOpen = !tiposOpen"
+                                    class="w-full min-h-9 px-2 py-1 text-sm bg-white border border-default-200 rounded-lg text-left flex items-center justify-between gap-1.5 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                    <div class="flex flex-wrap items-center gap-1 min-w-0">
+                                        <template x-if="selectedTiposTrabajador.length === 0">
+                                            <span class="text-default-400 px-1">Todos los tipos</span>
+                                        </template>
+                                        <template x-for="t in selectedTiposTrabajador" :key="t">
+                                            <span class="inline-flex items-center gap-1 pl-2 pr-1 h-6 rounded-full bg-primary/10 border border-primary/25 text-primary text-[11px] font-medium max-w-[130px]">
+                                                <span class="truncate" x-text="t"></span>
+                                                <span @click.stop="toggleTipoTrabajador(t)"
+                                                    class="shrink-0 w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center transition-colors cursor-pointer">
+                                                    <i class="ti ti-x text-[9px]"></i>
+                                                </span>
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <i class="ti ti-chevron-down text-default-400 text-xs shrink-0 transition-transform"
+                                        :class="tiposOpen ? 'rotate-180' : ''"></i>
+                                </button>
+
+                                <div x-show="tiposOpen" x-cloak
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0 -translate-y-1"
+                                    x-transition:enter-end="opacity-100 translate-y-0"
+                                    class="absolute z-30 mt-1 w-full bg-white border border-default-200 rounded-lg shadow-lg overflow-hidden">
+                                    <div class="flex items-center justify-between px-3 py-2 border-b border-default-100 bg-default-50/60">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wider text-default-500">
+                                            Hasta 4 tipos
+                                        </span>
+                                        <button type="button" @click="limpiarTiposTrabajador()"
+                                            class="text-[11px] font-medium text-danger hover:text-danger/80 transition-colors cursor-pointer">
+                                            Limpiar
+                                        </button>
+                                    </div>
+                                    <div class="max-h-48 overflow-y-auto custom-scrollbar divide-y divide-default-100">
+                                        <template x-for="tipo in tiposTrabajadorDisponibles" :key="tipo">
+                                            <label class="flex items-center gap-2.5 px-3 py-2 select-none transition-colors"
+                                                :class="selectedTiposTrabajador.includes(tipo)
+                                                    ? 'bg-primary/5 cursor-pointer'
+                                                    : (selectedTiposTrabajador.length >= 4
+                                                        ? 'opacity-40 cursor-not-allowed'
+                                                        : 'hover:bg-default-50 cursor-pointer')">
+                                                <input type="checkbox" :value="tipo"
+                                                    :checked="selectedTiposTrabajador.includes(tipo)"
+                                                    :disabled="!selectedTiposTrabajador.includes(tipo) && selectedTiposTrabajador.length >= 4"
+                                                    @change="toggleTipoTrabajador(tipo)" class="sr-only">
+                                                <div class="w-4 h-4 shrink-0 rounded border flex items-center justify-center transition-all"
+                                                    :class="selectedTiposTrabajador.includes(tipo)
+                                                        ? 'bg-primary border-primary'
+                                                        : 'bg-white border-default-300'">
+                                                    <i class="ti ti-check text-white text-[10px]"
+                                                        x-show="selectedTiposTrabajador.includes(tipo)"></i>
+                                                </div>
+                                                <span class="text-sm transition-colors"
+                                                    :class="selectedTiposTrabajador.includes(tipo) ? 'text-primary font-medium' : 'text-default-700'"
+                                                    x-text="tipo"></span>
+                                            </label>
+                                        </template>
+                                        <template x-if="tiposTrabajadorDisponibles.length === 0">
+                                            <p class="px-3 py-4 text-center text-xs text-default-400">Sin tipos disponibles</p>
+                                        </template>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
