@@ -47,8 +47,10 @@ class ExamenesModel extends Model
             FROM_UNIXTIME(qa.timefinish, '%H:%i:%s')                       AS end_time,
             SEC_TO_TIME(qa.timefinish - qa.timestart)                      AS duration,
             ROUND(qa.sumgrades / NULLIF(quiz.sumgrades, 0) * 100, 2)       AS passing_percentage,
+            ROUND(quiz.sumgrades, 2)                                       AS max_grade,
             COALESCE(ans.correct_answers, 0)                               AS correct_answers,
             COALESCE(ans.incorrect_answers, 0)                             AS incorrect_answers,
+            COALESCE(ans.total_questions, 0)                               AS total_questions,
             CONCAT(u.firstname, ' ', u.lastname)                           AS full_name
         FROM mdl_quiz_attempts qa
         JOIN mdl_user   u    ON u.id  = qa.userid
@@ -67,6 +69,7 @@ class ExamenesModel extends Model
             /* correctas/incorrectas solo de los intentos de este quiz y de los usuarios pedidos */
             SELECT
                 qat.questionusageid,
+                COUNT(*)                                                                  AS total_questions,
                 SUM(CASE WHEN ls.fraction = 1 THEN 1 ELSE 0 END)                          AS correct_answers,
                 SUM(CASE WHEN ls.fraction IS NULL OR ls.fraction < 1 THEN 1 ELSE 0 END)   AS incorrect_answers
             FROM mdl_quiz_attempts qa4
@@ -185,8 +188,10 @@ class ExamenesModel extends Model
             FROM_UNIXTIME(qa.timefinish, '%H:%i:%s')                       AS end_time,
             SEC_TO_TIME(qa.timefinish - qa.timestart)                      AS duration,
             ROUND(qa.sumgrades / NULLIF(quiz.sumgrades, 0) * 100, 2)       AS passing_percentage,
+            ROUND(quiz.sumgrades, 2)                                       AS max_grade,
             COALESCE(ans.correct_answers, 0)                               AS correct_answers,
             COALESCE(ans.incorrect_answers, 0)                             AS incorrect_answers,
+            COALESCE(ans.total_questions, 0)                               AS total_questions,
             CONCAT(u.firstname, ' ', u.lastname)                           AS full_name
         FROM mdl_quiz_attempts qa
         JOIN mdl_user   u    ON u.id  = qa.userid
@@ -195,6 +200,7 @@ class ExamenesModel extends Model
         LEFT JOIN (
             SELECT
                 qat.questionusageid,
+                COUNT(*)                                                                  AS total_questions,
                 SUM(CASE WHEN ls.fraction = 1 THEN 1 ELSE 0 END)                          AS correct_answers,
                 SUM(CASE WHEN ls.fraction IS NULL OR ls.fraction < 1 THEN 1 ELSE 0 END)   AS incorrect_answers
             FROM mdl_question_attempts qat

@@ -6070,20 +6070,22 @@ export default document.addEventListener("alpine:init", () => {
                 const renderContenido = (doc, totalPaginas) => {
                     let ultimaPaginaEncabezado = 0;
 
+                    // El encabezado del formato solo debe dibujarse una vez,
+                    // al inicio del documento (página 1). En las páginas
+                    // siguientes el contenido continúa sin repetir la cabecera.
                     const onDidDrawPage = (tableData) => {
                         if (!totalPaginas) return;
-                        if (tableData.pageNumber === ultimaPaginaEncabezado)
-                            return;
-                        ultimaPaginaEncabezado = tableData.pageNumber;
-                        dibujarEncabezadoPagina(
-                            doc,
-                            tableData.pageNumber,
-                            totalPaginas,
-                        );
+                        if (tableData.pageNumber !== 1) return;
+                        if (ultimaPaginaEncabezado === 1) return;
+                        ultimaPaginaEncabezado = 1;
+                        dibujarEncabezadoPagina(doc, 1, totalPaginas);
                     };
 
+                    // En la página 1 la primera tabla arranca debajo del
+                    // encabezado (startY 49). En las páginas siguientes no hay
+                    // cabecera, por lo que el margen superior es el normal.
                     const margenContenido = {
-                        top: 49,
+                        top: margenIzq,
                         left: margenIzq,
                         right: margenIzq,
                         bottom: margenIzq,
@@ -6365,8 +6367,22 @@ export default document.addEventListener("alpine:init", () => {
                     });
 
                     // Responsable del registro
+                    // Evita que el bloque se corte entre páginas: si no hay
+                    // espacio suficiente, se dibuja completo en la siguiente.
+                    let startYResponsable = doc.lastAutoTable.finalY + 10;
+                    const alturaResponsable = 7 + 9 + 9 + 9 + 17;
+                    const limiteInferior =
+                        doc.internal.pageSize.getHeight() - margenIzq;
+                    if (
+                        startYResponsable + alturaResponsable >
+                        limiteInferior
+                    ) {
+                        doc.addPage();
+                        startYResponsable = margenContenido.top;
+                    }
+
                     doc.autoTable({
-                        startY: doc.lastAutoTable.finalY + 10,
+                        startY: startYResponsable,
                         margin: margenContenido,
                         theme: "grid",
                         didDrawPage: onDidDrawPage,

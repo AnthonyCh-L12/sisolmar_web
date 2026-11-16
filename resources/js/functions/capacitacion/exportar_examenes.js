@@ -83,6 +83,23 @@ function _dibujarDetalle(doc, detalle, esc, ctx) {
     };
     const valueStyle = { halign: "center", fontSize: fsDatos };
 
+    // Total real de preguntas del examen. Se toma del modelo y, si no
+    // estuviera disponible, se deduce de correctas + incorrectas o del
+    // listado de preguntas del intento.
+    const totalPreguntas =
+        Number(detalle.total_questions) > 0
+            ? Number(detalle.total_questions)
+            : (Number(detalle.correct_answers) || 0) +
+                  (Number(detalle.incorrect_answers) || 0) ||
+              (Array.isArray(detalle.questions_answers)
+                  ? detalle.questions_answers.length
+                  : 0);
+
+    // Puntaje máximo real del examen (suma de los puntajes de sus
+    // preguntas). No se asume un valor fijo como 20.
+    const maxGrade =
+        Number(detalle.max_grade) > 0 ? Number(detalle.max_grade) : null;
+
     doc.autoTable({
         startY: y,
         theme: "grid",
@@ -136,13 +153,18 @@ function _dibujarDetalle(doc, detalle, esc, ctx) {
                 {
                     content:
                         detalle.obtained_grade != null
-                            ? `${detalle.obtained_grade} / 20`
+                            ? maxGrade != null
+                                ? `${detalle.obtained_grade} / ${maxGrade}`
+                                : String(detalle.obtained_grade)
                             : "—",
                     styles: { ...valueStyle, fontStyle: "bold" },
                 },
                 { content: "Correctas", styles: labelStyle },
                 {
-                    content: String(detalle.correct_answers ?? "—"),
+                    content:
+                        totalPreguntas > 0
+                            ? `${detalle.correct_answers ?? 0} / ${totalPreguntas}`
+                            : String(detalle.correct_answers ?? "—"),
                     styles: { ...valueStyle, fontStyle: "bold" },
                 },
                 { content: "Incorrectas", styles: labelStyle },

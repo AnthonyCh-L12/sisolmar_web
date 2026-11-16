@@ -84,6 +84,8 @@ class ExamenesController extends Controller
                         'passing_percentage' => $detalle->passing_percentage,
                         'correct_answers'    => (int) $detalle->correct_answers,
                         'incorrect_answers'  => (int) $detalle->incorrect_answers,
+                        'total_questions'    => (int) $detalle->total_questions,
+                        'max_grade'          => (float) $detalle->max_grade,
                         'full_name'          => $detalle->full_name,
                         'dni'                => $dni,
                         'questions_answers'  => $preguntasPorIntento[$attemptId] ?? [],
