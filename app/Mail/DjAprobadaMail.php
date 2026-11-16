@@ -29,9 +29,9 @@ class DjAprobadaMail extends Mailable
      */
     public function build()
     {
-        $asuntoDinamico = 'Aprobación de información DJ';
+        $asuntoDinamico = 'GRUPO SOLAR | Aprobación de información DJ';
 
-        return $this->from(config('mail.from.address'), config('mail.from.name'))
+        return $this->from(config('mail.from.address'), 'GRUPO SOLAR')
                     ->subject($asuntoDinamico)
                     ->bcc([
                         'webmater@gruposolmar.com.pe', // Mantén el correo tal cual lo pide la empresa

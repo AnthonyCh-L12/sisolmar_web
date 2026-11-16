@@ -892,7 +892,43 @@
             </div>
         </div>
 
-    </div> @include('file_control.rrhh.partials_modal_dj')
+    </div>
+
+    <div id="modalSolicitudSip" class="hidden fixed inset-0 z-[100] items-center justify-center bg-slate-950/60 p-3">
+        <section class="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+            <header class="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">Revisión de solicitud de actualización DJ</h2>
+                    <p id="solicitudSipPersona" class="mt-1 text-sm text-slate-500"></p>
+                </div>
+                <button type="button" id="cerrarModalSolicitudSip" class="rounded-full p-2 text-slate-500 hover:bg-slate-100" aria-label="Cerrar">✕</button>
+            </header>
+            <div class="min-h-0 flex-1 overflow-auto px-6 py-4">
+                <div id="solicitudSipEstado" class="mb-3 text-sm text-slate-500"></div>
+                <section class="mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <h3 class="mb-3 text-sm font-bold text-slate-800">Datos personales</h3>
+                    <dl id="solicitudSipDatosPersona" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"></dl>
+                </section>
+                <table class="min-w-full border-collapse text-sm">
+                    <thead class="sticky top-0 bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-600">
+                        <tr><th class="border p-3">Cambio solicitado</th><th class="border p-3">Dato registrado</th><th class="border p-3">Dato solicitado</th></tr>
+                    </thead>
+                    <tbody id="solicitudSipComparacion"></tbody>
+                </table>
+                <section class="mt-5 rounded-lg border border-slate-200 p-4">
+                    <h3 class="mb-3 text-sm font-bold text-slate-800">Datos familiares</h3>
+                    <div id="solicitudSipFamiliares" class="grid grid-cols-1 gap-4"></div>
+                </section>
+            </div>
+            <footer class="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-6 py-4">
+                <button type="button" id="cerrarModalSolicitudSip2" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cerrar</button>
+                <button type="button" id="rechazarSolicitudSip" class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50">Rechazar</button>
+                <button type="button" id="aprobarSolicitudSip" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Aprobar</button>
+            </footer>
+        </section>
+    </div>
+
+    @include('file_control.rrhh.partials_modal_dj')
 
 <button id="btn-modal-biometrico" data-hs-overlay="#modal-biometrico" class="hidden"></button>
     @include('file_control.rrhh.partials_modal_comparacion_huellafirma_dni')
@@ -964,6 +1000,7 @@
         }
         window.logoUrl = "{{ asset('images/logo_sol.png') }}";
         window.tipoUsuario = {{ $tipoUsuario ?? 'null' }};
+        window.puedeResolverSolicitudSip = [11, 17].includes(Number(window.tipoUsuario));
     </script>
 @endsection
 

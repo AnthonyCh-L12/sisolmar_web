@@ -1,39 +1,31 @@
-{{-- ============================================================
-     MODAL: Reporte — Datos Generales del Personal
-     Uso: @include('file_control.rrhh.partials_modal_reporte')
-     ============================================================ --}}
+{{-- Reporte General — se muestra dentro del centro de reportes DJ. --}}
 
-<div id="modalReporte"
-     class="fixed inset-0 z-[999] hidden items-start justify-center bg-black/45 overflow-y-auto p-4"
-     role="dialog" aria-modal="true" aria-labelledby="modalReporteTitulo">
-
-    <div class="relative w-full max-w-[1400px] my-4 bg-white rounded-xl border border-gray-200 flex flex-col shadow-lg">
-
-        {{-- HEADER --}}
-        <div class="flex items-center justify-between px-5 py-2.5 border-b border-gray-200">
-            {{-- Título centrado estilo original --}}
-            <div class="flex-1 text-center">
-                <h2 id="modalReporteTitulo"
-                    class="text-sm font-bold text-primary underline underline-offset-2 tracking-wide uppercase">
-                    Datos Básicos del Personal
-                </h2>
-                <p class="text-xs font-semibold text-gray-700 mt-0.5">Sol Security S.A.C.</p>
+<div id="modalReporte" class="min-w-0 overflow-hidden rounded-xl border border-default-200 bg-white shadow-sm dark:border-slate-700">
+    <div class="p-5 md:p-6">
+        <div class="flex items-start gap-3 border-b border-default-200 pb-5 dark:border-slate-700">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <i class="i-ph-identification-card text-2xl"></i>
             </div>
-            <button type="button" id="btnCerrarReporte"
-                    class="text-gray-400 hover:text-gray-700 text-xl leading-none w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 transition-colors flex-shrink-0">
-                &times;
-            </button>
+            <div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 id="modalReporteTitulo" class="text-lg font-semibold text-default-900 dark:text-white">Reporte General</h2>
+                    <span class="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">Excel · PDF</span>
+                </div>
+                <p class="mt-1 text-sm text-default-600 dark:text-slate-300">Consulta los datos básicos del personal, descarga sus fotos o DNI y exporta los resultados.</p>
+            </div>
         </div>
 
         {{-- FILTROS --}}
-        <div class="flex flex-wrap gap-x-3 gap-y-2 items-end px-5 py-2.5 bg-gray-50/70 border-b border-gray-200">
+        <div class="border-b border-default-200 py-5 dark:border-slate-700">
+            <h3 class="mb-4 text-sm font-semibold uppercase tracking-wide text-default-500 dark:text-slate-400">Filtros del reporte</h3>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
 
             {{-- Sucursal --}}
             <div class="flex flex-col gap-1">
-                <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sucursal</label>
+                <label class="text-sm font-medium text-default-700 dark:text-slate-200">Sucursal</label>
                 @php $sucursalesFiltradas = array_slice($sucursales, 1); @endphp
                 <select id="rptSucursal"
-                        class="h-7 px-2 text-xs border border-gray-300 py-0 rounded-md bg-white text-gray-700 focus:ring-1 focus:ring-primary focus:border-primary w-32">
+                        class="mt-1 block w-full rounded-lg border-default-300 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white">
                     @if(count($sucursalesFiltradas) > 1)
                         <option value="">Todas</option>
                     @endif
@@ -45,16 +37,15 @@
 
             {{-- Tipo --}}
             <div class="flex flex-col gap-1">
-                <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Tipo</label>
+                <label class="text-sm font-medium text-default-700 dark:text-slate-200">Tipo de personal</label>
                 <select id="rptTipoPer"
-                        class="h-7 px-2 text-xs border border-gray-300 py-0 rounded-md bg-white text-gray-700 focus:ring-1 focus:ring-primary focus:border-primary w-44">
+                        class="mt-1 block w-full rounded-lg border-default-300 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white">
                     @if($tipoPerLimitar == 0)
                         <option value="">Todos</option>
                         <option value="01">Operativo 4°</option>
                         <option value="03">Operativo 5°</option>
                         <option value="02">Administrativo 4°</option>
                         <option value="05">Administrativo 5°</option>
-                        <option value="06">Especial</option>
                     @elseif($tipoPerLimitar == 1)
                         <option value="02">Administrativo 4°</option>
                         <option value="05">Administrativo 5°</option>
@@ -65,87 +56,76 @@
                 </select>
             </div>
 
-            {{-- Ap. Paterno --}}
-            <div class="flex flex-col gap-1">
-                <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Ap. Paterno</label>
-                <input type="text" id="rptApPaterno" placeholder="Buscar..." autocomplete="off"
-                       class="h-7 px-2.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary w-40 uppercase placeholder:normal-case placeholder:text-gray-300">
-            </div>
-
-            {{-- Doc. Identidad --}}
-            <div class="flex flex-col gap-1">
-                <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Doc. Identidad</label>
-                <input type="text" id="rptDocIdentidad" placeholder="DNI..." autocomplete="off" maxlength="12"
-                       class="h-7 px-2.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary w-28 placeholder:text-gray-300">
-            </div>
-
             {{-- Estado --}}
             <div class="flex flex-col gap-1">
-                <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Estado</label>
-                <div class="flex border border-gray-300 rounded-md overflow-hidden h-7 text-xs">
-                    <label id="rptLblVig"
-                           class="flex items-center gap-1.5 px-3 cursor-pointer bg-primary text-white font-medium transition-colors">
-                        <input type="radio" name="rptVigente" value="1" checked class="w-3 h-3 accent-white"> Vigente
-                    </label>
-                    <label id="rptLblNoVig"
-                           class="flex items-center gap-1.5 px-3 cursor-pointer bg-white text-gray-500 border-l border-gray-300 transition-colors">
-                        <input type="radio" name="rptVigente" value="0" class="w-3 h-3 accent-primary"> No vigente
-                    </label>
-                </div>
+                <label class="text-sm font-medium text-default-700 dark:text-slate-200">Estado</label>
+                <select id="rptVigente" class="mt-1 block w-full rounded-lg border-default-300 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                    <option value="1">Activos</option>
+                    <option value="0">Cesados</option>
+                </select>
             </div>
 
             {{-- Descargar con --}}
             <div class="flex flex-col gap-1">
-                <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Descargar con</label>
-                <div class="flex border border-gray-300 rounded-md overflow-hidden h-7 text-xs">
-                    <label class="flex items-center gap-1.5 px-3 cursor-pointer bg-white text-gray-600 border-r border-gray-300">
-                        <input type="radio" name="rptDescCon" value="codigo" class="w-3 h-3 accent-primary"> Código
-                    </label>
-                    <label class="flex items-center gap-1.5 px-3 cursor-pointer bg-primary text-white font-medium" id="rptLblDescDoc">
-                        <input type="radio" name="rptDescCon" value="doc" checked class="w-3 h-3 accent-white"> N° Doc.
-                    </label>
-                </div>
+                <label class="text-sm font-medium text-default-700 dark:text-slate-200">Identificar descarga por</label>
+                <select id="rptDescCon" class="mt-1 block w-full rounded-lg border-default-300 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+                    <option value="codigo">Código</option>
+                    <option value="doc" selected>N.º de documento</option>
+                </select>
             </div>
 
-            {{-- Buscar --}}
-            <button type="button" id="btnBuscarReporte"
-                    class="h-7 flex items-center gap-1.5 px-4 text-xs rounded-md bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all font-medium self-end">
-                <i class='bx bx-search text-sm'></i> Buscar
-            </button>
+            </div>
         </div>
 
         {{-- BARRA DE ACCIONES --}}
-        <div class="flex flex-wrap items-center gap-2 px-5 py-1.5 border-b border-gray-100 bg-white">
-            <span id="rptSelInfo" class="text-xs text-gray-400 min-w-[90px]">0 seleccionados</span>
-            <span class="text-gray-200">|</span>
-            <span class="text-xs text-gray-500 font-medium">Descargar:</span>
-            <button type="button" id="btnRptDescFoto"
-                    class="flex items-center gap-1 px-2.5 py-1 text-xs border border-violet-300 text-violet-700 bg-violet-50 rounded-md hover:bg-violet-500 hover:text-white hover:border-violet-500 transition-colors">
-                <i class='bx bx-image-alt text-sm'></i> Foto
+        <div class="flex flex-wrap items-center gap-2 border-b border-default-200 py-5 dark:border-slate-700">
+            <button type="button" id="btnLimpiarFiltrosReporte"
+                    class="rounded-lg border border-default-300 px-4 py-2 text-sm font-medium text-default-700 transition hover:bg-gray-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700">
+                <i class="i-ph-arrow-counter-clockwise mr-1"></i> Limpiar filtros
             </button>
-            <button type="button" id="btnRptDescDNI"
-                    class="flex items-center gap-1 px-2.5 py-1 text-xs border border-sky-300 text-sky-700 bg-sky-50 rounded-md hover:bg-sky-500 hover:text-white hover:border-sky-500 transition-colors">
-                <i class='bx bx-id-card text-sm'></i> DNI
-            </button>
-            <button type="button" id="btnRptDescCUL"
-                    class="hidden items-center gap-1 px-2.5 py-1 text-xs border border-emerald-300 text-emerald-700 bg-emerald-50 rounded-md hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-colors">
-                <i class='bx bx-check-shield text-sm'></i> CUL
-            </button>
-            <span class="text-gray-200">|</span>
-            <span class="text-xs text-gray-500 font-medium">Exportar:</span>
-            <button type="button" id="btnRptExportPDF"
-                    class="flex items-center gap-1 px-2.5 py-1 text-xs border border-rose-300 text-rose-700 bg-rose-50 rounded-md hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-colors">
-                <i class='bx bxs-file-pdf text-sm'></i> PDF
-            </button>
-            <button type="button" id="btnRptExportExcel"
-                    class="flex items-center gap-1 px-2.5 py-1 text-xs border border-green-300 text-green-700 bg-green-50 rounded-md hover:bg-green-600 hover:text-white hover:border-green-600 transition-colors">
-                <i class='bx bxs-file text-sm'></i> Excel
+            <button type="button" id="btnBuscarReporte"
+                    class="inline-flex items-center gap-2 rounded-lg border border-primary px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/5">
+                <i class='bx bx-eye text-base'></i> Vista previa
             </button>
         </div>
 
-        {{-- TABLA --}}
-        <div class="overflow-x-auto px-4 py-2 min-h-[300px]">
-            <table class="w-full border-collapse text-[11px]" id="rptTabla" style="table-layout:auto">
+        {{-- VISTA PREVIA: se muestra después de solicitarla. --}}
+        <div id="rptResultados" class="hidden">
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+                <span id="rptSelInfo" class="mr-2 text-sm text-default-500">0 seleccionados</span>
+                <span class="text-sm font-semibold text-default-700 dark:text-slate-200">Descargar:</span>
+                <button type="button" id="btnRptDescFoto"
+                        class="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-600 hover:text-white">
+                    <i class='bx bx-image-alt text-base'></i> Fotos
+                </button>
+                <button type="button" id="btnRptDescDNI"
+                        class="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-600 hover:text-white">
+                    <i class='bx bx-id-card text-base'></i> DNI
+                </button>
+                <span class="ml-2 text-sm font-semibold text-default-700 dark:text-slate-200">Exportar:</span>
+                <button type="button" id="btnRptExportPDF"
+                        class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700">
+                    <i class='bx bxs-file-pdf text-base'></i> Exportar PDF
+                </button>
+                <button type="button" id="btnRptExportExcel"
+                        class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                    <i class='bx bxs-file text-base'></i> Exportar Excel
+                </button>
+                <button type="button" id="btnRptDescCUL"
+                        class="hidden items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-600 hover:text-white">
+                    <i class='bx bx-check-shield text-base'></i> CUL
+                </button>
+            </div>
+            <label class="relative block w-full sm:max-w-sm">
+                <i class="i-ph-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-default-400"></i>
+                <input id="rptBuscarPreview" type="search" autocomplete="off" placeholder="Buscar por nombre, apellido o DNI..."
+                       style="padding-left: 2.25rem;"
+                       class="block w-full rounded-lg border-default-300 py-2 pr-3 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white">
+            </label>
+        </div>
+        <div class="mt-5 min-h-[300px] overflow-x-auto rounded-lg border border-default-200 dark:border-slate-700">
+            <table class="w-full border-collapse text-xs" id="rptTabla" style="table-layout:auto">
                 <thead>
                     <tr class="border-b-2 border-gray-300">
                         <th class="py-1.5 px-1 text-center whitespace-nowrap">
@@ -174,7 +154,7 @@
                 <tbody id="rptTbody">
                     <tr>
                         <td colspan="19" class="text-center py-12 text-gray-300 italic text-xs">
-                            Usa el buscador para cargar registros
+                            Selecciona los filtros y pulsa Vista previa
                         </td>
                     </tr>
                 </tbody>
@@ -182,8 +162,8 @@
         </div>
 
         {{-- FOOTER --}}
-        <div class="flex items-center justify-between px-5 py-2 border-t border-gray-100 bg-gray-50/60 rounded-b-xl">
-            <span id="rptPagInfo" class="text-xs text-gray-400">—</span>
+        <div class="flex flex-wrap items-center justify-between gap-3 py-4">
+            <span id="rptPagInfo" class="text-sm text-default-500">—</span>
             <div class="flex items-center gap-1.5">
                 <button id="rptBtnPrev"
                         class="w-7 h-7 flex items-center justify-center text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed">
@@ -203,6 +183,7 @@
                     <option value="50">50</option>
                 </select>
             </div>
+        </div>
         </div>
 
     </div>

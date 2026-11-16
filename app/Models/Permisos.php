@@ -63,7 +63,30 @@ class Permisos extends Model
             );
         }
 
-        // 3. Construir árbol indexado por código de menú
+        // 3. Cargar el agrupador maestro opcional sin cambiar el filtro por rol.
+        // Si las tablas nuevas aún no están desplegadas en otro entorno,
+        // los menús siguen apareciendo con el comportamiento anterior.
+        $grupoPorMenu = [];
+        try {
+            $asignacionesModulo = DB::table('sw_modulos_menus as mm')
+                ->join('sw_modulos as mod', 'mod.codigo', '=', 'mm.codModulo')
+                ->where('mod.habilitado', 1)
+                ->orderBy('mod.orden')
+                ->get(['mm.codMenu', 'mod.codigo as grupo_codigo', 'mod.nombre as grupo_nombre']);
+
+            foreach ($asignacionesModulo as $asignacion) {
+                $grupoPorMenu[$asignacion->codMenu] = [
+                    'codigo' => $asignacion->grupo_codigo,
+                    'nombre' => $asignacion->grupo_nombre,
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::info('No se cargaron grupos maestros del sidebar; se conserva la navegación actual.', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // 4. Construir árbol indexado por código de menú
         $menuArbol = [];
 
         foreach ($menus as $menu) {
@@ -74,11 +97,12 @@ class Permisos extends Model
                 'icono'         => $menu->icono,
                 'orden'         => $menu->orden,
                 'tiene_submenu' => (bool) $menu->tiene_submenu,
+                'grupo_modulo'  => $grupoPorMenu[$menu->codigo] ?? null,
                 'submenus'      => [],
             ];
         }
 
-        // 4. Anidar submenús en su menú padre
+        // 5. Anidar submenús en su menú padre
         //    Nota: si tiene_submenu = false, el submenú se ignora intencionalmente
         //    (el flag controla si el menú debe renderizarse como expandible).
         foreach ($submenus as $submenu) {
@@ -97,7 +121,7 @@ class Permisos extends Model
             ];
         }
 
-        // 5. Devolver array plano (índices numéricos consecutivos)
+        // 6. Devolver array plano (índices numéricos consecutivos)
         return array_values($menuArbol);
     }
 }

@@ -4,13 +4,43 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadNotifications() {
+    const list = document.getElementById('notif-list');
+    const badge = document.getElementById('notif-count');
+    if (!list || !badge) return;
+
     try {
-        const response = await fetch(`${VITE_URL_APP}/api/notificaciones/pendientes-etapa2`);
+        const response = await fetch(list.dataset.etapa2Url || '/api/notificaciones/pendientes-etapa2', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
 
-        const list = document.getElementById('notif-list');
-        const badge = document.getElementById('notif-count');
-        
+        let hijosResult = { success: true, total: 0, avisos: { '30': [], '15': [] } };
+        try {
+            const hijosResponse = await fetch(list.dataset.mayoriaUrl || '/api/notificaciones/hijos-por-cumplir-mayoria-edad', {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+            if (hijosResponse.ok) hijosResult = await hijosResponse.json();
+        } catch (error) {
+            console.error('Error cargando avisos de mayoría de edad', error);
+        }
+        const hijosAvisos = hijosResult.avisos || { '30': [], '15': [] };
+        const totalHijos = Number(hijosResult.total) || 0;
+        const hijosHtml = totalHijos > 0 ? `
+            <button type="button" onclick="window.abrirDetalleMayoriaEdad?.()" class="w-full text-left flex items-center justify-between px-4 py-4 hover:bg-slate-50 transition-colors border-b border-gray-100 group">
+                <div class="flex items-center gap-3">
+                    <div class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-orange-100 text-orange-600 border border-orange-200 shadow-sm"><i class="bx bx-child text-xl"></i></div>
+                    <div class="flex flex-col">
+                        <span class="text-sm font-bold text-gray-800 group-hover:text-primary">Asignación familiar próxima a vencer</span>
+                        <span class="text-[11px] text-gray-500 leading-snug mt-1">Aviso inicial (hasta 30 días): ${(hijosAvisos['30'] || []).length} · Recordatorio (15 días o menos): ${(hijosAvisos['15'] || []).length}</span>
+                        <span class="text-[11px] text-gray-500 leading-none mt-1">Haz clic para ver el detalle por sucursal</span>
+                    </div>
+                </div>
+                <span class="flex-shrink-0 flex items-center justify-center min-w-[28px] h-7 bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold px-2 rounded-full">${totalHijos}</span>
+            </button>` : '';
+
         // Elementos del Modal
         const modalList = document.getElementById('modal-etapa2-list');
         const modalTotal = document.getElementById('modal-etapa2-total');
@@ -21,9 +51,9 @@ async function loadNotifications() {
         const demandasVivas = Array.from(list.querySelectorAll('[id^="campana-demanda-"]')).map(el => el.outerHTML).join('');
         const cantidadDemandas = list.querySelectorAll('[id^="campana-demanda-"]').length;
 
-        if (!result.success || result.total === 0) {
-            // Si Etapa 2 es cero, pero SÍ hay Demandas, no borramos nada
-            if (demandasVivas === '') {
+        if (!result.success || Number(result.total) === 0) {
+            // Mantener solicitudes SIP y avisos de mayoría de edad aunque Etapa 2 esté vacío.
+            if (demandasVivas === '' && hijosHtml === '') {
                 list.innerHTML = `
                     <div class="px-4 py-8 text-center flex flex-col items-center justify-center gap-2">
                         <i class="bx bx-check-shield text-4xl text-green-500"></i>
@@ -32,8 +62,8 @@ async function loadNotifications() {
                     </div>`;
                 badge.classList.add('hidden');
             } else {
-                list.innerHTML = demandasVivas; // Pintamos las demandas
-                badge.textContent = cantidadDemandas;
+                list.innerHTML = demandasVivas + hijosHtml;
+                badge.textContent = cantidadDemandas + (totalHijos > 0 ? 1 : 0);
                 badge.classList.remove('hidden');
             }
             return;
@@ -42,14 +72,14 @@ async function loadNotifications() {
         // ====================================================
         // 1. UI DE LA CAMPANITA (Solo el resumen)
         // ====================================================
-        list.innerHTML = demandasVivas + `
+        list.innerHTML = demandasVivas + hijosHtml + `
             <button type="button" onclick="document.getElementById('btn-open-modal-etapa2').click()" class="w-full text-left flex items-center justify-between px-4 py-4 hover:bg-slate-50 transition-colors border-b border-gray-100 group">
                 <div class="flex items-center gap-3">
                     <div class="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-orange-100 text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition-colors border border-orange-200 shadow-sm">
                         <i class="bx bx-task text-xl"></i>
                     </div>
                     <div class="flex flex-col">
-                        <span class="text-sm font-bold text-gray-800 group-hover:text-primary transition-colors">Pendientes Etapa 2</span>
+                        <span class="text-sm font-bold text-gray-800 group-hover:text-primary transition-colors">Pendiente actualización Anual</span>
                         
                         <!-- Contenedor de Etiquetas (Submódulos) -->
                         <div class="flex flex-wrap items-center gap-1.5 mt-1 mb-0.5">
@@ -92,13 +122,13 @@ async function loadNotifications() {
         if(modalList) modalList.innerHTML = modalHtml.join('');
 
         // Globito rojo de la campana (Sumamos Etapa 2 + Demandas)
-        let totalFinal = result.total + cantidadDemandas;
+        let totalFinal = result.total + cantidadDemandas + (totalHijos > 0 ? 1 : 0);
         badge.textContent = totalFinal > 99 ? '99+' : totalFinal;
         badge.classList.remove('hidden');
 
     } catch (error) {
         console.error('Error cargando notificaciones', error);
-        document.getElementById('notif-list').innerHTML = `
+        list.innerHTML = `
             <div class="px-4 py-6 text-center text-red-500 flex flex-col items-center">
                 <i class="bx bx-error text-3xl mb-2"></i>
                 <span class="font-bold text-sm">Error de sincronización</span>

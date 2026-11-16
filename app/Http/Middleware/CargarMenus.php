@@ -18,6 +18,13 @@ namespace App\Http\Middleware;
               View::share('permisos', $permisos);
               session(['permisos' => $permisos]); // mantiene RoutingController funcionando
 
+              $nombreRol = DB::table('sw_roles')
+                  ->where('codigo', Auth::user()->tipo_rol)
+                  ->value('nombre');
+              $rolSinNotificacionesDj = mb_strtoupper(trim((string) $nombreRol))
+                  === mb_strtoupper(trim((string) config('report_access.role_without_dj_notifications')));
+              View::share('ocultarNotificacionesDj', $rolSinNotificacionesDj);
+
               // Funcionalidades del rol (exento_validaciones, cambiar_tipo_personal, etc.)
               try {
                   $funcionalidades = DB::select(
@@ -32,6 +39,8 @@ namespace App\Http\Middleware;
               }
               View::share('funcionalidades', $funcionalidades);
               session(['funcionalidades' => $funcionalidades]);
+          } else {
+              View::share('ocultarNotificacionesDj', false);
           }
 
           return $next($request);

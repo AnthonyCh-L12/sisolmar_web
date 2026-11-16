@@ -6,9 +6,25 @@ use App\Mail\AlertaCaducidadMail;
 use Illuminate\Http\Request;
 use App\Models\NotificacionModel;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 
 class NotificacionController extends Controller{
+    private function rolSinNotificacionesDj(): bool
+    {
+        if (!Auth::check()) {
+            return false;
+        }
+
+        $nombreRol = DB::table('sw_roles')
+            ->where('codigo', Auth::user()->tipo_rol)
+            ->value('nombre');
+
+        return mb_strtoupper(trim((string) $nombreRol))
+            === mb_strtoupper(trim((string) config('report_access.role_without_dj_notifications')));
+    }
+
     public function deleteNotificacion(Request $request){
         $codigo = $request->input('codigo');
         $habilitado = 0;
@@ -30,6 +46,10 @@ class NotificacionController extends Controller{
     // METODO NOTIFICACIONES
     public function foliosPorVencer()
     {
+        if ($this->rolSinNotificacionesDj()) {
+            return response()->json([]);
+        }
+
         $dias = 10;
 
         $rows = NotificacionModel::foliosPorVencer($dias);
@@ -114,6 +134,10 @@ class NotificacionController extends Controller{
 
     public function pendientesEtapa2()
     {
+        if ($this->rolSinNotificacionesDj()) {
+            return response()->json(['success' => true, 'total' => 0, 'data' => []]);
+        }
+
         // Trae ['CALLAO' => 5, 'LIMA' => 12, ...]
         $conteosPorSucursal = NotificacionModel::pendientesEtapa2();
         
@@ -127,9 +151,45 @@ class NotificacionController extends Controller{
         ]);
     }
 
+    /** Avisos agrupados para personal con hijos registrados que cumplen 18 años. */
+    public function hijosPorCumplirMayoriaEdad()
+    {
+        if ($this->rolSinNotificacionesDj()) {
+            return response()->json(['success' => true, 'total' => 0, 'avisos' => ['30' => [], '15' => []]]);
+        }
+
+        $avisos = ['30' => [], '15' => []];
+        foreach (NotificacionModel::hijosPorCumplirMayoriaEdad() as $row) {
+            $dias = (string) $row->dias_aviso;
+            if (isset($avisos[$dias])) {
+                $avisos[$dias][] = [
+                    'codigo_personal' => trim((string) $row->codigo_personal),
+                    'personal' => trim((string) $row->personal),
+                    'dni' => trim((string) ($row->dni ?? '')),
+                    'sucursal' => trim((string) $row->sucursal),
+                    'hijo' => trim((string) $row->hijo),
+                    'fecha_nacimiento' => $row->fecha_nacimiento,
+                    'fecha_mayoria' => $row->fecha_mayoria,
+                    'dias_restantes' => (int) $row->dias_restantes,
+                    'dias_aviso' => (int) $row->dias_aviso,
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'total' => count($avisos['30']) + count($avisos['15']),
+            'avisos' => $avisos,
+        ]);
+    }
+
 public function getDemandasAdmin()
     {
-        $demandas = NotificacionModel::obtenerDemandasNuevas();
+        if ($this->rolSinNotificacionesDj()) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        $demandas = NotificacionModel::obtenerSolicitudesDjPendientes();
         
         return response()->json([
             'success' => true,
@@ -137,12 +197,18 @@ public function getDemandasAdmin()
         ]);
     }
 
+    /**
+     * Atiende una notificación SIP desde la campanita.
+     * La archiva (habilitado = 0); NO la borra, para conservar el historial.
+     * Siempre responde success: si ya estaba archivada (doble clic) también
+     * debe quitarse de la campanita.
+     */
     public function deleteDemandaAdmin(Request $request)
     {
         $id = $request->input('id');
-        $deleted = NotificacionModel::borrarDemanda($id);
+        $archivadas = NotificacionModel::archivarDemanda($id);
 
-        return response()->json(['success' => $deleted > 0]);
+        return response()->json(['success' => true, 'archivadas' => $archivadas]);
     }
 
 }

@@ -54,6 +54,11 @@ class AuthenticatedSessionController extends Controller
             // Pop-ups de notificaciones: se muestran una vez por login
             session()->forget('notif_popups_ya_mostrados');
 
+            $usuariosSoloReportePersonal = config('report_access.personal_only_users', []);
+            if (in_array(mb_strtolower((string) $user->usuario), $usuariosSoloReportePersonal, true)) {
+                return redirect('/home');
+            }
+
             return redirect()->intended('/home');
         }
 

@@ -22,8 +22,8 @@ class BienvenidaSipMail extends Mailable
     {
         return $this
             ->mailer('sip')
-            ->from('robotsisolmar@solsecurity.pe', 'SISOL Robot')
-            ->subject("¡{$this->datos['nombre_corto']}, Bienvenido al SIP de SOLMAR!")
+            ->from('robotsisolmar@solsecurity.pe', 'GRUPO SOLAR')
+            ->subject("GRUPO SOLAR | ¡{$this->datos['nombre_corto']}, bienvenido al SIP!")
             ->view('emails.bienvenida-sip');
     }
 }

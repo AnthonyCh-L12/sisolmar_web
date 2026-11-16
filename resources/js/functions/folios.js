@@ -89,7 +89,8 @@ const tblFolios = new Tabulator("#tblFolios", {
                     color = 'border-indigo-500 bg-indigo-100 text-indigo-800 shadow-sm';
                 }
 
-                return val ? `<span class="inline-flex items-center justify-center rounded-full border ${color} px-3 py-1 text-[11px] font-bold tracking-wider whitespace-nowrap" style="min-width: 95px;">${val}</span>` : '—';
+                const etiqueta = val === 'PRINCIPAL' ? 'OBLIGATORIO' : val;
+                return val ? `<span class="inline-flex items-center justify-center rounded-full border ${color} px-3 py-1 text-[11px] font-bold tracking-wider whitespace-nowrap" style="min-width: 95px;">${etiqueta}</span>` : '—';
             }
         },
         {
@@ -432,6 +433,7 @@ document.getElementById("buscar").addEventListener("keyup", function () {
 function aplicarTodosFiltros() {
       const filtroTipos          = document.getElementById('filtroTipos')?.value;
       const filtroClasificacion  = document.getElementById('filtroClasificacion')?.value;
+      const filtroCategoria      = document.getElementById('filtroCategoria')?.value;
       const vencimientoFiltro    = document.getElementById('vencimientoFiltro')?.value;
       const filtroEstado         = document.getElementById('filtroEstado')?.value; // <-- NUEVO
       const buscarValor          = document.getElementById('buscar')?.value.toLowerCase().trim() || '';
@@ -454,6 +456,12 @@ function aplicarTodosFiltros() {
           filtros.push({ field: "tipoFolio", type: "=", value: filtroClasificacion });
       }
 
+      if (filtroCategoria === "SIN_CATEGORIA") {
+          filtros.push({ field: "nombre_categoria", type: "=", value: "SIN CATEGORÍA" });
+      } else if (filtroCategoria && filtroCategoria !== "TODOS") {
+          filtros.push({ field: "cod_categoria", type: "=", value: filtroCategoria });
+      }
+
       if (vencimientoFiltro === "SI") {
           filtros.push({ field: "periodo", type: "!=", value: "NO VENCE" });
       } else if (vencimientoFiltro === "NO") {
@@ -465,6 +473,7 @@ function aplicarTodosFiltros() {
               { field: "nombre", type: "like", value: buscarValor },
               { field: "prioridad", type: "like", value: buscarValor },
               { field: "tipoFolio", type: "like", value: buscarValor },
+              { field: "nombre_categoria", type: "like", value: buscarValor },
               { field: "periodo", type: "like", value: buscarValor },
           ]);
       }
@@ -479,6 +488,7 @@ function aplicarTodosFiltros() {
   // Listeners para los Selects
   document.getElementById('filtroTipos')?.addEventListener('change', aplicarTodosFiltros);
   document.getElementById('filtroClasificacion')?.addEventListener('change', aplicarTodosFiltros);
+  document.getElementById('filtroCategoria')?.addEventListener('change', aplicarTodosFiltros);
   document.getElementById('vencimientoFiltro')?.addEventListener('change', aplicarTodosFiltros);
   document.getElementById('filtroEstado')?.addEventListener('change', aplicarTodosFiltros); // <-- NUEVO LISTENER
 
@@ -537,6 +547,11 @@ function cargarFolios() {
             document.getElementById('countTotal').textContent = total;
             document.getElementById('countActivos').textContent = activos;
             document.getElementById('countInactivos').textContent = inactivos;
+            const porcentajeActivos = total ? (activos / total) * 100 : 0;
+            const porcentajeInactivos = total ? (inactivos / total) * 100 : 0;
+            document.getElementById('barTotal').style.width = total ? '100%' : '0%';
+            document.getElementById('barActivos').style.width = `${porcentajeActivos}%`;
+            document.getElementById('barInactivos').style.width = `${porcentajeInactivos}%`;
         })
         .catch(error => {
             console.error("Error al obtener los datos:", error);
@@ -690,7 +705,8 @@ document.getElementById('btnGenerarPDF').addEventListener('click', function () {
                 doc.setFillColor(236, 240, 241);
                 doc.rect(10, yPosition, 190, 6, 'F');
                 doc.setTextColor(44, 62, 80);
-                doc.text(`1.${index + 1} ${prioridad}`, 12, yPosition + 4);
+                const etiquetaPrioridad = prioridad === 'PRINCIPAL' ? 'OBLIGATORIO' : prioridad;
+                doc.text(`1.${index + 1} ${etiquetaPrioridad}`, 12, yPosition + 4);
                 doc.setFont(undefined, 'normal');
                 doc.setTextColor(127, 140, 141);
                 doc.text(`(${folios.length} ${folios.length === 1 ? 'folio' : 'folios'})`, 50, yPosition + 4);

@@ -99,7 +99,8 @@ class DjService
                 'JUBILADO'              => 0,
                 'SCRT'                  => 0,
                 'ESTA_ACTI'             => 1,
-                'ASIG_FAMI'             => 0,
+                'ASIG_FAMI'             => $this->calcularAsigFami($data),
+                'PERS_CONHIJOS'         => $this->calcularConHijos($data),
                 'AFIL_SIND'             => 0,
                 'COMI_PESC'             => 0,
             ];
@@ -176,6 +177,59 @@ class DjService
         }
 
         return $res;
+    }
+
+    /**
+     * Asignación familiar: SI para hijos menores de 18 años o hijos mayores
+     * incapacitados permanentemente. Un hijo mayor de edad sin incapacidad
+     * permanente no genera asignación familiar.
+     */
+    private function calcularAsigFami(array $data): string
+    {
+        $parentescos = $data['parentesco'] ?? [];
+        $fechasNacimiento = $data['fechaNacimiento'] ?? [];
+
+        foreach ($parentescos as $indice => $parentesco) {
+            $parentesco = mb_strtoupper(trim((string) $parentesco), 'UTF-8');
+            if (str_starts_with($parentesco, 'HIJO MAYOR DE EDAD')
+                && (str_contains($parentesco, 'INCAPACITADO') || str_contains($parentesco, 'DISCAPACIDAD'))
+                && str_contains($parentesco, 'PERMANENT')) {
+                return 'SI';
+            }
+
+            // Solo HIJO MENOR DE EDAD se confirma con su fecha de nacimiento.
+            if ($parentesco !== 'HIJO MENOR DE EDAD') {
+                continue;
+            }
+
+            $fechaNacimiento = trim((string) ($fechasNacimiento[$indice] ?? ''));
+            if ($fechaNacimiento === '') {
+                continue;
+            }
+
+            try {
+                $edad = Carbon::parse($fechaNacimiento)->age;
+                if ($edad >= 0 && $edad < 18) {
+                    return 'SI';
+                }
+            } catch (Exception $e) {
+                // Una fecha inválida no se considera evidencia de un hijo menor.
+            }
+        }
+
+        return 'NO';
+    }
+
+    /** PERS_CONHIJOS indica si se registró algún hijo, sin importar la edad. */
+    private function calcularConHijos(array $data): string
+    {
+        foreach (($data['parentesco'] ?? []) as $parentesco) {
+            if (preg_match('/^HIJ/i', trim((string) $parentesco))) {
+                return 'SI';
+            }
+        }
+
+        return 'NO';
     }
 
     private function saveTelefonos($codiPers, array $data)

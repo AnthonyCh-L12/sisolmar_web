@@ -13,12 +13,34 @@ use Barryvdh\Snappy\Facades\SnappyPdf;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class FileController extends Controller
 {
+    public function indexReportesDj()
+    {
+        $sucursales = FileControl::getSucursales();
+        $tipoPerLimitar = session('limitarTipoPer');
+        $tiposPersonal = DB::select(
+            'SELECT TIPE_CODIGO AS codigo, TIPE_DESCRIPCION AS nombre
+             FROM si_solm.dbo.ADMI_TIPO_PERSONAL
+             WHERE TIPE_CODIGO <> ?
+             ORDER BY TIPE_DESCRIPCION'
+            , ['06']
+        );
+        $cargosDj = DB::select(
+            "SELECT CODI_CARG AS codigo, DESC_CARGO AS nombre, CARGO_TIPO AS tipo
+             FROM si_solm.dbo.CARGOS WITH (NOLOCK)
+             WHERE CARG_VIGENCIA = 'SI' AND DESC_CARGO IS NOT NULL
+             ORDER BY DESC_CARGO"
+        );
+
+        return view('file_control.reportes_dj', compact('sucursales', 'tiposPersonal', 'cargosDj', 'tipoPerLimitar'));
+    }
+
     public function index()
     {
         $personal = FileControl::getPersonal();
@@ -28,8 +50,12 @@ class FileController extends Controller
 
         $tipoPerLimitar = session('limitarTipoPer');
         $tipoUsuario = session('tipo_rol');
+        $categoriasFolio = DB::table('sw_folios_categoria')
+            ->where('habilitado', 1)
+            ->orderBy('nombre')
+            ->get(['codigo', 'nombre']);
 
-        return view('file_control.chargefile', compact('personal', 'clientes', 'sucursales', 'tipoPerLimitar', 'tipoUsuario'));
+        return view('file_control.chargefile', compact('personal', 'clientes', 'sucursales', 'tipoPerLimitar', 'tipoUsuario', 'categoriasFolio'));
     }
 
     public function indexGestionDj()
@@ -1269,6 +1295,17 @@ class FileController extends Controller
         return response()->json($folios);
     }
 
+    public function getFoliosPorCategoria($codCategoria)
+    {
+        $folios = DB::table('sw_folios')
+            ->where('cod_categoria', $codCategoria)
+            ->where('habilitado', 1)
+            ->orderBy('nombre')
+            ->get(['codigo', 'nombre']);
+
+        return response()->json($folios);
+    }
+
     public function getListaDJ(Request $request)
     {
         // Atrapamos la vigencia que viene del switch ('SI' o 'TD'). Si no viene, por defecto es 'SI'
@@ -1355,12 +1392,14 @@ class FileController extends Controller
         $formato = Folio::habilitado()->where('tipo', 2)->count();
         $certificado = Folio::habilitado()->where('tipo', 3)->count();
 
-        $roles = FileControl::getRoles();
-        
+        $responsables = DB::table('si_solm.dbo.TIPO_CARGO')
+            ->select('CODI_TIPO_CARG as codigo', 'DESC_TIPO_CARG as nombre')
+            ->orderBy('CODI_TIPO_CARG')
+            ->get();
 
         $categorias = DB::table('sw_folios_categoria')->where('habilitado', 1)->get();
 
-        return view('file_control.folios', compact('periodos', 'todos', 'principal', 'adicional', 'documento', 'formato', 'certificado', 'roles', 'categorias'));
+        return view('file_control.folios', compact('periodos', 'todos', 'principal', 'adicional', 'documento', 'formato', 'certificado', 'responsables', 'categorias'));
     }
 
     public function ViewBusquedaLegajo()
@@ -1743,7 +1782,7 @@ class FileController extends Controller
         try {
             $request->validate([
                 'fecha_emision' => 'required|date',
-                'codPersonal' => 'required',
+                'codPersonal' => 'required|digits:5',
                 'pdf' => 'required|file|mimes:pdf|max:5120',
             ]);
 
@@ -1759,16 +1798,16 @@ class FileController extends Controller
 
             $nameFile = $codPersonal.'.pdf';
 
-            // Carpeta dentro de storage/app
+            // Guardar en la carpeta compartida del servidor de producción.
+            $directorioDj = config('firmahuella.destinos.dj');
+            File::ensureDirectoryExists($directorioDj, 0770, true);
+            $rutaFisica = $directorioDj . DIRECTORY_SEPARATOR . $nameFile;
+            $contenido = file_get_contents($archivo->getRealPath());
+            if ($contenido === false || file_put_contents($rutaFisica, $contenido, LOCK_EX) !== strlen($contenido)) {
+                return response()->json(['error' => 'No se pudo guardar el archivo PDF en la carpeta compartida del servidor.'], 500);
+            }
+
             $rutaStorage = 'dj/2026/'.$nameFile;
-
-            // Guardar archivo
-            Storage::disk('local')->putFileAs('dj/2026', $archivo, $nameFile);
-
-            // Ruta física real (opcional, por si la necesitas)
-            $rutaFisica = storage_path('app/'.$rutaStorage);
-
-            // Ruta que puedes guardar en BD (depende cómo lo consumas luego)
             $rutaArchivo = 'file://192.168.10.5/Extranet_2024/apps/sisolmar/storage/app/'.$rutaStorage;
 
             // Guardar en BD

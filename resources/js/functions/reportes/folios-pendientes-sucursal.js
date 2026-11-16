@@ -80,7 +80,7 @@ function renderTabla(data) {
             const map = {}; p.docs.forEach(d => { map[d.documento?.toUpperCase().trim()] = d.tipo_folio?.toUpperCase().trim(); });
             return `<tr><td>${p.nombre}</td>${todosLosDocs.map(doc => {
                 if (!set.has(doc)) return `<td class="celda-x">X</td>`;
-                return map[doc] === 'PRINCIPAL' ? `<td class="celda-p">P</td>` : `<td class="celda-a">A</td>`;
+                return map[doc] === 'PRINCIPAL' ? `<td class="celda-p">O</td>` : `<td class="celda-a">A</td>`;
             }).join('')}</tr>`;
         }).join('')}</tbody>
               </table></div></div>`;
@@ -115,7 +115,7 @@ function exportarPdf() {
                 ...todosLosDocs.map(doc => {
                     const tiene = set.has(doc), tipo = map[doc];
                     return {
-                        content: tiene ? (tipo === 'PRINCIPAL' ? 'P' : 'A') : 'X',
+                        content: tiene ? (tipo === 'PRINCIPAL' ? 'O' : 'A') : 'X',
                         styles: {
                             fillColor: tiene ? (tipo === 'PRINCIPAL' ? [34, 139, 34] : [41, 128, 185]) : [192, 57, 43],
                             textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center',
@@ -138,7 +138,7 @@ function exportarPdf() {
             doc.setFillColor(6, 10, 81); doc.rect(MARGEN, y, PW - MARGEN * 2, 6.5, 'F');
             doc.setTextColor(255, 255, 255); doc.text(`Sucursal: ${suc}`, MARGEN + 2, y + 4.5); doc.setTextColor(0, 0, 0);
             y += 9;
-            [{ color: [34, 139, 34], l: 'P', t: '= PRINCIPAL' }, { color: [41, 128, 185], l: 'A', t: '= ADICIONAL' }, { color: [192, 57, 43], l: 'X', t: '= PENDIENTE' }].forEach((item, xi) => {
+            [{ color: [34, 139, 34], l: 'O', t: '= OBLIGATORIO' }, { color: [41, 128, 185], l: 'A', t: '= ADICIONAL' }, { color: [192, 57, 43], l: 'X', t: '= PENDIENTE' }].forEach((item, xi) => {
                 const lx = MARGEN + xi * 50;
                 doc.setFillColor(...item.color); doc.roundedRect(lx, y, 5, 4, 0.8, 0.8, 'F');
                 doc.setTextColor(255, 255, 255); doc.setFont(undefined, 'bold'); doc.setFontSize(6.5); doc.text(item.l, lx + 2.5, y + 3, { align: 'center' });

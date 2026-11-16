@@ -288,7 +288,7 @@
                         <label class="text-default-800 text-sm font-medium inline-block mb-2">Prioridad</label>
                         <select id="filtroPrioridad" class="form-select">
                             <option value="">Todas</option>
-                            <option value="PRINCIPAL">Principal</option>
+                            <option value="PRINCIPAL">Obligatorio</option>
                             <option value="ADICIONAL">Adicional</option>
                         </select>
                     </div>

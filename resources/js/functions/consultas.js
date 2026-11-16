@@ -194,7 +194,7 @@ const ConsultaFolios = (() => {
                 <td class="text-center">${inicio + i + 1}</td>
                 <td>${item.nombre ?? '—'}</td>
                 <td class="text-center">${item.tipoFolio ?? '—'}</td>
-                <td class="text-center">${item.prioridad ?? '—'}</td>
+                <td class="text-center">${item.prioridad === 'PRINCIPAL' ? 'OBLIGATORIO' : (item.prioridad ?? '—')}</td>
                 <td class="text-center">${item.periodo ?? 'Sin vencimiento'}</td>
             </tr>
         `).join('');
@@ -379,7 +379,7 @@ const ConsultaFolios = (() => {
             <tr>
                 <td>${doc.documento ?? '—'}</td>
                 <td class="text-center">${doc.tipo_folio ?? '—'}</td>
-                <td class="text-center">${doc.prioridad ?? (doc.tipo_folio === 'PRINCIPAL' ? 'ALTA' : 'NORMAL')}</td>
+                <td class="text-center">${doc.prioridad === 'PRINCIPAL' || (!doc.prioridad && doc.tipo_folio === 'PRINCIPAL') ? 'OBLIGATORIO' : (doc.prioridad ?? 'NORMAL')}</td>
                 <td class="text-center">${formatFecha(doc.fecha_caducidad)}</td>
                 <td class="text-center">${getBadgeEstado(doc)}</td>
             </tr>

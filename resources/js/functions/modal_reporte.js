@@ -9,9 +9,14 @@ import Swal from 'sweetalert2';
 
     // ── Referencias DOM ───────────────────────────────────────
     const modal        = document.getElementById('modalReporte');
-    const btnAbrir     = document.getElementById('btnAbrirReporte');
-    const btnCerrar    = document.getElementById('btnCerrarReporte');
     const btnBuscar    = document.getElementById('btnBuscarReporte');
+    const btnLimpiarFiltros = document.getElementById('btnLimpiarFiltrosReporte');
+    const resultados   = document.getElementById('rptResultados');
+    const inputBusquedaPreview = document.getElementById('rptBuscarPreview');
+    const modalPreview = document.getElementById('modalVistaPreviaReporte');
+    const tituloPreview = document.getElementById('tituloVistaPreviaReporte');
+    const subtituloPreview = document.getElementById('subtituloVistaPreviaReporte');
+    const contenidoPreview = document.getElementById('contenidoVistaPreviaReporte');
     const tbody        = document.getElementById('rptTbody');
     const cbAll        = document.getElementById('rptCbAll');
     const selInfo      = document.getElementById('rptSelInfo');
@@ -20,8 +25,6 @@ import Swal from 'sweetalert2';
     const btnPrev      = document.getElementById('rptBtnPrev');
     const btnNext      = document.getElementById('rptBtnNext');
     const pageSizeSel  = document.getElementById('rptPageSize');
-    const lblVig       = document.getElementById('rptLblVig');
-    const lblNoVig     = document.getElementById('rptLblNoVig');
     const btnDescFoto  = document.getElementById('btnRptDescFoto');
     const btnDescDNI   = document.getElementById('btnRptDescDNI');
     const btnDescCUL   = document.getElementById('btnRptDescCUL');
@@ -29,10 +32,21 @@ import Swal from 'sweetalert2';
     const btnExportXLS = document.getElementById('btnRptExportExcel');
     const selSucursal  = document.getElementById('rptSucursal');
     const selTipo      = document.getElementById('rptTipoPer');
-    const inputApPat   = document.getElementById('rptApPaterno');
-    const inputDoc     = document.getElementById('rptDocIdentidad');
 
     if (!modal) return;
+
+    const contenedorOriginalResultados = resultados?.parentElement;
+    const siguienteHermanoResultados = resultados?.nextSibling ?? null;
+
+    function cerrarVistaPreviaGeneral() {
+        if (contenedorOriginalResultados && resultados) {
+            contenedorOriginalResultados.insertBefore(resultados, siguienteHermanoResultados);
+            resultados.classList.add('hidden');
+        }
+        contenidoPreview.replaceChildren();
+    }
+
+    window.addEventListener('dj:cerrar-vista-previa', cerrarVistaPreviaGeneral);
 
     // ── Estado ────────────────────────────────────────────────
     let filtrados       = [];
@@ -66,36 +80,24 @@ import Swal from 'sweetalert2';
         { label: 'Fin Contrato',     key: 'finContrato' },
     ];
 
-    // ── Abrir / cerrar ────────────────────────────────────────
-    function abrirModal() {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function cerrarModal() {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        document.body.style.overflow = '';
-    }
-
-    btnAbrir?.addEventListener('click', abrirModal);
-    btnCerrar?.addEventListener('click', cerrarModal);
-    modal?.addEventListener('click', e => { if (e.target === modal) cerrarModal(); });
-
     // ── Fetch ─────────────────────────────────────────────────
     async function fetchPersonal() {
         const codSucursal  = selSucursal?.value.trim()  ?? '';
         const tipoPer      = selTipo?.value.trim()      ?? '';
-        const vigente      = document.querySelector('input[name="rptVigente"]:checked')?.value ?? '1';
-        const apPaterno    = inputApPat?.value.trim()   ?? '';
-        const docIdentidad = inputDoc?.value.trim()     ?? '';
-
-        Swal.fire({ title: 'Cargando registros...', allowOutsideClick: false, allowEscapeKey: false, didOpen: () => Swal.showLoading() });
+        const vigente      = document.getElementById('rptVigente')?.value ?? '';
+        btnBuscar.disabled = true;
+        tituloPreview.textContent = 'Vista previa: Reporte General';
+        subtituloPreview.textContent = 'Aplicando los filtros seleccionados…';
+        contenidoPreview.innerHTML = '<p class="text-sm text-slate-500">Consultando datos del personal…</p>';
+        contenidoPreview.classList.remove('text-center', 'text-sm', 'text-red-600');
+        modalPreview.classList.remove('hidden');
+        modalPreview.classList.remove('flex');
+        modalPreview.style.display = 'flex';
+        document.body.classList.add('overflow-hidden');
 
         try {
             const response = await axios.get(`${VITE_URL_APP}/api/dj/reporte-personal-datos-generales`, {
-                params: { codSucursal, tipoPer, vigente, apPaterno, docIdentidad }
+                params: { codSucursal, tipoPer, vigente }
             });
 
             const raw = response.data?.data ?? response.data;
@@ -127,19 +129,35 @@ import Swal from 'sweetalert2';
             // Reasignar _it tras filtrado
             filtrados.forEach((r, i) => r._it = i + 1);
 
-            Swal.close();
             paginaActual = 1;
             seleccionados.clear();
+            if (inputBusquedaPreview) inputBusquedaPreview.value = '';
             renderTabla();
+            resultados?.classList.remove('hidden');
+            subtituloPreview.textContent = `${filtrados.length.toLocaleString('es-PE')} registros encontrados con estos filtros.`;
+            contenidoPreview.replaceChildren(resultados);
 
         } catch (err) {
             console.error('Error cargando reporte:', err);
-            Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar el reporte.' });
+            subtituloPreview.textContent = 'No se pudo consultar el reporte.';
+            contenidoPreview.textContent = err.message || 'No se pudo cargar el reporte.';
+            contenidoPreview.classList.add('text-center', 'text-sm', 'text-red-600');
+        } finally {
+            btnBuscar.disabled = false;
         }
     }
 
     // ── Helpers ───────────────────────────────────────────────
     function trim(val) { return String(val ?? '').trim(); }
+
+    function filasVisibles() {
+        const busqueda = trim(inputBusquedaPreview?.value).toLocaleLowerCase('es')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (!busqueda) return filtrados;
+        return filtrados.filter(registro => `${registro.nombre} ${registro.nroDocIden}`
+            .toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .includes(busqueda));
+    }
 
     function formatFecha(valor) {
         if (!valor) return '—';
@@ -167,12 +185,16 @@ import Swal from 'sweetalert2';
 
     // ── Render tabla ──────────────────────────────────────────
     function renderTabla() {
+        const filas = filasVisibles();
         const inicio = (paginaActual - 1) * tamanoPagina;
-        const slice  = filtrados.slice(inicio, inicio + tamanoPagina);
+        const slice  = filas.slice(inicio, inicio + tamanoPagina);
 
         if (!slice.length) {
-            tbody.innerHTML = `<tr><td colspan="19" class="text-center py-12 text-gray-300 italic text-xs">Sin resultados para los filtros aplicados</td></tr>`;
-            actualizarFooter(0, 0, 0);
+            tbody.innerHTML = `<tr><td colspan="19" class="text-center py-12 text-gray-400 italic text-sm">No se encontraron registros con esa búsqueda.</td></tr>`;
+            cbAll.checked = false;
+            cbAll.indeterminate = false;
+            actualizarFooter(0, 0, filas.length);
+            actualizarSelInfo();
             return;
         }
 
@@ -218,7 +240,7 @@ import Swal from 'sweetalert2';
             </tr>`;
         }).join('');
 
-        actualizarFooter(inicio + 1, Math.min(inicio + tamanoPagina, filtrados.length), filtrados.length);
+        actualizarFooter(inicio + 1, Math.min(inicio + tamanoPagina, filas.length), filas.length);
         actualizarCbAll();
         actualizarSelInfo();
         bindCheckboxes();
@@ -232,7 +254,8 @@ import Swal from 'sweetalert2';
     }
 
     function actualizarCbAll() {
-        const slice = filtrados.slice((paginaActual - 1) * tamanoPagina, paginaActual * tamanoPagina);
+        const filas = filasVisibles();
+        const slice = filas.slice((paginaActual - 1) * tamanoPagina, paginaActual * tamanoPagina);
         cbAll.checked       = slice.length > 0 && slice.every(r => seleccionados.has(r.codPersonal));
         cbAll.indeterminate = !cbAll.checked && slice.some(r => seleccionados.has(r.codPersonal));
     }
@@ -253,35 +276,37 @@ import Swal from 'sweetalert2';
     }
 
     cbAll?.addEventListener('change', function () {
-        filtrados.slice((paginaActual - 1) * tamanoPagina, paginaActual * tamanoPagina)
+        filasVisibles().slice((paginaActual - 1) * tamanoPagina, paginaActual * tamanoPagina)
             .forEach(r => this.checked ? seleccionados.add(r.codPersonal) : seleccionados.delete(r.codPersonal));
+        renderTabla();
+    });
+
+    inputBusquedaPreview?.addEventListener('input', () => {
+        paginaActual = 1;
         renderTabla();
     });
 
     // ── Paginación ────────────────────────────────────────────
     btnPrev?.addEventListener('click', () => { if (paginaActual > 1) { paginaActual--; renderTabla(); } });
     btnNext?.addEventListener('click', () => {
-        if (paginaActual < Math.ceil(filtrados.length / tamanoPagina)) { paginaActual++; renderTabla(); }
+        if (paginaActual < Math.ceil(filasVisibles().length / tamanoPagina)) { paginaActual++; renderTabla(); }
     });
     pageSizeSel?.addEventListener('change', function () { tamanoPagina = parseInt(this.value); paginaActual = 1; renderTabla(); });
 
     // ── Buscar ────────────────────────────────────────────────
     btnBuscar?.addEventListener('click', fetchPersonal);
-    [inputApPat, inputDoc].forEach(inp => inp?.addEventListener('keyup', e => { if (e.key === 'Enter') fetchPersonal(); }));
+    btnLimpiarFiltros?.addEventListener('click', () => {
+        const resetSelect = (select, defaultValue = '') => {
+            if (!select) return;
+            const tieneDefault = [...select.options].some(option => option.value === defaultValue);
+            select.value = tieneDefault ? defaultValue : (select.options[0]?.value ?? '');
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        };
 
-    // ── Radio vigente ─────────────────────────────────────────
-    document.querySelectorAll('input[name="rptVigente"]').forEach(r => {
-        r.addEventListener('change', function () {
-            const esVig = this.value === '1';
-            lblVig?.classList.toggle('bg-primary',    esVig);
-            lblVig?.classList.toggle('text-white',    esVig);
-            lblVig?.classList.toggle('bg-white',      !esVig);
-            lblVig?.classList.toggle('text-gray-500', !esVig);
-            lblNoVig?.classList.toggle('bg-primary',    !esVig);
-            lblNoVig?.classList.toggle('text-white',    !esVig);
-            lblNoVig?.classList.toggle('bg-white',      esVig);
-            lblNoVig?.classList.toggle('text-gray-500', esVig);
-        });
+        resetSelect(selSucursal);
+        resetSelect(selTipo);
+        resetSelect(document.getElementById('rptVigente'), '1');
+        resetSelect(document.getElementById('rptDescCon'), 'doc');
     });
 
     // ── Descargas archivos ────────────────────────────────────
@@ -297,7 +322,7 @@ import Swal from 'sweetalert2';
     };
 
     function getSeleccionados() { return filtrados.filter(r => seleccionados.has(r.codPersonal)); }
-    function getModoDescarga()  { return document.querySelector('input[name="rptDescCon"]:checked')?.value ?? 'doc'; }
+    function getModoDescarga()  { return document.getElementById('rptDescCon')?.value ?? 'doc'; }
     function alertarSinSel()    { Swal.fire({ icon: 'warning', title: 'Sin selección', text: 'Marca al menos un registro.' }); }
 
     function getNombreBase(reg) {
@@ -460,75 +485,106 @@ import Swal from 'sweetalert2';
 
     // ── EXPORTAR PDF ──────────────────────────────────────────
     btnExportPDF?.addEventListener('click', async function () {
-        if (!filtrados.length) { Swal.fire({ icon: 'warning', title: 'Sin datos', text: 'Realiza una búsqueda antes de exportar.' }); return; }
+        const registrosSeleccionados = getSeleccionados();
+        if (!registrosSeleccionados.length) { alertarSinSel(); return; }
 
         try {
             const { jsPDF } = window.jspdf;
             // Oficio landscape (216 x 356 mm) — más ancho que A4 para que entren las 18 columnas
             const doc   = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [216, 356] });
-            const pageW = doc.internal.pageSize.getWidth(); // 356mm
-            let y = 12;
-
-            // Título subrayado azul
-            doc.setFontSize(12);
+            const pageW = doc.internal.pageSize.getWidth();
+            const marginX = 6;
+            let logoBase64 = null;
+            if (window.logoUrl) {
+                try {
+                    const response = await fetch(window.logoUrl);
+                    if (response.ok) {
+                        const logoBlob = await response.blob();
+                        const logoData = await new Promise(resolve => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(logoBlob);
+                        });
+                        doc.addImage(logoData, 'PNG', marginX, 4, 34, 16);
+                        logoBase64 = logoData;
+                    }
+                } catch (logoError) {
+                    console.warn('No se pudo incluir el logo en el PDF:', logoError);
+                }
+            }
+            const sucursalTexto = selSucursal?.selectedOptions[0]?.textContent.trim() || 'Todas las sucursales';
+            const tipoTexto = selTipo?.selectedOptions[0]?.textContent.trim() || 'Todos los tipos';
+            const estadoTexto = document.getElementById('rptVigente')?.selectedOptions[0]?.textContent.trim() || 'Todos';
+            const titulo = `REPORTE GENERAL | ${sucursalTexto} | ${tipoTexto} | ${estadoTexto}`.toUpperCase();
             doc.setFont('helvetica', 'bold');
-            doc.setTextColor(0, 0, 180);
-            doc.text(TITULO_REPORTE, pageW / 2, y, { align: 'center' });
-            const tW = doc.getTextWidth(TITULO_REPORTE);
-            doc.setDrawColor(0, 0, 180);
-            doc.setLineWidth(0.3);
-            doc.line((pageW - tW) / 2, y + 0.8, (pageW + tW) / 2, y + 0.8);
-            y += 6;
+            doc.setFontSize(13);
+            doc.setTextColor(18, 59, 89);
+            const lineasTitulo = doc.splitTextToSize(titulo, pageW - marginX * 2);
+            doc.text(lineasTitulo, pageW / 2, 11, { align: 'center' });
 
-            // Empresa
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(0);
-            doc.text(EMPRESA_REPORTE, pageW / 2, y, { align: 'center' });
-            y += 5;
+            const yTituloFin = 11 + lineasTitulo.length * 5.2;
+            const datosResumen = [[
+                'Generado', 'Personal seleccionado', 'Sucursal', 'Tipo de personal', 'Estado',
+            ], [
+                new Date().toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+                String(registrosSeleccionados.length), sucursalTexto, tipoTexto, estadoTexto,
+            ]];
+            doc.autoTable({
+                startY: yTituloFin + 2,
+                head: [datosResumen[0]],
+                body: [datosResumen[1]],
+                theme: 'grid',
+                margin: { left: marginX, right: marginX },
+                styles: { font: 'helvetica', fontSize: 7, cellPadding: 2, halign: 'center', valign: 'middle', lineColor: [209, 213, 219], lineWidth: 0.2 },
+                headStyles: { fillColor: [229, 231, 235], textColor: [55, 65, 81], fontStyle: 'bold', fontSize: 6.5 },
+                bodyStyles: { fillColor: [229, 231, 235], textColor: [17, 24, 39], fontStyle: 'bold' },
+            });
 
             const head = [COLUMNAS_EXPORT.map(c => c.label)];
-            const body = filtrados.map((r, i) =>
+            const body = registrosSeleccionados.map((r, i) =>
                 COLUMNAS_EXPORT.map(c => c.key === '_it' ? String(i + 1) : String(r[c.key] ?? '—'))
             );
 
             doc.autoTable({
-                startY: y,
+                startY: doc.lastAutoTable.finalY + 4,
                 head,
                 body,
+                theme: 'grid',
                 styles: {
                     fontSize:    5.5,
-                    cellPadding: 1.2,
+                    cellPadding: 1.5,
                     overflow:    'linebreak',
+                    halign:      'center',
                     valign:      'middle',
-                    lineColor:   [210, 218, 240],
-                    lineWidth:   0.1,
+                    lineColor:   [203, 213, 225],
+                    lineWidth:   0.15,
                 },
                 headStyles: {
-                    fillColor:  [30, 64, 175],
+                    fillColor:  [51, 65, 85],
                     textColor:  255,
                     fontStyle:  'bold',
-                    fontSize:   6,
+                    fontSize:   6.5,
                     halign:     'center',
+                    valign:     'middle',
                 },
-                alternateRowStyles: { fillColor: [246, 248, 255] },
-                margin: { left: 4, right: 4 },
+                alternateRowStyles: { fillColor: [241, 245, 249] },
+                margin: { left: marginX, right: marginX, bottom: 12 },
                 columnStyles: {
                     0:  { cellWidth: 5,  halign: 'center' }, // It
                     1:  { cellWidth: 12, halign: 'center' }, // Sucursal
                     2:  { cellWidth: 9,  halign: 'center' }, // Cód
-                    3:  { cellWidth: 40 },                   // Nombres
-                    4:  { cellWidth: 12 },                   // País
+                    3:  { cellWidth: 40, halign: 'center' }, // Nombres
+                    4:  { cellWidth: 12, halign: 'center' }, // País
                     5:  { cellWidth: 8,  halign: 'center' }, // Tipo Doc
                     6:  { cellWidth: 18, halign: 'center' }, // Doc Iden
                     7:  { cellWidth: 16, halign: 'center' }, // Caduca Doc
                     8:  { cellWidth: 7,  halign: 'center' }, // Sexo
                     9:  { cellWidth: 7,  halign: 'center' }, // Edad
-                    10: { cellWidth: 40 },                   // Email
-                    11: { cellWidth: 20 },                   // Teléfono
-                    12: { cellWidth: 48 },                   // Dirección
+                    10: { cellWidth: 40, halign: 'center' }, // Email
+                    11: { cellWidth: 20, halign: 'center' }, // Teléfono
+                    12: { cellWidth: 48, halign: 'center' }, // Dirección
                     13: { cellWidth: 16, halign: 'center' }, // F. Ingreso
-                    14: { cellWidth: 28 },                   // Cargo
+                    14: { cellWidth: 28, halign: 'center' }, // Cargo
                     15: { cellWidth: 14, halign: 'center' }, // Tipo Pers
                     16: { cellWidth: 16, halign: 'center' }, // Caduca EMO
                     17: { cellWidth: 16, halign: 'center' }, // Fin Contrato
@@ -536,10 +592,10 @@ import Swal from 'sweetalert2';
                 didDrawPage: data => {
                     const total = doc.internal.getNumberOfPages();
                     doc.setFontSize(7);
-                    doc.setTextColor(150);
+                    doc.setTextColor(100, 116, 139);
                     doc.text(
                         `Página ${data.pageNumber} de ${total}`,
-                        pageW - 8,
+                        pageW - marginX,
                         doc.internal.pageSize.getHeight() - 6,
                         { align: 'right' }
                     );
@@ -557,122 +613,134 @@ import Swal from 'sweetalert2';
 
     // ── EXPORTAR EXCEL ────────────────────────────────────────
     btnExportXLS?.addEventListener('click', async function () {
-        if (!filtrados.length) { Swal.fire({ icon: 'warning', title: 'Sin datos', text: 'Realiza una búsqueda antes de exportar.' }); return; }
-
-        // Cargar xlsx-js-style que soporta estilos correctamente
-        if (!window.XLSXStyle) {
-            try {
-                await new Promise((resolve, reject) => {
-                    const s   = document.createElement('script');
-                    s.src     = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
-                    s.onload  = () => { window.XLSXStyle = window.XLSX; resolve(); };
-                    s.onerror = reject;
-                    document.head.appendChild(s);
-                });
-            } catch {
-                Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar la librería de Excel.' });
-                return;
-            }
-        }
+        const registrosSeleccionados = getSeleccionados();
+        if (!registrosSeleccionados.length) { alertarSinSel(); return; }
 
         try {
-            const XLSX = window.XLSXStyle;
+            // ExcelJS ya forma parte de las dependencias del proyecto y conserva
+            // estilos al generar el archivo en el navegador.
+            const ExcelJS = (await import('exceljs')).default;
             const cols = COLUMNAS_EXPORT.length;
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Datos Personal', { views: [{ showGridLines: false }] });
 
-            // ── Estilos ───────────────────────────────────────
-            const borde = (color) => ({
-                top:    { style: 'thin', color: { rgb: color } },
-                bottom: { style: 'thin', color: { rgb: color } },
-                left:   { style: 'thin', color: { rgb: color } },
-                right:  { style: 'thin', color: { rgb: color } },
-            });
-
-            const estTitulo = {
-                font:      { bold: true, sz: 14, color: { rgb: '1E40AF' } },
-                alignment: { horizontal: 'center', vertical: 'center' },
-            };
-            const estEmpresa = {
-                font:      { bold: true, sz: 11 },
-                alignment: { horizontal: 'center', vertical: 'center' },
-            };
-            const estHeader = {
-                font:      { bold: true, sz: 9, color: { rgb: 'FFFFFF' } },
-                fill:      { patternType: 'solid', fgColor: { rgb: '1E40AF' } },
-                alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-                border:    borde('FFFFFF'),
-            };
-            const estDato = {
-                font:      { sz: 8 },
-                alignment: { vertical: 'center' },
-                border:    borde('D1D5DB'),
-            };
-            const estDatoAlt = {
-                font:      { sz: 8 },
-                fill:      { patternType: 'solid', fgColor: { rgb: 'EFF6FF' } },
-                alignment: { vertical: 'center' },
-                border:    borde('D1D5DB'),
-            };
-
-            // ── Datos ─────────────────────────────────────────
-            const ws_data = [
-                [TITULO_REPORTE],
-                [EMPRESA_REPORTE],
-                [],
-                COLUMNAS_EXPORT.map(c => c.label),
-                ...filtrados.map((r, i) =>
-                    COLUMNAS_EXPORT.map(c => c.key === '_it' ? i + 1 : (r[c.key] ?? ''))
-                ),
-            ];
-
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet(ws_data);
-
-            // ── Anchos ────────────────────────────────────────
-            ws['!cols'] = [
-                { wch: 5  }, { wch: 10 }, { wch: 8  }, { wch: 35 },
-                { wch: 12 }, { wch: 8  }, { wch: 13 }, { wch: 13 },
-                { wch: 5  }, { wch: 5  }, { wch: 32 }, { wch: 15 },
-                { wch: 40 }, { wch: 12 }, { wch: 26 }, { wch: 14 },
-                { wch: 13 }, { wch: 13 },
-            ];
-
-            // ── Altos ─────────────────────────────────────────
-            ws['!rows'] = [{ hpt: 22 }, { hpt: 16 }, { hpt: 6 }, { hpt: 28 }];
-
-            // ── Merges ────────────────────────────────────────
-            ws['!merges'] = [
-                { s: { r: 0, c: 0 }, e: { r: 0, c: cols - 1 } },
-                { s: { r: 1, c: 0 }, e: { r: 1, c: cols - 1 } },
-            ];
-
-            // ── Helper: ref de celda ──────────────────────────
-            const ref = (r, c) => XLSX.utils.encode_cell({ r, c });
-
-            // Estilos título y empresa
-            if (ws[ref(0, 0)]) ws[ref(0, 0)].s = estTitulo;
-            if (ws[ref(1, 0)]) ws[ref(1, 0)].s = estEmpresa;
-
-            // Encabezados (fila 3)
-            for (let c = 0; c < cols; c++) {
-                const cell = ref(3, c);
-                if (ws[cell]) ws[cell].s = estHeader;
+            // Encabezado igual al formato utilizado en los demás reportes.
+            if (window.logoUrl) {
+                try {
+                    const response = await fetch(window.logoUrl);
+                    if (response.ok) {
+                        const logoBlob = await response.blob();
+                        const logoBase64 = await new Promise(resolve => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(logoBlob);
+                        });
+                        const imageId = workbook.addImage({ base64: logoBase64, extension: 'png' });
+                        worksheet.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 130, height: 62 } });
+                    }
+                } catch (logoError) {
+                    console.warn('No se pudo incluir el logo en el Excel:', logoError);
+                }
             }
 
-            // Datos (fila 4 en adelante)
-            filtrados.forEach((_, rowIdx) => {
-                const est = rowIdx % 2 === 1 ? estDatoAlt : estDato;
-                for (let c = 0; c < cols; c++) {
-                    const cell = ref(4 + rowIdx, c);
-                    if (ws[cell]) ws[cell].s = est;
-                }
+            const ultimaColumna = worksheet.getColumn(cols).letter;
+            const sucursalTexto = selSucursal?.selectedOptions[0]?.textContent.trim() || 'Todas';
+            const tipoTexto = selTipo?.selectedOptions[0]?.textContent.trim() || 'Todos';
+            const estadoTexto = document.getElementById('rptVigente')?.selectedOptions[0]?.textContent.trim() || 'Todos';
+            worksheet.getRow(1).height = 64;
+            worksheet.mergeCells(`C1:${ultimaColumna}1`);
+            worksheet.getCell('C1').value = `REPORTE GENERAL | ${sucursalTexto.toUpperCase()} | ${tipoTexto.toUpperCase()} | ${estadoTexto.toUpperCase()}`;
+            worksheet.getCell('C1').font = { bold: true, color: { argb: 'FF990000' }, size: 11 };
+            worksheet.getCell('C1').alignment = { horizontal: 'left', vertical: 'center', wrapText: true };
+            worksheet.mergeCells(`C2:${ultimaColumna}2`);
+            worksheet.getRow(4).height = 6;
+
+            const bloques = [
+                { start: 1, end: 2, label: 'Generado', value: new Date().toLocaleString('es-PE', {
+                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+                }) },
+                { start: 3, end: 6, label: 'Personal seleccionado', value: registrosSeleccionados.length },
+                { start: 7, end: 9, label: 'Sucursal', value: sucursalTexto },
+                { start: 10, end: 12, label: 'Tipo de personal', value: tipoTexto },
+                { start: 13, end: cols, label: 'Estado', value: estadoTexto },
+            ];
+            bloques.forEach(({ start, end, label, value }) => {
+                worksheet.mergeCells(6, start, 6, end);
+                worksheet.mergeCells(5, start, 5, end);
+                const etiqueta = worksheet.getCell(5, start);
+                etiqueta.value = label;
+                etiqueta.font = { bold: true, size: 9, color: { argb: 'FF374151' } };
+                etiqueta.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+                const dato = worksheet.getCell(6, start);
+                dato.value = value;
+                dato.font = { bold: true, size: 10, color: { argb: 'FF111827' } };
+                dato.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+                [etiqueta, dato].forEach(cell => {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                        right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    };
+                });
             });
 
-            XLSX.utils.book_append_sheet(wb, ws, 'Datos Personal');
-            XLSX.writeFile(wb, `DatosPersonal_${timestamp()}.xlsx`);
+            worksheet.getRow(7).height = 6;
+            const headerRowNumber = 8;
+            const header = worksheet.getRow(headerRowNumber);
+            header.values = COLUMNAS_EXPORT.map(c => c.label);
+            header.height = 28;
+            header.eachCell(cell => {
+                cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4B5563' } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FF4B5563' } },
+                    bottom: { style: 'thin', color: { argb: 'FF4B5563' } },
+                    left: { style: 'thin', color: { argb: 'FF4B5563' } },
+                    right: { style: 'thin', color: { argb: 'FF4B5563' } },
+                };
+            });
+
+            registrosSeleccionados.forEach((registro, index) => {
+                const row = worksheet.addRow(COLUMNAS_EXPORT.map(c => c.key === '_it' ? index + 1 : (registro[c.key] ?? '')));
+                row.eachCell(cell => {
+                    cell.font = { size: 9 };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                        right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                    };
+                });
+            });
+
+            worksheet.columns = [
+                { width: 6 }, { width: 16 }, { width: 10 }, { width: 42 },
+                { width: 12 }, { width: 12 }, { width: 15 }, { width: 15 },
+                { width: 8 }, { width: 8 }, { width: 30 }, { width: 16 },
+                { width: 40 }, { width: 14 }, { width: 30 }, { width: 16 },
+                { width: 15 }, { width: 15 },
+            ];
+            worksheet.autoFilter = { from: { row: headerRowNumber, column: 1 }, to: { row: headerRowNumber, column: cols } };
+            worksheet.views = [{ state: 'frozen', ySplit: headerRowNumber, showGridLines: false }];
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `DatosPersonal_${timestamp()}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 
         } catch (err) {
             console.error('Error exportando Excel:', err);
-            Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo generar el Excel.' });
+            Swal.fire({ icon: 'error', title: 'Error', text: `No se pudo generar el Excel: ${err.message || 'error desconocido'}` });
         }
     });
 
@@ -686,8 +754,5 @@ import Swal from 'sweetalert2';
             + String(f.getHours()).padStart(2, '0')
             + String(f.getMinutes()).padStart(2, '0');
     }
-
-    // ── API pública ───────────────────────────────────────────
-    window.ModalReporte = { abrir: abrirModal, cerrar: cerrarModal };
 
 })();

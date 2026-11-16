@@ -12,6 +12,7 @@ use App\Http\Controllers\ConsultaController;
 use App\Http\Controllers\DjController;
 use App\Http\Controllers\ExamenesController;
 use App\Http\Controllers\FileController;
+use App\Http\Controllers\FirmaHuellaDjController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\ReporteAvancesController;
@@ -38,6 +39,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/get-personal-dj', [FileController::class, 'getListaDJXusuario']);
     Route::get('/get-personal-dj-2026', [FileController::class, 'getListaDJ2026']);
     Route::post('/save-dj-folio-2', [FileController::class, 'saveDjFolioAux']);
+    Route::post('/dj/guardar-escaneada-y-biometricos', [FirmaHuellaDjController::class, 'guardar'])->name('dj.guardar-escaneada-y-biometricos');
+    Route::post('/dj/extraer-firma-huella', [FirmaHuellaDjController::class, 'extraer'])->name('dj.extraer-firma-huella');
     Route::get('/get-personal', [FileController::class, 'getPersonal']);
     Route::get('/get-personal-total', [FileController::class, 'getPersonalTotal']);
     Route::get('/carga-escaneo-dj', [FileController::class, 'ViewEscaneoDJ'])->name('carga.escaneo.dj');
@@ -107,6 +110,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/get-folios/{codCliente}/{codCargo}', [FileController::class, 'getFoliosXLegajo']);
         Route::get('/get-folios-cliente-cargo', [FileController::class, 'getFoliosClienteCargo']);
         Route::get('/get-folios', [FileController::class, 'getFolios']);
+        Route::get('/get-folios-categoria/{codCategoria}', [FileController::class, 'getFoliosPorCategoria']);
         Route::get('/get-folios-vigentes', [ConsultaController::class, 'getFoliosVigentes']);
         Route::get('/get-folios-pendientes', [ConsultaController::class, 'getFoliosPendientes']);
         Route::get('/folios/proximos-vencer', [ConsultaController::class, 'getFoliosProximosVencer']);
@@ -136,6 +140,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/notificaciones-matriculas/leer-todas', [NotificacionController::class, 'marcarTodasLeidas']);
         Route::get('/notificaciones/folios-por-vencer', [NotificacionController::class, 'foliosPorVencer'])->name('notificaciones.foliosPorVencer');
         Route::get('/notificaciones/pendientes-etapa2', [NotificacionController::class, 'pendientesEtapa2']);
+        Route::get('/notificaciones/hijos-por-cumplir-mayoria-edad', [NotificacionController::class, 'hijosPorCumplirMayoriaEdad']);
         Route::get('/notificaciones/demandas-admin', [NotificacionController::class, 'getDemandasAdmin']);
         Route::post('/notificaciones/demandas-admin/borrar', [NotificacionController::class, 'deleteDemandaAdmin']);
 
@@ -344,6 +349,8 @@ Route::middleware(['auth'])->group(function () {
 
         // DJ módulo (antes con prefix 'dj')
         Route::prefix('dj')->middleware('throttle:dj_api')->group(function () {
+            Route::get('/solicitudes-sip/{id}', [DjController::class, 'detalleSolicitudSip']);
+            Route::post('/solicitudes-sip/{id}/resolver', [DjController::class, 'resolverSolicitudSip']);
             Route::get('/get-personal-data', [DjController::class, 'getPersonalData']);
             Route::get('/get-catalogs', [DjController::class, 'getCatalogs']);
             Route::get('/get-ubicacion', [DjController::class, 'getUbicacion']);
@@ -367,6 +374,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/reporte/proxy-imagen', [ReportePersonalController::class, 'proxyImagen']);
             Route::get('/reporte/personal-documentos', [ReportePersonalController::class, 'documentosPendientes']);
             Route::get('/reporte/dni-hijos', [ReportePersonalController::class, 'dniHijosPendientes']);
+            Route::get('/reporte/asignacion-familiar-hijos-mayores', [ReportePersonalController::class, 'asignacionFamiliarHijosMayores']);
+            Route::get('/reporte/asignacion-familiar-proxima-vencer', [ReportePersonalController::class, 'asignacionFamiliarProximaVencer']);
+            Route::get('/reporte/personal-sin-dj-escaneada', [ReportePersonalController::class, 'personalSinDjEscaneada']);
             Route::get('/reporte/descargar/{archivo}', [ReportePersonalController::class, 'descargarReporte'])->where('archivo', '.*')->name('reporte.descargar');
             Route::post('/save-recontratacion', [DjController::class, 'saveRecontratacion']);
             Route::post('/upload-foto-personal', [DjController::class, 'uploadFotoPersonal']);

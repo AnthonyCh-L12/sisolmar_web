@@ -265,40 +265,6 @@
                             <i class='bx bx-plus text-base'></i>
                             <span>Nueva DJ</span>
                         </button>
-                         {{-- REPORTES: un solo dropdown (agregar aquí los próximos reportes) --}}
-                         <div id="ddReportesDJ" class="hs-dropdown relative inline-flex [--placement:bottom-right]">
-                             <button type="button" aria-haspopup="menu" aria-expanded="false"
-                                 class="hs-dropdown-toggle btn rounded-full bg-dark/25 text-dark hover:bg-dark hover:text-white flex items-center gap-1 px-4 py-1">
-                                 <i class='bx bx-file-find'></i>
-                                 <span>Reportes</span>
-                                 <i class='bx bx-chevron-down text-base'></i>
-                             </button>
-
-                             <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 min-w-64 transition-[opacity,margin] mt-2 opacity-0 hidden z-50 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5">
-                                 <button type="button" id="btnAbrirReporte"
-                                     class="hs-dropdown-close w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-dark/10 hover:text-dark transition-colors">
-                                     <i class='bx bx-file-find text-base'></i>
-                                     <span>Reporte General</span>
-                                 </button>
-
-                                 {{-- Reporte de documentos: solo ADMINS RRHH (17) y SUPERUSUARIO (11) --}}
-                                 @if($tipoUsuario == 17 || $tipoUsuario == 11)
-                                 <button type="button" id="btnDocsPendientes"
-                                     title="Personal vigente que aún no tiene foto o DNI. Se revisa en cada clic contra el servidor de imágenes."
-                                     class="hs-dropdown-close w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-warning/15 hover:text-warning transition-colors">
-                                     <i class='bx bx-download text-base'></i>
-                                     <span>Sin foto / DNI</span>
-                                 </button>
-
-                                 <button type="button" id="btnDniHijosPendientes"
-                                     title="Personal vigente con hijos menores de edad sin DNI cargado (anverso/reverso). Se revisa en cada clic contra el servidor de imágenes."
-                                     class="hs-dropdown-close w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-warning/15 hover:text-warning transition-colors">
-                                     <i class='bx bx-group text-base'></i>
-                                     <span>DNI de hijos</span>
-                                 </button>
-                                 @endif
-                             </div>
-                         </div>
                      </div>
                         
                     @endif
@@ -573,7 +539,6 @@
     @include('file_control.rrhh.partials_modal_dj')
     @include('file_control.rrhh.partials_modal_nueva_dj')
     @include('file_control.rrhh.partials_modal_ext_firmahuella')
-    @include('file_control.rrhh.partials_modal_reporte')
 
     {{-- MODAL BIOMÉTRICO (Migrado desde Actualizar DJ) --}}
     <button id="btn-modal-biometrico" data-hs-overlay="#modal-biometrico" class="hidden"></button>
@@ -619,15 +584,84 @@
                         <ul id="listaArchivosDJ_E4C" class="mt-3 space-y-2"></ul>
                     </div>
                 </div>
-                <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-slate-50 rounded-b-lg">
-                    <button type="submit" class="btn bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1" id="btn-guardar-dj_E4C">
-                        <i class="bx bx-upload text-lg"></i> Subir DJ
+                <div class="flex items-center justify-between gap-2 px-5 py-3 border-t border-gray-200 bg-slate-50 rounded-b-lg">
+                    <button type="button" class="btn bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1" id="btn-vista-previa-dj_E4C" disabled>
+                        <i class="bx bx-show text-lg"></i> Vista Previa
                     </button>
                     <button type="button" id="btn-cancelar-dj_E4C" class="btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium" data-hs-overlay="#modal-carga-dj_E4C">
                         Cancelar
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    {{-- Vista previa local del PDF: no se envía al servidor hasta una acción posterior. --}}
+    <button type="button" class="hidden" id="btn-modal-vista-previa-dj_E4C" data-hs-overlay="#modal-vista-previa-dj_E4C"></button>
+    <div id="modal-vista-previa-dj_E4C" class="hs-overlay hidden fixed inset-0 z-[90] overflow-y-auto transition-all duration-300 pointer-events-none">
+        <div class="hs-overlay-open:translate-y-0 hs-overlay-open:opacity-100 translate-y-4 opacity-0 ease-out transition-all duration-300 w-[calc(100vw-1rem)] max-w-[1600px] my-2 mx-auto sm:my-4 sm:w-[90vw] flex flex-col bg-white shadow-xl rounded-xl pointer-events-auto border border-gray-200 h-[calc(100vh-1rem)] sm:h-[calc(100vh-2rem)]">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+                <div class="min-w-0">
+                    <h3 class="text-lg font-bold text-gray-900">Vista Previa de Declaración Jurada</h3>
+                    <p id="nombre-archivo-vista-previa-dj_E4C" class="text-sm text-gray-500 truncate"></p>
+                </div>
+                <button type="button" id="btn-cerrar-vista-previa-dj_E4C" class="text-gray-500 hover:text-gray-700 transition-colors" data-hs-overlay="#modal-vista-previa-dj_E4C" aria-label="Cerrar vista previa">
+                    <i class="bx bx-x text-2xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 min-h-0 flex flex-col md:flex-row gap-2 bg-slate-100 p-2">
+                <div class="flex-1 min-w-0 min-h-[45vh] md:min-h-0">
+                    <iframe id="iframe-vista-previa-dj_E4C" title="Vista previa del PDF de la Declaración Jurada" class="w-full h-full rounded-lg bg-white" src="about:blank"></iframe>
+                </div>
+                <aside id="panel-resultados-firmahuella-dj_E4C" class="hidden md:w-[320px] shrink-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 space-y-3">
+                    <div>
+                        <h4 class="font-semibold text-gray-800">Firma y huella extraídas</h4>
+                        <p class="text-xs text-gray-500">Revisa los recortes antes de continuar.</p>
+                    </div>
+                    <section class="rounded-lg border border-gray-200 p-2">
+                        <h5 class="mb-2 text-sm font-semibold text-gray-700">Firma</h5>
+                        <div id="placeholder-firma-extraida-dj_E4C" class="flex h-40 items-center justify-center rounded bg-slate-50 text-xs text-gray-400">Esperando extracción</div>
+                        <img id="imagen-firma-extraida-dj_E4C" class="hidden max-h-48 w-full rounded bg-slate-50 object-contain" alt="Firma extraída del PDF">
+                        <button type="button" id="btn-vista-previa-firma-extraida-dj_E4C" class="mt-2 w-full rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" disabled>
+                            <i class="bx bx-show mr-1"></i> Vista previa
+                        </button>
+                    </section>
+                    <section class="rounded-lg border border-gray-200 p-2">
+                        <h5 class="mb-2 text-sm font-semibold text-gray-700">Huella</h5>
+                        <div id="placeholder-huella-extraida-dj_E4C" class="flex h-40 items-center justify-center rounded bg-slate-50 text-xs text-gray-400">Esperando extracción</div>
+                        <img id="imagen-huella-extraida-dj_E4C" class="hidden max-h-48 w-full rounded bg-slate-50 object-contain" alt="Huella extraída del PDF">
+                        <button type="button" id="btn-vista-previa-huella-extraida-dj_E4C" class="mt-2 w-full rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" disabled>
+                            <i class="bx bx-show mr-1"></i> Vista previa
+                        </button>
+                    </section>
+                </aside>
+            </div>
+            <div class="flex justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-slate-50 rounded-b-xl">
+                <button type="button" id="btn-guardar-dj-biometricos_E4C" class="btn bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1" disabled>
+                    <i class="bx bx-save text-lg"></i> Guardar DJ y biométricos
+                </button>
+                <button type="button" id="btn-extraer-firmahuella-dj_E4C" class="btn bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1" disabled>
+                    <i class="bx bx-fingerprint text-lg"></i> Extraer Firma y Huella
+                </button>
+                <button type="button" class="btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 px-4 py-2 rounded-lg text-sm font-medium" data-hs-overlay="#modal-vista-previa-dj_E4C">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-vista-previa-biometrico_E4C" class="hidden fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="titulo-vista-previa-biometrico_E4C">
+        <div class="my-auto flex w-full max-w-5xl flex-col rounded-xl border border-gray-200 bg-white shadow-2xl">
+            <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+                <h3 id="titulo-vista-previa-biometrico_E4C" class="text-lg font-semibold text-gray-900">Vista previa</h3>
+                <button type="button" id="btn-cerrar-vista-previa-biometrico-x_E4C" class="text-gray-500 hover:text-gray-700" aria-label="Cerrar vista previa de imagen">
+                    <i class="bx bx-x text-2xl"></i>
+                </button>
+            </div>
+            <div class="flex min-h-[50vh] items-center justify-center bg-slate-100 p-4 sm:p-6">
+                <img id="imagen-vista-previa-biometrico_E4C" class="max-h-[75vh] max-w-full rounded bg-white object-contain shadow-sm" alt="Imagen biométrica completa">
+            </div>
+            <div class="flex justify-end border-t border-gray-200 bg-slate-50 px-5 py-3">
+                <button type="button" id="btn-cerrar-vista-previa-biometrico_E4C" class="btn rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">Cerrar</button>
+            </div>
         </div>
     </div>
 
@@ -658,6 +692,5 @@
 
  @vite([
         'resources/js/functions/gestion_dj.js',
-       'resources/js/functions/nueva_dj.js', 
-       'resources/js/functions/modal_reporte.js'
+       'resources/js/functions/nueva_dj.js'
     ])

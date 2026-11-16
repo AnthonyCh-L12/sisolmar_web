@@ -46,7 +46,7 @@ btnSeleccionar.addEventListener('click', () => archivoInput.click());
 // ============================================================
 const tblPersonas = new Tabulator("#tblPersonas", {
     height: "100%",
-    layout: "fitDataFill",
+    layout: "fitColumns",
     responsiveLayout: "collapse",
     ajaxConfig: "GET",
     pagination: true,
@@ -93,64 +93,64 @@ const tblPersonas = new Tabulator("#tblPersonas", {
     },
 
     columns: [
-        { 
-            title: "N°", 
+        {
+            title: "N°",
             field: "nro_fila_estatico", // Asignamos un identificador para llamarlo luego
             formatter: function() { return ""; }, // Lo dejamos vacío porque lo inyectaremos post-render
-            hozAlign: "center", 
-            width: 55, 
-            headerSort: false, 
-            responsive: false 
+            hozAlign: "center",
+            width: 45,
+            headerSort: false,
+            responsive: false
         },
-        { title: "Cód.", field: "CODI_PERS", hozAlign: "center", width: '8%', responsive: false },
-        { 
-            title: "Apellidos", field: "apellidos", hozAlign: "left", width: '15%', responsive: false,
+        { title: "Cód.", field: "CODI_PERS", hozAlign: "center", width: 75, responsive: false },
+        {
+            title: "Apellidos", field: "apellidos", hozAlign: "left", minWidth: 105, widthGrow: 1, responsive: false,
             formatter: function (cell) {
                 let val = cell.getValue() || '';
                 return val.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
             }
         },
         {
-            title: "Nombres", field: "nombres", hozAlign: "left", width: '20%', responsive: false,
+            title: "Nombres", field: "nombres", hozAlign: "left", minWidth: 110, widthGrow: 1, responsive: false,
             formatter: function (cell) {
                 let val = cell.getValue() || '';
                 const nombre = val.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                
+
                 // Botón azulito de DJ ocultado por instrucción
                 return `<span>${nombre}</span>`;
             }
         },
-        { title: "Nro Doc.", field: "nroDoc", hozAlign: "center", width: '12%', responsive: false },
-        { title: "Sucursal", field: "sucursal",   hozAlign: "center", width: '13%', responsive: 0 },
-        { title: "Tipo",     field: "TIPOTRAB2",  hozAlign: "center", width: '14%', responsive: false,
+        { title: "Nro Doc.", field: "nroDoc", hozAlign: "center", width: 95, responsive: false },
+        { title: "Sucursal", field: "sucursal", hozAlign: "center", minWidth: 90, widthGrow: 1, responsive: 0 },
+        { title: "Tipo",     field: "TIPOTRAB2",  hozAlign: "center", minWidth: 145, widthGrow: 1,
             formatter: function(cell) {
                 let val = cell.getValue() || '';
                 // Reemplazamos las abreviaturas por la palabra completa al vuelo (Mantenemos tu lógica original)
                 val = val.replace('OPER', 'OPERATIVO').replace('ADMIN', 'ADMINISTRATIVO');
-                
+
                 let color = 'bg-gray-100 border-gray-300 text-gray-800 shadow-sm'; // Color por defecto
-                
-                if (val.toUpperCase().includes('OPERATIVO')) { 
-                    color = 'bg-blue-100 border-blue-400 text-blue-800 shadow-sm'; 
-                } 
-                else if (val.toUpperCase().includes('ADMINISTRATIVO')) { 
-                    color = 'bg-purple-100 border-purple-500 text-purple-800 shadow-sm'; 
-                } 
-                else if (val.toUpperCase().includes('ESPECIAL')) { 
+
+                if (val.toUpperCase().includes('OPERATIVO')) {
+                    color = 'bg-blue-100 border-blue-400 text-blue-800 shadow-sm';
+                }
+                else if (val.toUpperCase().includes('ADMINISTRATIVO')) {
+                    color = 'bg-purple-100 border-purple-500 text-purple-800 shadow-sm';
+                }
+                else if (val.toUpperCase().includes('ESPECIAL')) {
                     color = 'bg-orange-100 border-orange-500 text-orange-800 shadow-sm';
                 }
 
                 // Inyectamos las clases idénticas al de la Etapa 1 (justify-center, min-width y flex)
-                return val ? `<span class="inline-flex items-center justify-center rounded-full border ${color} px-3 py-1 text-[11px] font-bold tracking-wider whitespace-nowrap" style="min-width: 125px;">${val}</span>` : '—';
+                return val ? `<span class="inline-flex items-center justify-center rounded-full border ${color} px-2 py-1 text-[10px] font-bold tracking-wider whitespace-nowrap">${val}</span>` : '—';
             }
         },
         {
-            title: "Acciones", field: "acciones", width: 220,
+            title: "Acciones", field: "acciones", width: 150, minWidth: 145,
             hozAlign: "center", headerSort: false, responsive: false,
             formatter: function () {
-                let html = `<button type="button" class="btn rounded-full docs-btn bg-success/25 text-success hover:bg-success hover:text-white">Folios</button>`;
+                let html = `<button type="button" class="btn rounded-full docs-btn bg-success/25 text-success hover:bg-success hover:text-white px-2 py-1 text-xs">Folios</button>`;
                 if (usuarioActual?.tipo_rol != 8) {
-                    html += ` <button type="button" class="btn rounded-full legajo-btn bg-warning/25 text-warning hover:bg-warning hover:text-white">Legajos</button>`;
+                    html += ` <button type="button" class="btn rounded-full legajo-btn bg-warning/25 text-warning hover:bg-warning hover:text-white px-2 py-1 text-xs">Legajos</button>`;
                     // Se agregó la clase "hidden" para ocultar el botón de la huellita
                     html += ` <button type="button" class="hidden btn rounded-full bio-btn bg-info/25 text-info hover:bg-info hover:text-white"><i class="fa fa-fingerprint bio-btn"></i></button>`;
                 }
@@ -168,6 +168,8 @@ const tblPersonas = new Tabulator("#tblPersonas", {
                     // Reseteamos el filtro de prioridad y la búsqueda para que siempre inicie limpio
                     document.getElementById('selectTipoFolio').value = 'TODOS';
                     document.getElementById('buscarFolio').value = '';
+                    document.getElementById('filtroCategoriaFolio').value = '';
+                    actualizarOpcionesFoliosPorCategoria();
 
                     getDocsObligatorios(codigo);
                     document.getElementById('btn-modal-folios').click();
@@ -201,7 +203,7 @@ tblPersonas.on("renderComplete", function () {
     const page = this.getPage() || 1;
     const size = this.getPageSize() || 10;
     const offset = (page - 1) * size;
-    
+
     // getRows("active") trae las filas en el orden visual ACTUAL de la pantalla
     this.getRows("active").forEach((row, index) => {
         const cell = row.getCell("nro_fila_estatico");
@@ -229,20 +231,21 @@ const tblDocs = new Tabulator("#tblDocs", {
     },
     columns: [
         { title: "Folio", field: "documento", hozAlign: "left", width: '30%' },
-        { 
+        {
             title: "Prioridad", field: "tipo_folio", hozAlign: "center", width: '10%',
             formatter: function (cell) {
                 const val = cell.getValue();
                 if (!val) return '—';
-                
+
                 // Colores más vivos, diseño tipo píldora y sombra suave
                 const isPrincipal = val.toUpperCase() === 'PRINCIPAL';
-                const color = isPrincipal 
-                    ? 'bg-blue-100 border-blue-400 text-blue-800 shadow-sm' 
+                const color = isPrincipal
+                    ? 'bg-blue-100 border-blue-400 text-blue-800 shadow-sm'
                     // Aquí le subimos la intensidad al borde morado a 500 para que resalte
                     : 'bg-purple-100 border-purple-500 text-purple-800 shadow-sm';
-                    
-                return `<span class="inline-flex items-center rounded-full border px-3 py-0.5 text-[10px] font-bold tracking-wider uppercase ${color}">${val}</span>`;
+
+                const label = val.toUpperCase() === 'PRINCIPAL' ? 'OBLIGATORIO' : val;
+                return `<span class="inline-flex items-center rounded-full border px-3 py-0.5 text-[10px] font-bold tracking-wider uppercase ${color}">${label}</span>`;
             }
         },
         {
@@ -718,6 +721,11 @@ document.getElementById("filtroDJ")?.addEventListener("change", () => reloadTabl
 // Filtros combinados para el Modal de Folios (Select + Búsqueda)
 document.getElementById('selectTipoFolio')?.addEventListener('change', filterTableByTipoFolio);
 document.getElementById('buscarFolio')?.addEventListener('keyup', filterTableByTipoFolio);
+document.getElementById('filtroCategoriaFolio')?.addEventListener('change', () => {
+    actualizarOpcionesFoliosPorCategoria();
+    filterTableByTipoFolio();
+});
+document.getElementById('filtroFolioCategoria')?.addEventListener('change', filterTableByTipoFolio);
 
 // ============================================================
 // LISTENERS — Legajos
@@ -762,15 +770,18 @@ function cargarIndicadores() {
     axios.get(`${VITE_URL_APP}/get-personal-total`, { params })
         .then(response => {
             const data = response.data.data || [];
-            
+
             const total = data.length;
             // 🔥 Ahora contamos en base a si están Vigentes en la empresa
-            const vigentes = data.filter(d => d.PERS_VIGENCIA === 'SI').length; 
+            const vigentes = data.filter(d => d.PERS_VIGENCIA === 'SI').length;
             const cesados = total - vigentes;
 
             document.getElementById('countTotal').textContent = total;
             document.getElementById('countVigentes').textContent = vigentes;
             document.getElementById('countCesados').textContent = cesados;
+            document.getElementById('barTotal').style.width = total ? '100%' : '0%';
+            document.getElementById('barVigentes').style.width = total ? `${(vigentes / total) * 100}%` : '0%';
+            document.getElementById('barCesados').style.width = total ? `${(cesados / total) * 100}%` : '0%';
         })
         .catch(error => console.error("Error al cargar indicadores:", error));
 }
@@ -799,6 +810,7 @@ function resaltarTexto(valor) {
 function filterTableByTipoFolio() {
     const tipo = document.getElementById('selectTipoFolio').value;
     const busqueda = document.getElementById("buscarFolio").value.toLowerCase().trim();
+    const codFolio = document.getElementById('filtroFolioCategoria').value;
 
     // 1. Limpiamos filtros anteriores para evitar conflictos
     tblDocs.clearFilter();
@@ -812,6 +824,50 @@ function filterTableByTipoFolio() {
     if (busqueda !== "") {
         tblDocs.addFilter("documento", "like", busqueda);
     }
+
+    if (codFolio !== "") {
+        tblDocs.addFilter(data => String(data.codFolio) === String(codFolio));
+    }
+}
+
+function actualizarOpcionesFoliosPorCategoria() {
+    const selectCategoria = document.getElementById('filtroCategoriaFolio');
+    const selectFolio = document.getElementById('filtroFolioCategoria');
+    if (!selectCategoria || !selectFolio) return;
+
+    const codCategoria = selectCategoria.value;
+    selectFolio.innerHTML = '';
+
+    if (!codCategoria) {
+        selectFolio.add(new Option('Selecciona una categoría primero', ''));
+        selectFolio.disabled = true;
+        return;
+    }
+
+    selectFolio.add(new Option('Cargando folios...', ''));
+    selectFolio.disabled = true;
+
+    axios.get(`${VITE_URL_APP}/api/get-folios-categoria/${encodeURIComponent(codCategoria)}`)
+        .then(response => {
+            if (selectCategoria.value !== codCategoria) return;
+
+            const folios = Array.isArray(response.data) ? response.data : [];
+            selectFolio.innerHTML = '';
+            if (!folios.length) {
+                selectFolio.add(new Option('No hay folios en esta categoría', ''));
+                return;
+            }
+
+            selectFolio.add(new Option('Todos los folios de la categoría', ''));
+            folios.forEach(folio => selectFolio.add(new Option(folio.nombre, folio.codigo)));
+            selectFolio.disabled = false;
+        })
+        .catch(error => {
+            if (selectCategoria.value !== codCategoria) return;
+            selectFolio.innerHTML = '';
+            selectFolio.add(new Option('Error al cargar los folios', ''));
+            console.error('Error al cargar folios por categoría:', error);
+        });
 }
 
 function seleccionarPrimeraSucursalValida() {

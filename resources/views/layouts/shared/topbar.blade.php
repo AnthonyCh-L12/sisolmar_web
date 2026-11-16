@@ -34,10 +34,16 @@
                         Centro de Notificaciones
                     </div>
                     <div class="max-h-[350px] overflow-y-auto">
-                        <div class="flex flex-col" id="notif-list">
-                            <div class="px-4 py-6 text-center text-sm text-gray-500">
-                                Cargando notificaciones...
-                            </div>
+                        <div class="flex flex-col" id="notif-list" data-etapa2-url="{{ url('/api/notificaciones/pendientes-etapa2') }}" data-mayoria-url="{{ url('/api/notificaciones/hijos-por-cumplir-mayoria-edad') }}">
+                            @if($ocultarNotificacionesDj ?? false)
+                                <div class="px-4 py-6 text-center text-sm text-gray-500">
+                                    No hay notificaciones pendientes.
+                                </div>
+                            @else
+                                <div class="px-4 py-6 text-center text-sm text-gray-500">
+                                    Cargando notificaciones...
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -214,6 +220,33 @@
     </div>
 </div>
 
+<button id="btn-open-modal-mayoria-edad" data-hs-overlay="#modal-mayoria-edad" class="hidden"></button>
+<div id="modal-mayoria-edad" class="hs-overlay w-full h-full fixed top-0 left-0 z-[80] transition-all duration-300 overflow-x-hidden overflow-y-auto hidden pointer-events-none">
+    <div class="hs-overlay-open:opacity-100 hs-overlay-open:duration-500 opacity-0 transition-all sm:max-w-3xl sm:w-full m-3 sm:mx-auto mt-10">
+        <div class="flex flex-col bg-white border border-gray-200 shadow-xl rounded-xl pointer-events-auto">
+            <div class="flex justify-between items-center py-3 px-4 border-b border-gray-200 bg-slate-50 rounded-t-xl">
+                <div>
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2"><i class="bx bx-child text-xl text-orange-500"></i> Asignación familiar próxima a vencer</h3>
+                    <p class="text-xs text-gray-500 mt-1">Hijos registrados en la DJ que están próximos a cumplir 18 años.</p>
+                </div>
+                <button type="button" aria-label="Cerrar detalle" class="flex justify-center items-center w-7 h-7 rounded-full text-gray-600 hover:bg-gray-200" data-hs-overlay="#modal-mayoria-edad"><i class="bx bx-x text-xl"></i></button>
+            </div>
+            <div class="p-4">
+                <div class="flex flex-wrap gap-3 mb-3 text-xs font-semibold">
+                    <span class="rounded-full bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1">Aviso inicial (hasta 30 días): <b id="mayoria-edad-total-30">0</b></span>
+                    <span class="rounded-full bg-orange-50 text-orange-700 border border-orange-100 px-3 py-1">Recordatorio (15 días o menos): <b id="mayoria-edad-total-15">0</b></span>
+                </div>
+                <div id="modal-mayoria-edad-list" class="max-h-[55vh] overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100"></div>
+            </div>
+            <div class="flex justify-end items-center px-4 py-3 border-t border-gray-200 bg-slate-50 rounded-b-xl">
+                <button type="button" class="btn border border-gray-300 bg-white text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-100 font-medium" data-hs-overlay="#modal-mayoria-edad">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts Topbar -->
-@vite(['resources/js/functions/notifications.js'])
+@unless($ocultarNotificacionesDj ?? false)
+    @vite(['resources/js/functions/notifications.js'])
+@endunless
 <!-- Topbar End -->

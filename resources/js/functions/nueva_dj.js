@@ -546,7 +546,21 @@ import Swal from 'sweetalert2';
 
             if (data.FOTO_PATH) {
                 const prv = $('ndj_previewFoto'), ph = $('ndj_placeholderFoto');
-                if (prv) { prv.src = data.FOTO_PATH + '?v=' + (Math.floor(Math.random() * 900) + 100); prv.classList.remove('hidden'); }
+                if (prv) {
+                    // FOTO_PATH es una URL que se arma SIEMPRE, exista o no la imagen.
+                    // Si el servidor de archivos no la tiene (404) volvemos al
+                    // placeholder: así el usuario ve que DEBE subirla y no se
+                    // encuentra con un 422 "falta_foto" habiendo visto una foto.
+                    prv.onerror = () => {
+                        prv.removeAttribute('src');
+                        prv.classList.add('hidden');
+                        ph?.querySelector('i')?.classList.remove('hidden');
+                        ph?.querySelector('span')?.classList.remove('hidden');
+                        $('ndj_btnEliminarFoto')?.classList.add('hidden');
+                    };
+                    prv.src = data.FOTO_PATH + '?v=' + (Math.floor(Math.random() * 900) + 100);
+                    prv.classList.remove('hidden');
+                }
                 if (ph)  ph.classList.add('hidden');
                 $('ndj_btnEliminarFoto')?.classList.remove('hidden');
             }
@@ -589,6 +603,7 @@ import Swal from 'sweetalert2';
         const selPar = div.querySelector('select[name="ndj_parentesco[]"]');
         const inpNom = div.querySelector('input[name="ndj_apellidosNombres[]"]');
         const inpFec = div.querySelector('input[name="ndj_fechaNacimiento[]"]');
+        const inpId  = div.querySelector('input[name="ndj_familiar_id[]"]');
         if (selPar) {
             const vPar = (f.TIPO_RELA || '').trim();
             if (vPar && ![...selPar.options].some(o => o.value === vPar)) selPar.add(new Option(vPar, vPar));
@@ -596,6 +611,7 @@ import Swal from 'sweetalert2';
         }
         if (inpNom) inpNom.value = f.Nombres   || '';
         if (inpFec) inpFec.value = fechaFormateada;
+        if (inpId) inpId.value = f.CODI_DERE_HABI || '';
         ndj_actualizarFechaFamiliar(div);
         return div;
     }
@@ -1021,7 +1037,7 @@ import Swal from 'sweetalert2';
     }
     function ndj_poblarInstituciones() {
         const sel = $('ndj_institucion'); if (!sel) return;
-        sel.innerHTML = '<option value="" disabled selected>—</option>';
+        sel.innerHTML = '<option value="" selected>—</option>';
         ndj_allInstituciones.forEach(i => { const o = document.createElement('option'); o.value = i.id; o.textContent = i.text; sel.appendChild(o); });
     }
     function ndj_poblarCarreras(ieduCodigo) {
@@ -1125,7 +1141,10 @@ import Swal from 'sweetalert2';
     function ndj_limpiarFoto() {
         const inp = $('ndj_inputFoto'), prv = $('ndj_previewFoto'), btn = $('ndj_btnEliminarFoto');
         if (inp) inp.value = '';
-        if (prv) { prv.src = ''; prv.classList.add('hidden'); }
+        if (prv) { prv.onerror = null; prv.src = ''; prv.classList.add('hidden'); }
+        // Restaurar el ícono/etiqueta del placeholder (se ocultan al elegir archivo)
+        $('ndj_placeholderFoto')?.querySelector('i')?.classList.remove('hidden');
+        $('ndj_placeholderFoto')?.querySelector('span')?.classList.remove('hidden');
         if (btn) btn.classList.add('hidden');
     }
 
@@ -1170,6 +1189,7 @@ import Swal from 'sweetalert2';
         div.className  = 'ndj-family-row';
         div.style.cssText = 'display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;';
         div.innerHTML = `
+            <input type="hidden" name="ndj_familiar_id[]" value="">
             <div><label class="dj-label">Parentesco</label>
                 <select name="ndj_parentesco[]" class="dj-select">
                     ${ndj_opcionesVinculo('')}
@@ -1199,7 +1219,10 @@ import Swal from 'sweetalert2';
         const numero = docInput.value.trim();
 
         docErrorMsg.innerHTML = '';
-        if (modoRecontratacion) {
+        // En modo recontratación el documento es de SOLO LECTURA (NDJ_READONLY_IDS)
+        // y jamás debe desactivarse el modo aquí: si ocurriera, el guardado se
+        // enviaría a save-nueva-dj en vez de a save-recontratacion.
+        if (modoRecontratacion && !tipoDocInput?.disabled) {
             modoRecontratacion = false;
             desactivarModoRecontratacion();
         }
@@ -1262,8 +1285,9 @@ import Swal from 'sweetalert2';
     }
 
     // ============================================================
-    // SUBIR FOTO AL PROXY (después de guardar)
-    // ── DNI Anverso / Reverso: vista previa + subida al GUARDAR ─────────
+    // ── DNI Anverso / Reverso: vista previa + adjunto al GUARDAR ───────────
+    // Los archivos NO se suben aparte: viajan en la misma petición de guardado
+    // (igual que la foto) para que el servidor pueda exigirlos antes de guardar.
     const ndjDniFiles = { anverso: null, reverso: null };
 
     function ndj_configDniInputs() {
@@ -1304,61 +1328,6 @@ import Swal from 'sweetalert2';
         if (m) m.style.display = 'none';
     }
 
-    async function ndj_subirDni(codiPers) {
-        if (!codiPers) return { ok: true, sinDni: true };
-        if (!ndjDniFiles.anverso && !ndjDniFiles.reverso) return { ok: true, sinDni: true };
-        try {
-            const fd = new FormData();
-            fd.append('codi_pers', codiPers);
-            if (ndjDniFiles.anverso) fd.append('dni_anverso', ndjDniFiles.anverso);
-            if (ndjDniFiles.reverso) fd.append('dni_reverso', ndjDniFiles.reverso);
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-            const res  = await fetch(`${VITE_URL_APP}/api/dj/upload-dni-personal`, {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                credentials: 'same-origin',
-                body:   fd,
-            });
-            const json = await res.json();
-            // Limpiar selección tras subir: nunca arrastrar el DNI de una persona a otra
-            if (json.success) ndj_limpiarDni();
-            return { ok: !!json.success, message: json.message };
-        } catch (err) {
-            console.warn('[NuevaDJ] Error subiendo DNI:', err);
-            return { ok: false, message: 'Error de conexión al subir el DNI.' };
-        }
-    }
-
-    // ============================================================
-    async function ndj_subirFoto(codiPers) {
-        const fotoFile    = $('ndj_inputFoto')?.files?.[0];
-        const fotoPreview = $('ndj_previewFoto');
-
-        // Solo subir si es un archivo nuevo seleccionado por el usuario
-        // (si es URL existente cargada en autocompletar, fotoFile estará vacío)
-        if (!fotoFile || !codiPers) return { ok: true, sinFoto: true };
-
-        try {
-            const fdFoto = new FormData();
-            fdFoto.append('foto',      fotoFile);
-            fdFoto.append('codi_pers', codiPers);
-
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
-            const res  = await fetch(`${VITE_URL_APP}/api/dj/upload-foto-personal`, {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                credentials: 'same-origin',
-                body:   fdFoto,
-            });
-            const json = await res.json();
-
-            return { ok: json.success, message: json.message };
-        } catch (err) {
-            console.warn('[NuevaDJ] Error subiendo foto:', err);
-            return { ok: false, message: 'Error de conexión al subir foto.' };
-        }
-    }
-
     // ============================================================
     // DNI DE HIJOS: {CODI}_H{N}.jpg → DNI1_HIJOS (anverso) / DNI2_HIJOS (reverso)
     // N = par por hijo en orden de fila: hijo 1 → H1/H2, hijo 2 → H3/H4, ...
@@ -1384,27 +1353,29 @@ import Swal from 'sweetalert2';
             .filter(f => (f.querySelector('select[name="ndj_parentesco[]"]')?.value || '').startsWith('HIJO'));
     }
 
+    function ndj_edadDesdeFecha(fecha) {
+        if (!fecha) return null;
+        const nac = new Date(String(fecha).slice(0, 10) + 'T00:00:00');
+        if (Number.isNaN(nac.getTime())) return null;
+        const hoy = new Date();
+        let edad = hoy.getFullYear() - nac.getFullYear();
+        if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) edad--;
+        return edad;
+    }
+
     function ndj_estadoDniHijo(fila) {
         let st = ndjDniHijosRows.get(fila);
         if (!st) { st = { anverso: null, reverso: null, tieneAnverso: false, tieneReverso: false }; ndjDniHijosRows.set(fila, st); }
         return st;
     }
 
-    // Regla DNI del hijo: OBLIGATORIO solo para menores de edad.
-    // El rol ADMINS RRHH (tipo 17) está exento de la regla.
-    function ndj_esMenorDeEdad(fecha) {
-        if (!fecha) return false;
-        const nac = new Date(String(fecha).slice(0, 10) + 'T00:00:00');
-        if (isNaN(nac)) return false;
-        const hoy = new Date();
-        let anios = hoy.getFullYear() - nac.getFullYear();
-        const m = hoy.getMonth() - nac.getMonth();
-        if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) anios--;
-        return anios < 18;
-    }
-
-    function ndj_esAdminRrhh() {
-        return String(window.tipoUsuario ?? '').trim() === '17';
+    // En nueva DJ: DNI obligatorio para hijo menor y mayor con discapacidad permanente.
+    function ndj_requiereDniHijo(fila) {
+        const parentesco = (fila?.querySelector('select[name="ndj_parentesco[]"]')?.value || '').trim().toUpperCase();
+        return parentesco === 'HIJO MENOR DE EDAD'
+            || (parentesco.startsWith('HIJO MAYOR DE EDAD')
+                && /INCAPACITADO|DISCAPACIDAD/.test(parentesco)
+                && parentesco.includes('PERMANENT'));
     }
 
     function ndj_actualizarEstadoDniHijo(fila) {
@@ -1421,8 +1392,7 @@ import Swal from 'sweetalert2';
             span.style.color = '#16a34a';
             return;
         }
-        const fecha = fila.querySelector('input[name="ndj_fechaNacimiento[]"]')?.value;
-        const obligatorio = ndj_esMenorDeEdad(fecha) && !ndj_esAdminRrhh();
+        const obligatorio = ndj_requiereDniHijo(fila);
         const detalle = (okA || okR) ? 'falta ' + (okA ? 'reverso' : 'anverso') : 'sin DNI';
         if (obligatorio) {
             span.textContent = '⚠ ' + detalle + ' (obligatorio)';
@@ -1490,8 +1460,9 @@ import Swal from 'sweetalert2';
                 if (btn) ndj_abrirModalDniHijos(btn.closest('.ndj-family-row'));
             });
             cont.addEventListener('change', (e) => {
-                if (e.target.matches('input[name="ndj_fechaNacimiento[]"]')) {
+                if (e.target.matches('input[name="ndj_fechaNacimiento[]"], select[name="ndj_parentesco[]"]')) {
                     ndj_actualizarFechaFamiliar(e.target.closest('.ndj-family-row'));
+                    ndj_actualizarExtrasFilaHijo(e.target.closest('.ndj-family-row'));
                 }
             });
         }
@@ -1786,26 +1757,21 @@ import Swal from 'sweetalert2';
             return;
         }
 
-        // DNI obligatorio: solo para hijos MENORES de edad
-        // (la regla NO aplica para el rol ADMINS RRHH)
-        if (!ndj_esAdminRrhh()) {
-            const filasHijosDni = ndj_filasHijos();
-            for (let i = 0; i < filasHijosDni.length; i++) {
-                const fechaH = filasHijosDni[i].querySelector('input[name="ndj_fechaNacimiento[]"]')?.value;
-                if (!ndj_esMenorDeEdad(fechaH)) continue;   // solo menores de edad
-                const stH = ndj_estadoDniHijo(filasHijosDni[i]);
-                const okA = !!(stH.anverso || stH.tieneAnverso);
-                const okR = !!(stH.reverso || stH.tieneReverso);
-                if (!okA || !okR) {
-                    const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Falta el DNI del hijo ' + (i + 1),
-                        text: 'Debe subir el ' + falta + ' del DNI para continuar.',
-                        confirmButtonText: 'Entendido',
-                    });
-                    return;
-                }
+        const filasHijosDni = ndj_filasHijos();
+        for (let i = 0; i < filasHijosDni.length; i++) {
+            if (!ndj_requiereDniHijo(filasHijosDni[i])) continue;
+            const stH = ndj_estadoDniHijo(filasHijosDni[i]);
+            const okA = !!(stH.anverso || stH.tieneAnverso);
+            const okR = !!(stH.reverso || stH.tieneReverso);
+            if (!okA || !okR) {
+                const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Falta el DNI del hijo ' + (i + 1),
+                    text: 'Debe subir el ' + falta + ' del DNI para continuar.',
+                    confirmButtonText: 'Entendido',
+                });
+                return;
             }
         }
 
@@ -1830,11 +1796,50 @@ import Swal from 'sweetalert2';
         } // fin exentoValidaciones
         // ── Fin validaciones ─────────────────────────────────
 
+        let desactivarAsignacionFamiliar = false;
+        let mantenerAsignacionFamiliar = false;
+        const hijosQueCumplieronMayorEdad = modoRecontratacion
+            ? ndj_filasHijos().filter(fila =>
+                fila.querySelector('select[name="ndj_parentesco[]"]')?.value?.trim().toUpperCase() === 'HIJO MENOR DE EDAD'
+                && ndj_edadDesdeFecha(fila.querySelector('input[name="ndj_fechaNacimiento[]"]')?.value) >= 18
+            )
+            : [];
+        if (hijosQueCumplieronMayorEdad.length) {
+            const decision = await Swal.fire({
+                icon: 'warning',
+                title: 'El hijo ya cumplió la mayoría de edad',
+                text: '¿Desactivar asignación familiar?',
+                showDenyButton: true,
+                confirmButtonText: 'Sí',
+                denyButtonText: 'No',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+            });
+            desactivarAsignacionFamiliar = decision.isConfirmed;
+            mantenerAsignacionFamiliar = decision.isDenied;
+            if (mantenerAsignacionFamiliar) {
+                for (const fila of hijosQueCumplieronMayorEdad) {
+                    const st = ndj_estadoDniHijo(fila);
+                    if (!st.anverso || !st.reverso) {
+                        await Swal.fire({
+                            icon: 'warning',
+                            title: 'DNI del hijo obligatorio',
+                            text: 'Para conservar la asignación familiar, vuelva a subir el anverso y el reverso del DNI de cada hijo mayor de edad.',
+                            confirmButtonText: 'Entendido',
+                        });
+                        ndj_abrirModalDniHijos(fila);
+                        return;
+                    }
+                }
+            }
+        }
+
         const fd      = new FormData($('formNuevaDJ'));
         const payload = Object.fromEntries(fd.entries());
         payload.ndj_parentesco       = fd.getAll('ndj_parentesco[]');
         payload.ndj_apellidosNombres = fd.getAll('ndj_apellidosNombres[]');
         payload.ndj_fechaNacimiento  = fd.getAll('ndj_fechaNacimiento[]');
+        payload.ndj_familiar_id     = fd.getAll('ndj_familiar_id[]');
 
         const body = {
             ...payload,
@@ -1908,10 +1913,15 @@ import Swal from 'sweetalert2';
             FAM_PARENTESCO:        payload.ndj_parentesco,
             FAM_NOMBRES:           payload.ndj_apellidosNombres,
             FAM_FECHA_NACI:        payload.ndj_fechaNacimiento,
+            FAM_ID:                payload.ndj_familiar_id,
+            // El envío explícito permite guardar también una lista totalmente vacía.
+            FAM_PRESENTE:          '1',
             sucursal:              payload.ndj_filtroSucursal,
             fecha_ingreso_solmar:  payload.ndj_fecha_ingreso_solmar,
             usuario:               payload.ndj_usuario,
             PERS_CONTRATADO:       0,
+            desactivar_asignacion_familiar: desactivarAsignacionFamiliar ? '1' : '0',
+            mantener_asignacion_familiar: mantenerAsignacionFamiliar ? '1' : '0',
         };
 
         const esRecontratacion = modoRecontratacion && codiPersRecontratacion;
@@ -1920,34 +1930,31 @@ import Swal from 'sweetalert2';
             : `${VITE_URL_APP}/api/dj/save-nueva-dj`;
         if (esRecontratacion) body.cod_postulante = codiPersRecontratacion;
 
-        // Nueva DJ: el DNI (anverso + reverso) viaja ADJUNTO en esta misma petición,
-        // para que el servidor lo exija antes de crear el personal.
+        // Foto + DNI (anverso y reverso) viajan ADJUNTOS en esta misma petición,
+        // tanto al crear una DJ nueva como en recontratación: así el servidor los
+        // exige antes de guardar (422 "falta_foto" / "falta_dni").
         const csrfTokenSave = document.querySelector('[name=_token]')?.value || '';
-        let opciones;
-        if (esRecontratacion) {
-            opciones = {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfTokenSave },
-                body:    JSON.stringify(body),
-            };
-        } else {
-            const fd = new FormData();
-            Object.keys(body).forEach(k => {
-                const v = body[k];
-                if (v === undefined || v === null) return;
-                if (Array.isArray(v)) v.forEach(item => fd.append(`${k}[]`, item ?? ''));
-                else fd.append(k, v);
-            });
-            const fotoAdjuntaNueva = $('ndj_inputFoto')?.files?.[0] || null;
-            if (fotoAdjuntaNueva)    fd.append('foto', fotoAdjuntaNueva);
-            if (ndjDniFiles.anverso) fd.append('dni_anverso', ndjDniFiles.anverso);
-            if (ndjDniFiles.reverso) fd.append('dni_reverso', ndjDniFiles.reverso);
-            opciones = {
-                method:  'POST',
-                headers: { 'X-CSRF-TOKEN': csrfTokenSave, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                body:    fd,
-            };
-        }
+        const fdGuardado = new FormData();
+        Object.keys(body).forEach(k => {
+            const v = body[k];
+            if (v === undefined || v === null) return;
+            if (Array.isArray(v)) v.forEach(item => fdGuardado.append(`${k}[]`, item ?? ''));
+            else fdGuardado.append(k, v);
+        });
+        const fotoAdjuntaNueva = $('ndj_inputFoto')?.files?.[0] || null;
+        if (fotoAdjuntaNueva)    fdGuardado.append('foto', fotoAdjuntaNueva);
+        if (ndjDniFiles.anverso) fdGuardado.append('dni_anverso', ndjDniFiles.anverso);
+        if (ndjDniFiles.reverso) fdGuardado.append('dni_reverso', ndjDniFiles.reverso);
+        ndj_filasHijos().forEach((fila, i) => {
+            const st = ndj_estadoDniHijo(fila);
+            if (st.anverso) fdGuardado.append(`dni_hijos_anverso[${i + 1}]`, st.anverso);
+            if (st.reverso) fdGuardado.append(`dni_hijos_reverso[${i + 1}]`, st.reverso);
+        });
+        const opciones = {
+            method:  'POST',
+            headers: { 'X-CSRF-TOKEN': csrfTokenSave, 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            body:    fdGuardado,
+        };
 
         try {
             btnGuardar.disabled = true;
@@ -1955,29 +1962,20 @@ import Swal from 'sweetalert2';
             const json = await res.json();
 
             if (json.success) {
-                // ── Subir foto y DNI de los hijos si hay archivos nuevos ──
-                // (el DNI del personal ya viajó dentro de esta misma petición,
-                //  salvo en recontratación que conserva la subida aparte)
-                const codiPers = json.codi_pers || body.cod_postulante || '';
-                const resFoto  = esRecontratacion ? await ndj_subirFoto(codiPers) : { ok: true, sinFoto: true };
-                const resDni   = esRecontratacion ? await ndj_subirDni(codiPers) : { ok: true, sinDni: true };
-                const resDniH  = await ndj_subirDniHijos(codiPers);
-
-                const falloFoto = !resFoto.sinFoto && !resFoto.ok;
-                const falloDni  = !resDni.sinDni  && !resDni.ok;
+                // ── Subir el DNI de los hijos si hay archivos nuevos ──
+                // (la foto y el DNI del personal ya viajaron adjuntos dentro de
+                //  esta misma petición, igual en DJ nueva y en recontratación)
+                const codiPers  = json.codi_pers || body.cod_postulante || '';
+                const resDniH   = await ndj_subirDniHijos(codiPers);
                 const falloDniH = !resDniH.sinDni && !resDniH.ok;
 
-                if (falloFoto || falloDni || falloDniH) {
-                    // DJ guardado OK pero foto/DNI falló, mostrar alerta clara
-                    const partes = [];
-                    if (falloFoto) partes.push('la foto');
-                    if (falloDni)  partes.push('el DNI');
-                    if (falloDniH) partes.push('el DNI de los hijos');
-                    const msjFallo = (falloFoto ? resFoto.message : (falloDni ? resDni.message : resDniH.message)) || 'Error al conectar con el servidor de imágenes';
+                if (falloDniH) {
+                    // Recontratación/DJ guardada OK pero el DNI de los hijos falló
+                    const msjFallo = resDniH.message || 'Error al conectar con el servidor de imágenes';
                     Swal.fire({
                         icon:  'warning',
-                        title: 'Datos guardados, pero falló ' + partes.join(' y '),
-                        html:  `<p style="color:#4b5563; font-size: 14px;">La Declaración Jurada se guardó correctamente, pero ocurrió un problema con ${partes.join(' o ')}.</p>
+                        title: 'Datos guardados, pero falló el DNI de los hijos',
+                        html:  `<p style="color:#4b5563; font-size: 14px;">La Declaración Jurada se guardó correctamente, pero ocurrió un problema con el DNI de los hijos.</p>
                                <div style="background: #fff7ed; border: 1px solid #fdba74; padding: 10px; border-radius: 6px; margin-top: 10px;">
                                    <span style="color:#b45309; font-weight: 600;">⚠️ ${msjFallo}</span>
                                </div>`,

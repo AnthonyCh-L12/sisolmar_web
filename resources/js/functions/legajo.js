@@ -120,7 +120,7 @@ const tblFolio = new Tabulator("#tblFolio", {
                 const obl = cell.getData().obligatorio;
                 return obl == '0'
                     ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 text-default-800">ADICIONAL</span>`
-                    : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/25 text-primary-800">PRINCIPAL</span>`;
+                    : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/25 text-primary-800">OBLIGATORIO</span>`;
             }
         },
         {
@@ -172,7 +172,7 @@ const tblFolioModal = new Tabulator("#tblFolioModal", {
                 const obl = cell.getData().obligatorio;
                 return obl == '0'
                     ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 text-default-800">ADICIONAL</span>`
-                    : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/25 text-primary-800">PRINCIPAL</span>`;
+                    : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/25 text-primary-800">OBLIGATORIO</span>`;
             }
         }
     ]

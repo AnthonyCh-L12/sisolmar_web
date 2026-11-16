@@ -1,6 +1,6 @@
 
   @push('page-heading')
-  <div class="hidden md:flex flex-col justify-center leading-tight">
+  <div class="hidden md:flex flex-col justify-center leading-tight {{ $headingClass ?? '' }}">
       <h5 class="text-lg font-bold text-gray-900 dark:text-slate-100 tracking-tight">
           {{ $title }}
       </h5>

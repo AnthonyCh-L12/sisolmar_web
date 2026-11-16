@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bienvenido al SIP - Grupo Solmar</title>
+    <title>Bienvenido al SIP - Grupo Solar</title>
 </head>
 <body style="margin:0; padding:0; background-color:#ffffff; font-family:Arial, Helvetica, sans-serif;">
 
-    {{-- Banner SIP --}}
+    {{-- Logo Grupo Solar --}}
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
         <tr>
-            <td align="center">
-                <img src="{{ $message->embed(public_path('images/email/banner-sip.jpg')) }}"
-                     alt="SIP - Sistema de Información Personal"
-                     width="600" style="display:block; max-width:600px; width:100%;">
+            <td align="center" style="padding:28px 24px 18px;">
+                <img src="{{ $message->embed(public_path('images/grupo_solar_email.png')) }}"
+                     alt="GRUPO SOLAR"
+                     width="300" style="display:block; max-width:300px; width:100%; height:auto;">
             </td>
         </tr>
     </table>
@@ -50,7 +50,7 @@
                     <tr>
                         <td style="padding:12px 35px 0 35px; color:#1a3c6e; font-size:12.5px; line-height:1.65; text-align:justify;">
                             <p style="margin:0 0 10px 0;">
-                                SOL SECURITY S.A.C., te da la bienvenida como usuario preferente de su
+                                GRUPO SOLAR te da la bienvenida como usuario preferente de su
                                 <strong>EXTRANET</strong>, esperamos que lo disfrutes y sea de mucha utilidad para ti.
                             </p>
                             <p style="margin:0 0 10px 0;">
@@ -124,7 +124,7 @@
                     <tr>
                         <td style="padding:0 35px; color:#1a3c6e; font-size:12.5px; line-height:1.65;">
                             <p style="margin:0 0 15px 0;">
-                                A nombre del <strong>Grupo SOLMAR</strong> te deseamos éxitos.
+                                A nombre de <strong>GRUPO SOLAR</strong> te deseamos éxitos.
                             </p>
                         </td>
                     </tr>

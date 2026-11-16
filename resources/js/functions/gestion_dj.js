@@ -159,6 +159,25 @@ document.addEventListener('DOMContentLoaded', function () {
     const archivoDJ_E4C = document.getElementById('archivoDJ_E4C');
     const zonaDropDJ_E4C = document.getElementById('zonaDropDJ_E4C');
     const listaArchivosDJ_E4C = document.getElementById('listaArchivosDJ_E4C');
+    const btnVistaPreviaDJ_E4C = document.getElementById('btn-vista-previa-dj_E4C');
+    const iframeVistaPreviaDJ_E4C = document.getElementById('iframe-vista-previa-dj_E4C');
+    const nombreVistaPreviaDJ_E4C = document.getElementById('nombre-archivo-vista-previa-dj_E4C');
+    const btnExtraerFirmaHuellaDJ_E4C = document.getElementById('btn-extraer-firmahuella-dj_E4C');
+    const panelFirmaHuellaDJ_E4C = document.getElementById('panel-resultados-firmahuella-dj_E4C');
+    const imagenFirmaExtraidaDJ_E4C = document.getElementById('imagen-firma-extraida-dj_E4C');
+    const imagenHuellaExtraidaDJ_E4C = document.getElementById('imagen-huella-extraida-dj_E4C');
+    const placeholderFirmaDJ_E4C = document.getElementById('placeholder-firma-extraida-dj_E4C');
+    const placeholderHuellaDJ_E4C = document.getElementById('placeholder-huella-extraida-dj_E4C');
+    const btnVistaPreviaFirmaExtraidaDJ_E4C = document.getElementById('btn-vista-previa-firma-extraida-dj_E4C');
+    const btnVistaPreviaHuellaExtraidaDJ_E4C = document.getElementById('btn-vista-previa-huella-extraida-dj_E4C');
+    const modalVistaPreviaBiometrico_E4C = document.getElementById('modal-vista-previa-biometrico_E4C');
+    const btnCerrarVistaPreviaBiometricoX_E4C = document.getElementById('btn-cerrar-vista-previa-biometrico-x_E4C');
+    const btnCerrarVistaPreviaBiometrico_E4C = document.getElementById('btn-cerrar-vista-previa-biometrico_E4C');
+    const imagenVistaPreviaBiometrico_E4C = document.getElementById('imagen-vista-previa-biometrico_E4C');
+    const tituloVistaPreviaBiometrico_E4C = document.getElementById('titulo-vista-previa-biometrico_E4C');
+    const btnGuardarDjBiometricos_E4C = document.getElementById('btn-guardar-dj-biometricos_E4C');
+    let urlVistaPreviaDJ_E4C = null;
+    let botonVistaPreviaBiometricoOrigen_E4C = null;
 
     let ultimoContextoMenu = null; // Guardará los datos para poder regresar al menú
 
@@ -252,13 +271,48 @@ document.addEventListener('DOMContentLoaded', function () {
             el.readOnly = true;
             el.classList.add('bg-gray-100', 'cursor-not-allowed');
         }
+        if (urlVistaPreviaDJ_E4C) {
+            URL.revokeObjectURL(urlVistaPreviaDJ_E4C);
+            urlVistaPreviaDJ_E4C = null;
+        }
+        if (iframeVistaPreviaDJ_E4C) iframeVistaPreviaDJ_E4C.src = 'about:blank';
+        if (nombreVistaPreviaDJ_E4C) nombreVistaPreviaDJ_E4C.textContent = '';
+        if (btnVistaPreviaDJ_E4C) btnVistaPreviaDJ_E4C.disabled = true;
+        if (btnExtraerFirmaHuellaDJ_E4C) btnExtraerFirmaHuellaDJ_E4C.disabled = true;
+        if (btnGuardarDjBiometricos_E4C) btnGuardarDjBiometricos_E4C.disabled = true;
+        if (panelFirmaHuellaDJ_E4C) panelFirmaHuellaDJ_E4C.classList.add('hidden');
+        if (imagenFirmaExtraidaDJ_E4C) { imagenFirmaExtraidaDJ_E4C.src = ''; imagenFirmaExtraidaDJ_E4C.classList.add('hidden'); }
+        if (imagenHuellaExtraidaDJ_E4C) { imagenHuellaExtraidaDJ_E4C.src = ''; imagenHuellaExtraidaDJ_E4C.classList.add('hidden'); }
+        if (btnVistaPreviaFirmaExtraidaDJ_E4C) btnVistaPreviaFirmaExtraidaDJ_E4C.disabled = true;
+        if (btnVistaPreviaHuellaExtraidaDJ_E4C) btnVistaPreviaHuellaExtraidaDJ_E4C.disabled = true;
+        if (imagenVistaPreviaBiometrico_E4C) imagenVistaPreviaBiometrico_E4C.src = '';
+        if (placeholderFirmaDJ_E4C) placeholderFirmaDJ_E4C.classList.remove('hidden');
+        if (placeholderHuellaDJ_E4C) placeholderHuellaDJ_E4C.classList.remove('hidden');
         if (archivoDJ_E4C) archivoDJ_E4C.value = '';
         if (listaArchivosDJ_E4C) listaArchivosDJ_E4C.innerHTML = '';
     }
 
     archivoDJ_E4C?.addEventListener('change', function () {
         const archivos = Array.from(this.files);
-        if (!archivos.length) return;
+        if (urlVistaPreviaDJ_E4C) {
+            URL.revokeObjectURL(urlVistaPreviaDJ_E4C);
+            urlVistaPreviaDJ_E4C = null;
+        }
+        if (btnVistaPreviaDJ_E4C) btnVistaPreviaDJ_E4C.disabled = true;
+        if (btnExtraerFirmaHuellaDJ_E4C) btnExtraerFirmaHuellaDJ_E4C.disabled = true;
+        if (btnGuardarDjBiometricos_E4C) btnGuardarDjBiometricos_E4C.disabled = true;
+        if (panelFirmaHuellaDJ_E4C) panelFirmaHuellaDJ_E4C.classList.add('hidden');
+        if (imagenFirmaExtraidaDJ_E4C) { imagenFirmaExtraidaDJ_E4C.src = ''; imagenFirmaExtraidaDJ_E4C.classList.add('hidden'); }
+        if (imagenHuellaExtraidaDJ_E4C) { imagenHuellaExtraidaDJ_E4C.src = ''; imagenHuellaExtraidaDJ_E4C.classList.add('hidden'); }
+        if (btnVistaPreviaFirmaExtraidaDJ_E4C) btnVistaPreviaFirmaExtraidaDJ_E4C.disabled = true;
+        if (btnVistaPreviaHuellaExtraidaDJ_E4C) btnVistaPreviaHuellaExtraidaDJ_E4C.disabled = true;
+        if (imagenVistaPreviaBiometrico_E4C) imagenVistaPreviaBiometrico_E4C.src = '';
+        if (placeholderFirmaDJ_E4C) placeholderFirmaDJ_E4C.classList.remove('hidden');
+        if (placeholderHuellaDJ_E4C) placeholderHuellaDJ_E4C.classList.remove('hidden');
+        if (!archivos.length) {
+            listaArchivosDJ_E4C.innerHTML = '';
+            return;
+        }
         const maxSize = 1.2 * 1024 * 1024;
 
         for (const archivo of archivos) {
@@ -279,47 +333,166 @@ document.addEventListener('DOMContentLoaded', function () {
                 <span class="text-gray-400">(${(a.size / 1024).toFixed(1)} KB)</span>
             </li>
         `).join('');
+
+        urlVistaPreviaDJ_E4C = URL.createObjectURL(archivos[0]);
+        if (btnVistaPreviaDJ_E4C) btnVistaPreviaDJ_E4C.disabled = false;
+        if (btnExtraerFirmaHuellaDJ_E4C) btnExtraerFirmaHuellaDJ_E4C.disabled = false;
     });
 
-    document.getElementById('formSubirDJ_E4C')?.addEventListener('submit', function (e) {
-        e.preventDefault();
+    // La vista previa trabaja solo con el archivo local del navegador: no hace POST ni lo guarda.
+    document.getElementById('formSubirDJ_E4C')?.addEventListener('submit', e => e.preventDefault());
 
-        const fechaEmision = document.getElementById('fecha_emision_dj_E4C').value;
-        const codPersonal = document.getElementById('codPersonalDJ_E4C').value;
+    btnVistaPreviaDJ_E4C?.addEventListener('click', () => {
         const archivo = archivoDJ_E4C?.files?.[0];
-        const maxSize = 1.2 * 1024 * 1024;
-
-        if (!fechaEmision) { Swal.fire({ title: 'Ingrese la fecha de emisión', icon: 'warning' }); return; }
-        if (!archivo) { Swal.fire({ title: 'Seleccione un archivo PDF', icon: 'warning' }); return; }
-        if (archivo.type !== 'application/pdf') { Swal.fire({ title: 'Solo se permite PDF', icon: 'warning' }); return; }
-        if (archivo.size > maxSize) { Swal.fire({ title: 'El archivo supera 1 MB', icon: 'warning' }); return; }
-
-        const btnGuardar = document.getElementById('btn-guardar-dj_E4C');
-        btnGuardar.disabled = true;
-        btnGuardar.innerHTML = 'Guardando...';
-
-        const formData = new FormData();
-        formData.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
-        formData.append('fecha_emision', fechaEmision);
-        formData.append('codPersonal', codPersonal);
-        formData.append('pdf', archivo);
-
-        axios.post(`${VITE_URL_APP}/save-dj-folio-2`, formData, { headers: { 'Accept': 'application/json' } })
-            .then(() => {
-                document.getElementById('btn-modal-dj-close_E4C').click();
-                limpiarModal_E4C();
-                getPersonal(); // Recargamos la tabla de Gestión DJ
-                Swal.fire({ title: 'DJ subida correctamente', icon: 'success', timer: 2000, showConfirmButton: false });
-            })
-            .catch(error => {
-                const msg = error.response?.data?.error || error.response?.data?.message || 'Error al guardar el DJ';
-                Swal.fire({ title: msg, icon: 'error' });
-            })
-            .finally(() => {
-                btnGuardar.disabled = false;
-                btnGuardar.innerHTML = '<i class="bx bx-upload text-lg me-1"></i> Subir DJ';
-            });
+        if (!archivo || !urlVistaPreviaDJ_E4C) return;
+        if (nombreVistaPreviaDJ_E4C) nombreVistaPreviaDJ_E4C.textContent = archivo.name;
+        if (iframeVistaPreviaDJ_E4C) iframeVistaPreviaDJ_E4C.src = `${urlVistaPreviaDJ_E4C}#zoom=page-fit`;
+        document.getElementById('btn-modal-vista-previa-dj_E4C')?.click();
     });
+
+    document.getElementById('btn-cerrar-vista-previa-dj_E4C')?.addEventListener('click', () => {
+        if (iframeVistaPreviaDJ_E4C) iframeVistaPreviaDJ_E4C.src = 'about:blank';
+    });
+
+    function abrirVistaPreviaBiometrico_E4C(imagen, etiqueta) {
+        const src = imagen?.src;
+        if (!src?.startsWith('data:image/')) return;
+        if (tituloVistaPreviaBiometrico_E4C) tituloVistaPreviaBiometrico_E4C.textContent = `Vista previa de ${etiqueta}`;
+        if (imagenVistaPreviaBiometrico_E4C) {
+            imagenVistaPreviaBiometrico_E4C.src = src;
+            imagenVistaPreviaBiometrico_E4C.alt = `${etiqueta} completa`;
+        }
+        botonVistaPreviaBiometricoOrigen_E4C = document.activeElement;
+        modalVistaPreviaBiometrico_E4C?.classList.remove('hidden');
+        btnCerrarVistaPreviaBiometricoX_E4C?.focus();
+    }
+
+    function cerrarVistaPreviaBiometrico_E4C() {
+        modalVistaPreviaBiometrico_E4C?.classList.add('hidden');
+        if (imagenVistaPreviaBiometrico_E4C) imagenVistaPreviaBiometrico_E4C.src = '';
+        botonVistaPreviaBiometricoOrigen_E4C?.focus();
+        botonVistaPreviaBiometricoOrigen_E4C = null;
+    }
+
+    btnVistaPreviaFirmaExtraidaDJ_E4C?.addEventListener('click', () => {
+        abrirVistaPreviaBiometrico_E4C(imagenFirmaExtraidaDJ_E4C, 'firma');
+    });
+    btnVistaPreviaHuellaExtraidaDJ_E4C?.addEventListener('click', () => {
+        abrirVistaPreviaBiometrico_E4C(imagenHuellaExtraidaDJ_E4C, 'huella');
+    });
+    btnCerrarVistaPreviaBiometricoX_E4C?.addEventListener('click', cerrarVistaPreviaBiometrico_E4C);
+    btnCerrarVistaPreviaBiometrico_E4C?.addEventListener('click', cerrarVistaPreviaBiometrico_E4C);
+    modalVistaPreviaBiometrico_E4C?.addEventListener('click', event => {
+        if (event.target === modalVistaPreviaBiometrico_E4C) cerrarVistaPreviaBiometrico_E4C();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && modalVistaPreviaBiometrico_E4C && !modalVistaPreviaBiometrico_E4C.classList.contains('hidden')) {
+            event.stopImmediatePropagation();
+            cerrarVistaPreviaBiometrico_E4C();
+        }
+    }, true);
+
+    btnExtraerFirmaHuellaDJ_E4C?.addEventListener('click', async () => {
+        const archivo = archivoDJ_E4C?.files?.[0];
+        if (!archivo || btnExtraerFirmaHuellaDJ_E4C.disabled) return;
+
+        const etiquetaOriginal = '<i class="bx bx-fingerprint text-lg"></i> Extraer Firma y Huella';
+        btnExtraerFirmaHuellaDJ_E4C.disabled = true;
+        btnExtraerFirmaHuellaDJ_E4C.innerHTML = '<i class="bx bx-loader-alt bx-spin text-lg"></i> Extrayendo...';
+        panelFirmaHuellaDJ_E4C?.classList.remove('hidden');
+        imagenFirmaExtraidaDJ_E4C?.classList.add('hidden');
+        imagenHuellaExtraidaDJ_E4C?.classList.add('hidden');
+        if (btnVistaPreviaFirmaExtraidaDJ_E4C) btnVistaPreviaFirmaExtraidaDJ_E4C.disabled = true;
+        if (btnVistaPreviaHuellaExtraidaDJ_E4C) btnVistaPreviaHuellaExtraidaDJ_E4C.disabled = true;
+        placeholderFirmaDJ_E4C?.classList.remove('hidden');
+        placeholderHuellaDJ_E4C?.classList.remove('hidden');
+
+        try {
+            const formData = new FormData();
+            formData.append('pdf', archivo);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const response = await axios.post(`${VITE_URL_APP}/dj/extraer-firma-huella`, formData, {
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+            });
+
+            if (!response.data?.success || !response.data?.data?.firma || !response.data?.data?.huella) {
+                throw new Error(response.data?.message || 'No se pudieron extraer ambos recuadros.');
+            }
+
+            imagenFirmaExtraidaDJ_E4C.src = response.data.data.firma;
+            imagenHuellaExtraidaDJ_E4C.src = response.data.data.huella;
+            imagenFirmaExtraidaDJ_E4C.classList.remove('hidden');
+            imagenHuellaExtraidaDJ_E4C.classList.remove('hidden');
+            if (btnVistaPreviaFirmaExtraidaDJ_E4C) btnVistaPreviaFirmaExtraidaDJ_E4C.disabled = false;
+            if (btnVistaPreviaHuellaExtraidaDJ_E4C) btnVistaPreviaHuellaExtraidaDJ_E4C.disabled = false;
+            placeholderFirmaDJ_E4C.classList.add('hidden');
+            placeholderHuellaDJ_E4C.classList.add('hidden');
+            if (btnGuardarDjBiometricos_E4C) btnGuardarDjBiometricos_E4C.disabled = false;
+        } catch (error) {
+            // El botón permanece visible para indicar el flujo de guardado, pero sigue
+            // deshabilitado hasta que ambos recortes estén listos.
+            if (btnGuardarDjBiometricos_E4C) btnGuardarDjBiometricos_E4C.disabled = true;
+            Swal.fire({
+                icon: 'warning',
+                title: 'Cargar Nuevo Escaneo e Inténtelo de Nuevo',
+                text: 'No se pudo recortar correctamente la firma, la huella o ambas. Cargue un nuevo escaneo e inténtelo de nuevo.',
+            });
+        } finally {
+            btnExtraerFirmaHuellaDJ_E4C.disabled = !archivoDJ_E4C?.files?.length;
+            btnExtraerFirmaHuellaDJ_E4C.innerHTML = etiquetaOriginal;
+        }
+    });
+
+    btnGuardarDjBiometricos_E4C?.addEventListener('click', async () => {
+        const pdf = archivoDJ_E4C?.files?.[0];
+        const codigo = document.getElementById('codPersonalDJ_E4C')?.value?.trim();
+        const firmaData = imagenFirmaExtraidaDJ_E4C?.src;
+        const huellaData = imagenHuellaExtraidaDJ_E4C?.src;
+        if (!pdf || !codigo || !firmaData?.startsWith('data:image/') || !huellaData?.startsWith('data:image/')) return;
+
+        const aArchivo = dataUrl => {
+            const [cabecera, contenido] = dataUrl.split(',');
+            const tipo = cabecera.match(/data:(.*?);base64/)?.[1] || 'image/jpeg';
+            const binario = atob(contenido);
+            const bytes = new Uint8Array(binario.length);
+            for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+            return new Blob([bytes], { type: tipo });
+        };
+
+        const botonOriginal = '<i class="bx bx-save text-lg"></i> Guardar DJ y biométricos';
+        btnGuardarDjBiometricos_E4C.disabled = true;
+        btnGuardarDjBiometricos_E4C.innerHTML = '<i class="bx bx-loader-alt bx-spin text-lg"></i> Guardando...';
+
+        try {
+            const formData = new FormData();
+            formData.append('codPersonal', codigo);
+            formData.append('fecha_emision', document.getElementById('fecha_emision_dj_E4C')?.value || '');
+            formData.append('pdf', pdf, pdf.name);
+            formData.append('firma', aArchivo(firmaData), `${codigo}.jpg`);
+            formData.append('huella', aArchivo(huellaData), `${codigo}.jpg`);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const response = await axios.post(`${VITE_URL_APP}/dj/guardar-escaneada-y-biometricos`, formData, {
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+            });
+
+            if (!response.data?.success) throw new Error(response.data?.message || 'No se pudieron guardar los archivos.');
+
+            if (ultimoContextoMenu) ultimoContextoMenu.tieneDJ = true;
+            document.getElementById('btn-cerrar-vista-previa-dj_E4C')?.click();
+            limpiarModal_E4C();
+            document.getElementById('btn-modal-dj-close_E4C')?.click();
+            getPersonal();
+            Swal.fire({ icon: 'success', title: 'DJ y biométricos guardados', text: response.data.message, timer: 2500, showConfirmButton: false });
+        } catch (error) {
+            const mensaje = error.response?.data?.message || error.message || 'No se pudieron guardar los archivos.';
+            Swal.fire({ icon: 'error', title: 'Error al guardar', text: mensaje });
+        } finally {
+            btnGuardarDjBiometricos_E4C.innerHTML = botonOriginal;
+            btnGuardarDjBiometricos_E4C.disabled = !imagenFirmaExtraidaDJ_E4C?.src?.startsWith('data:image/')
+                || !imagenHuellaExtraidaDJ_E4C?.src?.startsWith('data:image/');
+        }
+    });
+
     // === FIN LÓGICA DEL MODAL SUBIR DJ ===
 
     // Cache stale-while-revalidate para las vistas de personal
@@ -664,6 +837,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function makeFamilyRow() {
         return `
         <div class="family-row grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg relative" data-familia-row>
+            <input type="hidden" name="familiar_id[]" value="">
             <div>
                 <label class="text-sm font-medium inline-block mb-2">Parentesco</label>
                 <select name="parentesco[]" class="form-select w-full">
@@ -771,35 +945,47 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!selectProv || !selectDist) return;
         selectProv.innerHTML = '<option value="">Seleccionar</option>';
         selectDist.innerHTML = '<option value="">Seleccionar</option>';
+        selectProv.disabled = true;
+        selectDist.disabled = true;
         if (!departamentoId) return;
         try {
-            const response = await axios.get(`${API_BASE}/provincias/${departamentoId}`);
-            response.data.forEach(prov => selectProv.add(new Option(prov.provi_descripcion, prov.provi_codigo)));
+            const provincias = await getUbicacionCached({ type: 'prov', dept: departamentoId });
+            provincias.forEach(prov => selectProv.add(new Option(prov.text, prov.id)));
             if (selectedProvincia) {
                 selectProv.value = selectedProvincia;
                 await cargarDistritos(selectDist, selectedProvincia, selectedDistrito);
             }
-        } catch (error) { console.error("Error cargando provincias:", error); }
+        } catch (error) {
+            console.error("Error cargando provincias:", error);
+        } finally {
+            selectProv.disabled = false;
+            selectDist.disabled = !selectProv.value;
+        }
     }
 
     async function cargarDistritos(selectDist, provinciaId, selectedDistrito = null) {
         if (!selectDist) return;
         selectDist.innerHTML = '<option value="">Seleccionar</option>';
+        selectDist.disabled = true;
         if (!provinciaId) return;
         try {
-            const response = await axios.get(`${API_BASE}/distritos/${provinciaId}`);
-            response.data.forEach(dist => selectDist.add(new Option(dist.dist_descripcion, dist.dist_codigo)));
+            const distritos = await getUbicacionCached({ type: 'dist', prov: provinciaId });
+            distritos.forEach(dist => selectDist.add(new Option(dist.text, dist.id)));
             if (selectedDistrito) selectDist.value = selectedDistrito;
-        } catch (error) { console.error("Error cargando distritos:", error); }
+        } catch (error) {
+            console.error("Error cargando distritos:", error);
+        } finally {
+            selectDist.disabled = false;
+        }
     }
 
     if (departamentoSelect && departamentoSelectDni && departamentoSelectNac) {
-        axios.get(`${API_BASE}/departamentos`)
-            .then(response => {
-                response.data.forEach(dep => {
-                    departamentoSelect.add(new Option(dep.depa_descripcion, dep.depa_codigo));
-                    departamentoSelectDni.add(new Option(dep.depa_descripcion, dep.depa_codigo));
-                    departamentoSelectNac.add(new Option(dep.depa_descripcion, dep.depa_codigo));
+        getUbicacionCached({ type: 'dept' })
+            .then(departamentos => {
+                departamentos.forEach(dep => {
+                    departamentoSelect.add(new Option(dep.text, dep.id));
+                    departamentoSelectDni.add(new Option(dep.text, dep.id));
+                    departamentoSelectNac.add(new Option(dep.text, dep.id));
                 });
             })
             .catch(error => console.error("Error cargando departamentos:", error));
@@ -1260,6 +1446,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 const data = Object.fromEntries(formData.entries());
                 console.log('📦 data object:', data);
 
+                // Construir los arrays familiares por fila evita que nombres,
+                // parentescos, fechas e IDs pierdan su correspondencia entre sí.
+                const filasFamiliaresPayload = [...document.querySelectorAll('#familyContainer .family-row')];
+                const familiaresPayload = {
+                    FAM_PARENTESCO: filasFamiliaresPayload.map(fila => fila.querySelector('select[name="parentesco[]"]')?.value ?? ''),
+                    FAM_NOMBRES: filasFamiliaresPayload.map(fila => fila.querySelector('input[name="apellidosNombres[]"]')?.value ?? ''),
+                    FAM_FECHA_NACI: filasFamiliaresPayload.map(fila => fila.querySelector('input[name="fechaNacimiento[]"]')?.value ?? ''),
+                    FAM_ID: filasFamiliaresPayload.map(fila => fila.querySelector('input[name="familiar_id[]"]')?.value ?? ''),
+                };
+
                 const tabActiva = document.querySelector('.tab-btn.border-b-white')?.dataset?.tab ?? 'pendiente';
 
                 const hijoSinFecha = [...document.querySelectorAll('#familyContainer .family-row')]
@@ -1275,37 +1471,69 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
 
-                // DNI obligatorio: solo para hijos MENORES de edad
-                // (la regla NO aplica para el rol ADMINS RRHH)
-                if (!esAdminRrhhDj()) {
-                    const filasHijosDni = filasHijosDj();
-                    for (let i = 0; i < filasHijosDni.length; i++) {
-                        const fechaH = filasHijosDni[i].querySelector('input[name="fechaNacimiento[]"]')?.value;
-                        if (!esMenorDeEdadDj(fechaH)) continue;   // solo menores de edad
-                        const stH = estadoDniHijo(filasHijosDni[i]);
-                        const okA = !!(stH.anverso || stH.tieneAnverso);
-                        const okR = !!(stH.reverso || stH.tieneReverso);
-                        if (!okA || !okR) {
-                            const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Falta el DNI del hijo ' + (i + 1),
-                                text: 'Debe subir el ' + falta + ' del DNI para continuar.',
-                                confirmButtonText: 'Entendido',
-                            });
-                            if (btnGuardar) btnGuardar.disabled = false;
-                            return;
-                        }
+                const filasHijosDni = filasHijosDj();
+                for (let i = 0; i < filasHijosDni.length; i++) {
+                    if (!requiereDniHijoDj(filasHijosDni[i])) continue;
+                    const stH = estadoDniHijo(filasHijosDni[i]);
+                    const okA = !!(stH.anverso || stH.tieneAnverso);
+                    const okR = !!(stH.reverso || stH.tieneReverso);
+                    if (!okA || !okR) {
+                        const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Falta el DNI del hijo ' + (i + 1),
+                            text: 'Debe subir el ' + falta + ' del DNI para continuar.',
+                            confirmButtonText: 'Entendido',
+                        });
+                        if (btnGuardar) btnGuardar.disabled = false;
+                        return;
                     }
                 }
 
+                // La decisión de desactivar se solicita antes de guardar cuando un
+                // hijo registrado como menor ya cumplió 18 años.
+                let desactivarAsignacionFamiliar = false;
+                let mantenerAsignacionFamiliar = false;
+                const hijosMayorEdad = filasHijosDj().filter(fila =>
+                    fila.querySelector('select[name="parentesco[]"]')?.value?.trim().toUpperCase() === 'HIJO MENOR DE EDAD'
+                    && !esMenorDeEdadDj(fila.querySelector('input[name="fechaNacimiento[]"]')?.value)
+                    && !!fila.querySelector('input[name="fechaNacimiento[]"]')?.value
+                );
+                if (hijosMayorEdad.length) {
+                    const decision = await Swal.fire({
+                        icon: 'warning',
+                        title: 'El hijo ya cumplió la mayoría de edad',
+                        text: '¿Desactivar asignación familiar?',
+                        showDenyButton: true,
+                        confirmButtonText: 'Sí',
+                        denyButtonText: 'No',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                    });
+                    desactivarAsignacionFamiliar = decision.isConfirmed;
+                    mantenerAsignacionFamiliar = decision.isDenied;
+                    if (mantenerAsignacionFamiliar) {
+                        for (const fila of hijosMayorEdad) {
+                            const st = estadoDniHijo(fila);
+                            if (!st.anverso || !st.reverso) {
+                                Swal.fire({ icon: 'warning', title: 'DNI del hijo obligatorio', text: 'Para conservar la asignación familiar, vuelva a subir el anverso y el reverso del DNI de cada hijo mayor de edad.', confirmButtonText: 'Entendido' });
+                                abrirModalDniHijosDj(fila);
+                                if (btnGuardar) btnGuardar.disabled = false;
+                                return;
+                            }
+                        }
+                    }
+                }
                 const payload = {
                     ...data,
                     source: tabActiva,
+                    desactivar_asignacion_familiar: desactivarAsignacionFamiliar ? '1' : '0',
+                    mantener_asignacion_familiar: mantenerAsignacionFamiliar ? '1' : '0',
                     no_caduca_dni: data.no_caduca_dni === 'on' ? '1' : '0',
-                    FAM_PARENTESCO: formData.getAll('parentesco[]'),
-                    FAM_NOMBRES: formData.getAll('apellidosNombres[]'),
-                    FAM_FECHA_NACI: formData.getAll('fechaNacimiento[]'),
+                    ...familiaresPayload,
+                    // Señala que el listado completo fue enviado, incluso si el usuario
+                    // quitó todos los familiares y los arrays quedan vacíos.
+                    FAM_PRESENTE: '1',
                     dj2026_descripcion: formData.getAll('ocupacion_alterna[]')
                 };
 
@@ -1335,6 +1563,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fotoAdjuntaGest)        formDataSave.append('foto', fotoAdjuntaGest);
                 if (dniAdjuntoGest.anverso)  formDataSave.append('dni_anverso', dniAdjuntoGest.anverso);
                 if (dniAdjuntoGest.reverso) formDataSave.append('dni_reverso', dniAdjuntoGest.reverso);
+                filasHijosDj().forEach((fila, i) => {
+                    const st = estadoDniHijo(fila);
+                    if (st.anverso) formDataSave.append(`dni_hijos_anverso[${i + 1}]`, st.anverso);
+                    if (st.reverso) formDataSave.append(`dni_hijos_reverso[${i + 1}]`, st.reverso);
+                });
 
                 const csrfTokenSave = document.querySelector('meta[name="csrf-token"]')?.content || '';
                 const response = await axios.post(url, formDataSave, {
@@ -1395,6 +1628,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     // Invalidar cache para que la recarga traiga datos frescos
                     _personalCache.SI = null; _personalCache.NO = null; _personalCache.TODOS = null;
+                    const codiPersGuardado = String(response.data.codi_pers || data.cod_postulante || codiPersActual || '').trim();
+                    if (codiPersGuardado) {
+                        ['pendiente', 'migracion'].forEach(source => {
+                            const cacheKey = `${codiPersGuardado}_${source}`;
+                            personalDataCache.delete(cacheKey);
+                            personalDataPromise.delete(cacheKey);
+                        });
+                    }
                     getPersonal();
                 }
             } catch (error) {
@@ -2433,44 +2674,29 @@ async function llenarFormulario(data) {
     setValue('#pensionista', data.PERS_PENSIONISTA ? data.PERS_PENSIONISTA.trim() : '');
 
     setValue('#grado_instruccion', data.PERS_GRADO_INSTRUCCION ? data.PERS_GRADO_INSTRUCCION.trim() : '');
-    if (data.CARR_CODIGO == '999999') {
-        setValue('#institucion', data.IEDU_CODIGO ? data.IEDU_CODIGO.trim() : '299999999');
-        if (data.IEDU_CODIGO && window.allCarreras) {
-            const selCarrera = document.getElementById('carrera');
-            if (selCarrera) {
-                selCarrera.innerHTML = '<option value="">—</option>';
-                window.allCarreras
-                    .filter(c => c.IEDU_CODIGO === data.IEDU_CODIGO.trim())
-                    .forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = c.text;
-                        selCarrera.appendChild(opt);
-                    });
-                selCarrera.value = data.CARR_CODIGO ? data.CARR_CODIGO.trim() : '';
-            }
-        }
+    const institucionEducativa = String(data.IEDU_CODIGO ?? '').trim();
+    const carreraEducativa = String(data.CARR_CODIGO ?? '').trim();
+    const institucionNoEspecificada = ['', '999999', '199999999', '299999999'].includes(institucionEducativa);
+    const carreraNoEspecificada = ['', '999999'].includes(carreraEducativa);
+    const institucionValida = institucionNoEspecificada ? '' : institucionEducativa;
+    const carreraValida = (institucionValida && !carreraNoEspecificada) ? carreraEducativa : '';
 
-    } else {
-        setValue('#institucion', data.IEDU_CODIGO ? data.IEDU_CODIGO.trim() : '999999');
-        if (data.IEDU_CODIGO && window.allCarreras) {
-            const selCarrera = document.getElementById('carrera');
-            if (selCarrera) {
-                selCarrera.innerHTML = '<option value="">—</option>';
-                window.allCarreras
-                    .filter(c => c.IEDU_CODIGO === data.IEDU_CODIGO.trim())
-                    .forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = c.text;
-                        selCarrera.appendChild(opt);
-                    });
-                selCarrera.value = data.CARR_CODIGO ? data.CARR_CODIGO.trim() : '';
-            }
+    setValue('#institucion', institucionValida);
+    const selCarrera = document.getElementById('carrera');
+    if (selCarrera) {
+        selCarrera.innerHTML = '<option value="" selected>—</option>';
+        if (institucionValida && window.allCarreras) {
+            window.allCarreras
+                .filter(c => c.IEDU_CODIGO === institucionValida && String(c.id).trim() !== '999999')
+                .forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.text;
+                    selCarrera.appendChild(opt);
+                });
         }
+        selCarrera.value = carreraValida;
     }
-
-    setValue('#carrera', data.CARR_CODIGO ? data.CARR_CODIGO.trim() : '999999');
     setValue('#anio_egreso', data.EGRESO_EDUCATIVO ? data.EGRESO_EDUCATIVO.trim() : '');
 
     setValue('#embargos', data.PERS_EMBARGO ? data.PERS_EMBARGO.trim() : '');
@@ -2493,9 +2719,11 @@ async function llenarFormulario(data) {
     setValue('#tipo_zona_dni', data.TIZO_CODIGO ? data.TIZO_CODIGO.trim() : '');
     setValue('#zona_dirdni', data.PERS_ZONA_DIRDNI ? data.PERS_ZONA_DIRDNI.trim() : '');
 
-    cargarUbicaciones('actual', data.PERS_DEPT_ACT?.trim() ?? '', data.PERS_PROV_ACT?.trim() ?? '', data.PERS_DIST_ACT?.trim() ?? '');
-    cargarUbicaciones('dni', data.PERS_DPTO_DIRDNI?.trim() ?? '', data.PERS_PROV_DIRDNI?.trim() ?? '', data.PERS_DIST_DIRDNI?.trim() ?? '');
-    cargarUbicaciones('nac', data.DEPA_CODIGO_NACI?.trim() ?? '', data.PROVI_CODIGO_NACI?.trim() ?? '', data.DIST_NACI?.trim() ?? '');
+    await Promise.all([
+        cargarUbicaciones('actual', data.PERS_DEPT_ACT?.trim() ?? '', data.PERS_PROV_ACT?.trim() ?? '', data.PERS_DIST_ACT?.trim() ?? ''),
+        cargarUbicaciones('dni', data.PERS_DPTO_DIRDNI?.trim() ?? '', data.PERS_PROV_DIRDNI?.trim() ?? '', data.PERS_DIST_DIRDNI?.trim() ?? ''),
+        cargarUbicaciones('nac', data.DEPA_CODIGO_NACI?.trim() ?? '', data.PROVI_CODIGO_NACI?.trim() ?? '', data.DIST_NACI?.trim() ?? ''),
+    ]);
 
 
     setValue('#ocupacion_principal', data.dj2026_ocupacion_principal);
@@ -2513,7 +2741,7 @@ async function llenarFormulario(data) {
     setValue('#brevete', data.PERS_BREVETE ? data.PERS_BREVETE.trim() : '');
     setValue('#clase_brevete', data.CLASE_BREVETE ? data.CLASE_BREVETE.trim() : '');
     actualizarCategorias();  // ← puebla el select tipo_vehiculo según la clase
-    setValue('#tipo_vehiculo', data.CATEGORIA_BREVETE ? data.CATEGORIA_BREVETE.trim() : '');
+    setValue('#tipo_vehiculo', data.CATEGORIA_BREVETE ?? data.PERS_TIPO_VEHICULO ?? '');
     setValue('#vehiculo_propio', data.PERS_VEHICULO_PROPIO ? data.PERS_VEHICULO_PROPIO.trim() : '');
 
     setValue('#empresa_anterior', data.PERS_CTRABANT ? data.PERS_CTRABANT.trim() : '');
@@ -2567,8 +2795,15 @@ function estadoDniHijo(fila) {
     return st;
 }
 
-// Regla DNI del hijo: OBLIGATORIO solo para menores de edad.
-// El rol ADMINS RRHH (tipo 17) está exento de la regla.
+function requiereDniHijoDj(fila) {
+    const parentesco = (fila?.querySelector('select[name="parentesco[]"]')?.value || '').trim().toUpperCase();
+    const discapacitadoPermanente = parentesco.startsWith('HIJO MAYOR DE EDAD')
+        && /INCAPACITADO|DISCAPACIDAD/.test(parentesco)
+        && parentesco.includes('PERMANENT');
+    return discapacitadoPermanente
+        || (parentesco === 'HIJO MENOR DE EDAD' && esMenorDeEdadDj(fila.querySelector('input[name="fechaNacimiento[]"]')?.value));
+}
+
 function esMenorDeEdadDj(fecha) {
     if (!fecha) return false;
     const nac = new Date(String(fecha).slice(0, 10) + 'T00:00:00');
@@ -2578,10 +2813,6 @@ function esMenorDeEdadDj(fecha) {
     const m = hoy.getMonth() - nac.getMonth();
     if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) anios--;
     return anios < 18;
-}
-
-function esAdminRrhhDj() {
-    return String(window.tipoUsuario ?? '').trim() === '17';
 }
 
 function actualizarEstadoDniHijo(fila) {
@@ -2598,8 +2829,7 @@ function actualizarEstadoDniHijo(fila) {
         span.style.color = '#16a34a';
         return;
     }
-    const fecha = fila.querySelector('input[name="fechaNacimiento[]"]')?.value;
-    const obligatorio = esMenorDeEdadDj(fecha) && !esAdminRrhhDj();
+    const obligatorio = requiereDniHijoDj(fila);
     const detalle = (okA || okR) ? 'falta ' + (okA ? 'reverso' : 'anverso') : 'sin DNI';
     if (obligatorio) {
         span.textContent = '⚠ ' + detalle + ' (obligatorio)';
@@ -2702,7 +2932,7 @@ function configDniHijosDj() {
             if (btn) abrirModalDniHijosDj(btn.closest('.family-row'));
         });
         cont.addEventListener('change', (e) => {
-            if (e.target.matches('input[name="fechaNacimiento[]"]')) {
+                if (e.target.matches('input[name="fechaNacimiento[]"], select[name="parentesco[]"]')) {
                 actualizarExtrasFilaHijo(e.target.closest('.family-row'));
             }
         });
@@ -2839,6 +3069,7 @@ function addFamiliarRow(data = {}, container = null) {
     row.className = 'family-row';
     row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;';
     row.innerHTML = `
+        <input type="hidden" name="familiar_id[]" value="${data.CODI_DERE_HABI || ''}">
         <div>
             <label class="dj-label">Parentesco</label>
             <select name="parentesco[]" class="dj-select">
@@ -2878,10 +3109,26 @@ async function getUbicacionCached(params) {
     if (ubicacionCache.has(key)) return ubicacionCache.get(key);
     if (ubicacionPromise.has(key)) return ubicacionPromise.get(key);
 
-    const req = axios.get(`${API_URL}/dj/get-ubicacion`, { params })
+    const ubicacionApi = `${API_URL}/ubicacion`;
+    const url = params.type === 'dept'
+        ? `${ubicacionApi}/departamentos`
+        : params.type === 'prov'
+            ? `${ubicacionApi}/provincias/${encodeURIComponent(params.dept)}`
+            : `${ubicacionApi}/distritos/${encodeURIComponent(params.prov)}`;
+
+    const req = axios.get(url)
         .then(res => {
-            ubicacionCache.set(key, res.data);
-            return res.data;
+            const data = (res.data || []).map(item => {
+                if (params.type === 'dept') {
+                    return { id: item.depa_codigo, text: item.depa_descripcion };
+                }
+                if (params.type === 'prov') {
+                    return { id: item.provi_codigo, text: item.provi_descripcion };
+                }
+                return { id: item.dist_codigo, text: item.dist_descripcion };
+            });
+            ubicacionCache.set(key, data);
+            return data;
         })
         .finally(() => {
             ubicacionPromise.delete(key);
@@ -2894,6 +3141,10 @@ async function getUbicacionCached(params) {
 
 async function cargarUbicaciones(tipo, dept, prov, dist) {
     const prefix = tipo === 'actual' ? '_actual' : tipo === 'dni' ? '_dni' : '_nac';
+    const selectProv = document.querySelector(`#provincia${prefix}`);
+    const selectDist = document.querySelector(`#distrito${prefix}`);
+    if (selectProv) selectProv.innerHTML = '<option value="">Seleccionar...</option>';
+    if (selectDist) selectDist.innerHTML = '<option value="">Seleccionar...</option>';
     if (!dept) return;
 
     const depts = await getUbicacionCached({ type: 'dept' });
@@ -3486,49 +3737,6 @@ document.getElementById('btnDocsPendientes')?.addEventListener('click', async fu
         const a = document.createElement('a');
         a.href = data.url;
         a.download = data.nombre || `Reporte_Documentos_Personal_${new Date().toISOString().slice(0, 10)}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-
-        Swal.close();
-    } catch {
-        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo generar el reporte. Inténtalo de nuevo.' });
-    }
-});
-
-// ── Reporte de DNI de hijos menores de edad (anverso/reverso) ──────────
-// Cada clic vuelve a verificar los archivos en el servidor de imágenes
-// (siempre actualizado, ~5-10 s). Shift + click reinicia el escaneo.
-document.getElementById('btnDniHijosPendientes')?.addEventListener('click', async function (ev) {
-    const refrescar = ev.shiftKey;
-
-    Swal.fire({
-        title: 'Generando reporte de DNI de hijos…',
-        text: 'Verificando el DNI (anverso y reverso) de los hijos menores de edad en el servidor de archivos (~5-10 s).',
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-    });
-
-    try {
-        const response = await axios.get(`${VITE_URL_APP}/api/dj/reporte/dni-hijos`, {
-            params: refrescar ? { refrescar: 1 } : {},
-            timeout: 0
-        });
-
-        const data = response.data;
-        if (!data?.url) {
-            Swal.fire({
-                icon: 'info',
-                title: 'Sin faltantes',
-                text: data?.message || 'Todos los hijos menores de edad cuentan con anverso y reverso del DNI cargados.'
-            });
-            return;
-        }
-
-        // Descarga directa navegando a la URL (mismo criterio que los otros reportes)
-        const a = document.createElement('a');
-        a.href = data.url;
-        a.download = data.nombre || `Reporte_DNI_Hijos_${new Date().toISOString().slice(0, 10)}.xlsx`;
         document.body.appendChild(a);
         a.click();
         a.remove();

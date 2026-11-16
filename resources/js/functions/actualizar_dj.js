@@ -227,6 +227,9 @@ document.addEventListener('DOMContentLoaded', function () {
         btnModoAnual.addEventListener('click', () => toggleModoDJ('anual'));
         btnModoDemanda.addEventListener('click', () => toggleModoDJ('demanda'));
     }
+    if (new URLSearchParams(window.location.search).get('modo') === 'demanda') {
+        setTimeout(() => btnModoDemanda?.click(), 100);
+    }
 
     // ============================================================
     // TIMELINE TABS (NUEVO)
@@ -848,7 +851,9 @@ document.addEventListener('DOMContentLoaded', function () {
         rowFormatter: function (row) {
             const d = row.getData();
             const el = row.getElement();
-            el.classList.toggle('rep-cesado', (d.migrado || '').toUpperCase().trim() !== 'SI');
+            const verificado = String(d.migrado || '').toUpperCase().trim() === 'SI';
+            el.classList.toggle('rep-cesado', !verificado);
+            el.classList.toggle('rep-alerta', Boolean(d.es_solicitud_nueva) && !verificado);
             el.style.removeProperty('background-color');
         },
         locale: "es",
@@ -868,13 +873,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 formatter: cell => {
                     const valor = (cell.getValue() ?? '').toUpperCase().trim();
                     const esVerificado = valor === 'SI';
+                    const esSolicitudSip = Boolean(cell.getData().es_solicitud_nueva);
 
                     // Si viene otra cosa que no sea SI o NO, lo mostramos tal cual, sino usamos SI/NO
                     const texto = (valor === 'SI' || valor === 'NO') ? valor : (valor || '—');
 
                     const color = esVerificado
                         ? 'border-success bg-success text-white'
-                        : 'border-yellow-300 bg-yellow-50 text-yellow-800';
+                        : esSolicitudSip
+                            ? 'border-rose-300 bg-rose-50 text-rose-700'
+                            : 'border-yellow-300 bg-yellow-50 text-yellow-800';
 
                     return `<span class="inline-flex items-center rounded-full border ${color} px-4 py-0.5 text-[11px] font-bold tracking-wider whitespace-nowrap">${texto}</span>`;
                 }
@@ -946,6 +954,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 title: "Acciones", hozAlign: "center", headerSort: false, widthGrow: 1,
                 formatter: cell => {
                     const d = cell.getData();
+                    const esSolicitudSip = Boolean(d.es_solicitud_nueva);
                     // Verificamos si el estado es 'SI' (Verificado)
                     const esVerificado = d.migrado === 'SI';
 
@@ -953,9 +962,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     const opacityClass = esVerificado ? 'opacity-50 cursor-not-allowed' : 'hover:bg-success hover:text-white';
 
                     // Si está verificado, le quitamos el atributo del modal para que no se abra accidentalmente
-                    const modalAttr = esVerificado ? '' : 'data-hs-overlay="#modalDjGestion"';
+                    const modalAttr = esVerificado || esSolicitudSip ? '' : 'data-hs-overlay="#modalDjGestion"';
 
-                    return `<button ${disabled} type="button" class="btn rounded-full form-btn-verificado bg-success/25 text-success ${opacityClass}" ${modalAttr}>DJ</button>`;
+                    const etiqueta = esSolicitudSip ? 'Revisar' : 'DJ';
+                    const claseColor = esSolicitudSip ? 'bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white' : 'bg-success/25 text-success';
+                    return `<button ${disabled} type="button" class="btn rounded-full form-btn-verificado ${claseColor} ${opacityClass}" ${modalAttr}>${etiqueta}</button>`;
                 },
                 cellClick: (e, cell) => {
                     const btn = e.target.closest('.form-btn-verificado');
@@ -965,6 +976,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (btn.hasAttribute('disabled')) return;
 
                     const rowData = cell.getRow().getData();
+                    if (rowData.es_solicitud_nueva && rowData.solicitud_id) {
+                        abrirRevisionSolicitudSip(rowData.solicitud_id);
+                        return;
+                    }
                     const codiPers = rowData.codPersonal || rowData.id;
                     abrirFormularioDJ(codiPers, 'migracion');
                 }
@@ -1203,7 +1218,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function cargarDatosEtapa2() {
         const anio = (window.modoDJ === 'anual') ? (document.getElementById('filtroAnio')?.value || '') : '';
 
-        axios.get(`${VITE_URL_APP}/api/reporte-personal-sin-migracion`, { params: { anio: anio } })
+        return axios.get(`${VITE_URL_APP}/api/reporte-personal-sin-migracion`, { params: { anio: anio } })
             .then(response => {
                 if (!response.data.success) return;
 
@@ -1223,8 +1238,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('contadorSinVerificarE2').textContent = sinVerificar;
 
                 // 2. Mandamos la data limpia a la tabla
-                tblPersonasVerificado.setData(datosLimpios);
-                aplicarFiltrosE2();
+                return tblPersonasVerificado.setData(datosLimpios).then(() => aplicarFiltrosE2());
             });
     }
 
@@ -1328,6 +1342,290 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     cargarDatosEtapa2();
+
+    // Las notificaciones SIP enlazan directamente con esta revisión en Actualizar DJ.
+    const solicitudSipUrl = new URLSearchParams(window.location.search).get('solicitud_id');
+    if (solicitudSipUrl) {
+        setTimeout(async () => {
+            btnModoDemanda?.click();
+
+            // El enlace puede venir con filtros guardados o valores por defecto
+            // (por ejemplo, Operativo 5°) que oculten a quien hizo la solicitud.
+            const sucursal = document.getElementById('filtroSucursalE2');
+            const tipoPersonal = document.getElementById('filtroTipoPerE2');
+            const estado = document.getElementById('filtroEstadoE2');
+            const busqueda = document.getElementById('buscarPersonalE2');
+            if (sucursal && [...sucursal.options].some(option => option.value === '00')) sucursal.value = '00';
+            if (tipoPersonal && [...tipoPersonal.options].some(option => option.value === '00')) tipoPersonal.value = '00';
+            if (estado) estado.value = 'null';
+            if (busqueda) busqueda.value = '';
+
+            try {
+                await cargarDatosEtapa2();
+                aplicarFiltrosE2();
+            } catch (error) {
+                console.error('No se pudo actualizar la lista de solicitudes SIP:', error);
+            }
+            abrirRevisionSolicitudSip(solicitudSipUrl);
+        }, 150);
+    }
+
+    const modalSolicitudSip = document.getElementById('modalSolicitudSip');
+    let solicitudSipActual = null;
+    let solicitudSipRenderSeq = 0;
+    const escaparHtml = valor => String(valor ?? '').replace(/[&<>"']/g, caracter => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[caracter]));
+    const etiquetasDatosSolicitud = {
+        parentesco: 'Parentesco', nombres: 'Nombres', nombre: 'Nombres', ocupacion: 'Ocupación',
+        fech_naci: 'Fecha de nacimiento', FECH_NACI: 'Fecha de nacimiento',
+        TIPO_RELA: 'Parentesco', OCUPACION: 'Ocupación',
+        NOMB_1: 'Primer nombre', NOMB_2: 'Segundo nombre', APEL_1: 'Apellido paterno', APEL_2: 'Apellido materno',
+        CODI_DERE_HABI: null
+    };
+    const valorSolicitudLegible = (valor, profundidad = 0) => {
+        if (valor === null || valor === undefined || valor === '') return '<span class="text-slate-400">Sin dato</span>';
+        if (typeof valor === 'string') {
+            const limpio = valor.trim();
+            if ((limpio.startsWith('{') && limpio.endsWith('}')) || (limpio.startsWith('[') && limpio.endsWith(']'))) {
+                try { return valorSolicitudLegible(JSON.parse(limpio), profundidad); } catch (_) {}
+            }
+            return escaparHtml(valor);
+        }
+        if (typeof valor !== 'object') return escaparHtml(valor);
+        if (profundidad > 3) return '<span class="text-slate-500">Información registrada</span>';
+
+        const elementos = Array.isArray(valor) ? valor : [valor];
+        if (!elementos.length) return '<span class="text-slate-400">Sin registros</span>';
+        return `<div class="space-y-2">${elementos.map(elemento => {
+            if (!elemento || typeof elemento !== 'object') {
+                return `<div class="rounded-md bg-slate-50 px-3 py-2">${valorSolicitudLegible(elemento, profundidad + 1)}</div>`;
+            }
+            const nombreCompleto = elemento.nombres || elemento.Nombres || [elemento.NOMB_1, elemento.NOMB_2, elemento.APEL_1, elemento.APEL_2].filter(Boolean).join(' ');
+            const parentesco = elemento.parentesco || elemento.TIPO_RELA;
+            const ocupacion = elemento.ocupacion || elemento.OCUPACION;
+            const fechaNacimiento = elemento.fech_naci || elemento.FECH_NACI;
+            if (nombreCompleto || parentesco || ocupacion || fechaNacimiento) {
+                const datosFamiliares = [
+                    ['Parentesco', parentesco], ['Nombres', nombreCompleto],
+                    ['Ocupación', ocupacion], ['Fecha de nacimiento', fechaNacimiento]
+                ].filter(([, dato]) => dato !== null && dato !== undefined && dato !== '');
+                return `<dl class="grid grid-cols-1 gap-x-4 gap-y-2 rounded-md bg-slate-50 p-3 sm:grid-cols-2">${datosFamiliares.map(([etiqueta, dato]) => `<div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">${etiqueta}</dt><dd class="mt-1 text-sm text-slate-800">${valorSolicitudLegible(dato, profundidad + 1)}</dd></div>`).join('')}</dl>`;
+            }
+            const campos = Object.entries(elemento).filter(([clave, dato]) =>
+                etiquetasDatosSolicitud[clave] !== null && dato !== null && dato !== undefined && dato !== ''
+            );
+            if (!campos.length) return '';
+            return `<dl class="grid grid-cols-1 gap-x-4 gap-y-2 rounded-md bg-slate-50 p-3 sm:grid-cols-2">${campos.map(([clave, dato]) => {
+                const etiqueta = etiquetasDatosSolicitud[clave] || clave.replace(/_/g, ' ').toLowerCase().replace(/(^|\s)\S/g, letra => letra.toUpperCase());
+                return `<div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">${escaparHtml(etiqueta)}</dt><dd class="mt-1 text-sm text-slate-800">${valorSolicitudLegible(dato, profundidad + 1)}</dd></div>`;
+            }).join('')}</dl>`;
+        }).join('')}</div>`;
+    };
+    const textoSolicitud = valor => valorSolicitudLegible(valor);
+    const valorCambioSolicitudLegible = (valor, campo) => {
+        const unidad = campo === 'PERS_PESO' ? ' kg' : (campo === 'PERS_TALLA' ? ' m' : '');
+        if (!unidad || valor === null || valor === undefined || String(valor).trim() === '') return textoSolicitud(valor);
+        if (campo === 'PERS_TALLA' && Number.isFinite(Number(valor))) {
+            return `${Number(valor).toFixed(2)}${escaparHtml(unidad)}`;
+        }
+        return `${textoSolicitud(valor)}${escaparHtml(unidad)}`;
+    };
+    const decodificarValorSolicitud = valor => {
+        if (typeof valor !== 'string') return valor;
+        const texto = valor.trim();
+        if (!texto) return '';
+        if ((texto.startsWith('{') && texto.endsWith('}')) || (texto.startsWith('[') && texto.endsWith(']'))) {
+            try { return JSON.parse(texto); } catch (_) {}
+        }
+        return valor;
+    };
+    const valorSolicitudComparable = (valor, campo) => {
+        valor = decodificarValorSolicitud(valor);
+        if (valor && typeof valor === 'object' && !Array.isArray(valor) && Object.prototype.hasOwnProperty.call(valor, 'date')) valor = valor.date;
+        if (valor === null || valor === undefined) return '';
+        const texto = String(valor).trim();
+        if (!texto) return '';
+        if (['PERS_PESO', 'PERS_TALLA', 'dj2026_experiencia_anios'].includes(campo) && Number.isFinite(Number(texto))) return String(Number(texto));
+        if (campo.toLowerCase().includes('fecha') || campo.toLowerCase().includes('fech')) {
+            const iso = texto.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (iso) return iso[1];
+            const local = texto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (local) return `${local[3]}-${local[2]}-${local[1]}`;
+        }
+        if (campo === 'PERS_BANCO') {
+            const banco = texto.toUpperCase();
+            return ({ 'BCP': '01', 'BANCO DE CREDITO DEL PERU': '01', 'INTERBANK': '03', 'BANCO INTERNACIONAL DEL PERU - INTERBANK': '03' })[banco] || banco;
+        }
+        if ([
+            'PERS_ESTADO_CIVIL', 'PERS_SIST_PREV', 'PERS_GRUP_SANGRE', 'PERS_ESSALUD', 'PERS_PENSIONISTA',
+            'PERS_EMBARGO', 'LAB_SUCAMEC', 'LAB_ARMA_PROPIA', 'LAB_SMO', 'PERS_VEHICULO_PROPIO',
+            'CLASE_BREVETE', 'PERS_TIPO_VEHICULO', 'PERS_PARENT_EME', 'dj2026_familiar_empresa', 'dj2026_familiar_parentesco'
+        ].includes(campo)) return texto.toUpperCase();
+        return texto;
+    };
+    const listaFamiliaresSolicitud = valor => {
+        const datos = decodificarValorSolicitud(valor);
+        const lista = Array.isArray(datos) ? datos : (datos && typeof datos === 'object' ? [datos] : []);
+        return lista.filter(item => item && typeof item === 'object').map(item => ({
+            TIPO_RELA: item.TIPO_RELA || item.parentesco || '',
+            Nombres: item.Nombres || item.nombres || [item.NOMB_1, item.NOMB_2, item.APEL_1, item.APEL_2].filter(Boolean).join(' '),
+            OCUPACION: item.OCUPACION || item.ocupacion || '',
+            FECH_NACI: item.FECH_NACI?.date || item.FECH_NACI || item.fech_naci?.date || item.fech_naci || ''
+        }));
+    };
+    const familiaresSolicitudComparables = familiares => familiares.map(item => {
+        const normalizarTexto = valor => String(valor || '').trim().replace(/\s+/g, ' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+        const parentesco = normalizarTexto(item.TIPO_RELA);
+        const nombre = normalizarTexto(item.Nombres);
+        const fecha = parentesco === 'HIJO MENOR DE EDAD'
+            ? valorSolicitudComparable(item.FECH_NACI, 'FECH_NACI')
+            : '';
+        return [parentesco, nombre, fecha].join('|');
+    }).sort();
+
+    async function abrirRevisionSolicitudSip(id) {
+        const renderSeq = ++solicitudSipRenderSeq;
+        solicitudSipActual = id;
+        document.getElementById('solicitudSipPersona').textContent = 'Cargando solicitud…';
+        document.getElementById('solicitudSipEstado').textContent = '';
+        document.getElementById('solicitudSipComparacion').replaceChildren();
+        document.getElementById('solicitudSipDatosPersona').replaceChildren();
+        document.getElementById('solicitudSipFamiliares').replaceChildren();
+        modalSolicitudSip.classList.remove('hidden');
+        modalSolicitudSip.classList.add('flex');
+        try {
+            const { data } = await axios.get(`${API_URL}/dj/solicitudes-sip/${encodeURIComponent(id)}`);
+            if (renderSeq !== solicitudSipRenderSeq || solicitudSipActual !== id) return;
+            if (!data.success) throw new Error(data.message || 'No se pudo cargar la solicitud.');
+            const persona = data.personal || {};
+            const nombrePersona = [persona.NOMB_1, persona.NOMB_2, persona.APEL_1, persona.APEL_2].filter(Boolean).join(' ');
+            document.getElementById('solicitudSipPersona').textContent =
+                `${nombrePersona} · DNI ${persona.NRO_DOCU_IDEN || '—'} · Solicitud #${id}`;
+            const datosPersonales = [
+                ['Personal', nombrePersona], ['DNI', persona.NRO_DOCU_IDEN], ['Sucursal', persona.SUCU_ABREVIATURA],
+                ['Tipo de trabajador', persona.TIPE_DESCRIPCION], ['Cargo', persona.DESC_CARGO]
+            ];
+            document.getElementById('solicitudSipDatosPersona').innerHTML = datosPersonales.map(([etiqueta, valor]) =>
+                `<div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">${escaparHtml(etiqueta)}</dt><dd class="mt-1 text-sm text-slate-800">${escaparHtml(valor || '—')}</dd></div>`
+            ).join('');
+            const pendiente = data.solicitud?.SOLI_ESTADO === 'PENDIENTE';
+            const puedeResolver = Boolean(window.puedeResolverSolicitudSip);
+            document.getElementById('solicitudSipEstado').textContent = pendiente
+                ? (puedeResolver
+                    ? 'Revisa solo los cambios solicitados y los datos personales y familiares.'
+                    : 'Pendiente de revisión. Solo Admins RRHH y Super Usuario pueden aprobar o rechazar esta solicitud.')
+                : `Esta solicitud ya fue ${data.solicitud?.SOLI_ESTADO || 'atendida'}.`;
+            document.getElementById('aprobarSolicitudSip').disabled = !pendiente || !puedeResolver;
+            document.getElementById('rechazarSolicitudSip').disabled = !pendiente || !puedeResolver;
+            const tbody = document.getElementById('solicitudSipComparacion');
+            const etiquetas = {
+                DJ_FAMILIARES: 'Datos familiares', FECH_CADUCA_DNI: 'Caducidad del DNI',
+                PERS_ESTADO_CIVIL: 'Estado civil', PERS_TELEFONO: 'Celular', PERS_EMAIL: 'Correo electrónico',
+                PERS_WHATSAPP: 'WhatsApp', SABE_NADAR: 'Sabe nadar', PERS_GRUP_SANGRE: 'Tipo de sangre',
+                PERS_PESO: 'Peso (kg)', PERS_TALLA: 'Talla (m)', PERS_SIST_PREV: 'Sistema previsional',
+                PERS_ESSALUD: 'EsSalud Vida', PERS_PENSIONISTA: 'Pensionista', PERS_GRADO_INST: 'Grado de instrucción',
+                PERS_INSTITUCION: 'Institución', PERS_CARRERA: 'Carrera', PERS_ANIO_EGRESO: 'Año de egreso',
+                PERS_EMBARGO: 'Embargos financieros', PERS_BANCO: 'Cuenta de sueldo', DIRECCION: 'Dirección actual',
+                DIRECCION_DNI: 'Dirección del DNI', PERS_NOMCONTACTO: 'Contacto de emergencia',
+                PERS_NROEMERGENCIA: 'Celular de emergencia', PERS_PARENT_EME: 'Parentesco de emergencia',
+                DEPA_CODIGO_NACI: 'Departamento de nacimiento', PROVI_CODIGO_NACI: 'Provincia de nacimiento',
+                DIST_NACI: 'Distrito de nacimiento', PERS_DEPT_ACT: 'Departamento actual',
+                PERS_PROV_ACT: 'Provincia actual', PERS_DIST_ACT: 'Distrito actual', PERS_DEPT_DNI: 'Departamento del DNI',
+                PERS_PROV_DNI: 'Provincia del DNI', PERS_DIST_DNI: 'Distrito del DNI', LAB_SUCAMEC: 'Curso SUCAMEC',
+                LAB_SUCAMEC_OBS: 'Detalle SUCAMEC', LAB_LIC_ARMA: 'Licencia L4', LAB_ARMA_PROPIA: 'Arma propia',
+                LAB_SMO: 'Servicio militar', PERS_BREVETE: 'Brevete', CLASE_BREVETE: 'Clase de brevete',
+                PERS_TIPO_VEHICULO: 'Categoría de brevete', PERS_VEHICULO_PROPIO: 'Vehículo propio',
+                PERS_ULTIMA_EMP: 'Empresa anterior', PERS_ULTIMO_CARGO: 'Cargo anterior',
+                PERS_ULTIMA_DURACION: 'Duración en cargo anterior', dj2026_ocupacion_principal: 'Ocupación principal',
+                dj2026_experiencia_anios: 'Experiencia (años)', dj2026_familiar_empresa: 'Familiar en la empresa',
+                dj2026_familiar_nombre: 'Nombre del familiar', dj2026_familiar_parentesco: 'Parentesco del familiar',
+                dj2026_descripcion: 'Ocupaciones adicionales', dj2026_ciudad_naci: 'Ciudad de nacimiento'
+            };
+            const detalles = data.detalles || [];
+            tbody.replaceChildren();
+            const detalleFamiliares = detalles.find(item => item.SOLD_CAMPO === 'DJ_FAMILIARES');
+            const familiaresAnteriores = detalleFamiliares
+                ? listaFamiliaresSolicitud(detalleFamiliares.SOLD_VALOR_ANTERIOR)
+                : listaFamiliaresSolicitud(data.familiares_actuales);
+            const familiaresSolicitados = detalleFamiliares
+                ? listaFamiliaresSolicitud(detalleFamiliares.SOLD_VALOR_PROPUESTO)
+                : familiaresAnteriores;
+            const familiaresSinCambios = JSON.stringify(familiaresSolicitudComparables(familiaresAnteriores))
+                === JSON.stringify(familiaresSolicitudComparables(familiaresSolicitados));
+            const familiaresHtml = familiares => familiares.length
+                ? textoSolicitud(familiares)
+                : '<p class="text-sm text-slate-400">Sin familiares registrados</p>';
+            const contenedorFamiliares = document.getElementById('solicitudSipFamiliares');
+            contenedorFamiliares.className = familiaresSinCambios
+                ? 'grid grid-cols-1 gap-4'
+                : 'grid grid-cols-1 gap-4 md:grid-cols-2';
+            contenedorFamiliares.innerHTML = familiaresSinCambios
+                ? `<div><p class="mb-2 text-sm text-slate-500">Sin cambios solicitados. Datos familiares registrados:</p>${familiaresHtml(familiaresAnteriores)}</div>`
+                : [
+                    ['Registrados', familiaresAnteriores], ['Solicitados', familiaresSolicitados]
+                ].map(([titulo, familiares]) =>
+                    `<div><h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">${titulo}</h4>${familiaresHtml(familiares)}</div>`
+                ).join('');
+
+            let totalCambios = 0;
+            const camposRenderizados = new Set();
+            detalles.filter(item => !['DJ_DATOS_ACTUALES', 'DJ_PROPUESTA_COMPLETA', 'DJ_FAMILIARES'].includes(item.SOLD_CAMPO))
+                .filter(item => valorSolicitudComparable(item.SOLD_VALOR_ANTERIOR, item.SOLD_CAMPO) !== valorSolicitudComparable(item.SOLD_VALOR_PROPUESTO, item.SOLD_CAMPO))
+                .filter(item => {
+                    if (camposRenderizados.has(item.SOLD_CAMPO)) return false;
+                    camposRenderizados.add(item.SOLD_CAMPO);
+                    return true;
+                })
+                .forEach(item => {
+                    totalCambios++;
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `<td class="border p-3 font-semibold text-slate-700">${escaparHtml(etiquetas[item.SOLD_CAMPO] || item.SOLD_CAMPO)}</td><td class="border p-3 align-top">${valorCambioSolicitudLegible(item.SOLD_VALOR_ANTERIOR, item.SOLD_CAMPO)}</td><td class="border p-3 align-top">${valorCambioSolicitudLegible(item.SOLD_VALOR_PROPUESTO, item.SOLD_CAMPO)}</td>`;
+                    tbody.appendChild(fila);
+                });
+            if (detalleFamiliares && !familiaresSinCambios) totalCambios++;
+            if (totalCambios === 0) {
+                const fila = document.createElement('tr');
+                fila.innerHTML = '<td colspan="3" class="border p-4 text-center text-sm text-slate-500">No hay cambios personales adicionales; revisa los datos familiares mostrados abajo.</td>';
+                tbody.appendChild(fila);
+            }
+        } catch (error) {
+            document.getElementById('solicitudSipEstado').textContent = error.response?.data?.message || error.message || 'Error cargando solicitud.';
+        }
+    }
+    window.abrirRevisionSolicitudSip = abrirRevisionSolicitudSip;
+
+    function cerrarRevisionSolicitudSip() {
+        solicitudSipRenderSeq++;
+        modalSolicitudSip.classList.add('hidden');
+        modalSolicitudSip.classList.remove('flex');
+        solicitudSipActual = null;
+    }
+    ['cerrarModalSolicitudSip', 'cerrarModalSolicitudSip2'].forEach(id => document.getElementById(id)?.addEventListener('click', cerrarRevisionSolicitudSip));
+    modalSolicitudSip?.addEventListener('click', event => { if (event.target === modalSolicitudSip) cerrarRevisionSolicitudSip(); });
+
+    async function resolverSolicitudSip(decision) {
+        if (!solicitudSipActual) return;
+        if (!window.puedeResolverSolicitudSip) {
+            return Swal.fire('Acceso restringido', 'Solo Admins RRHH y Super Usuario pueden aprobar o rechazar solicitudes DJ.', 'warning');
+        }
+        const confirmacion = await Swal.fire({
+            title: decision === 'APROBADA' ? '¿Aprobar la solicitud?' : '¿Rechazar la solicitud?',
+            text: decision === 'APROBADA' ? 'Los cambios se guardarán en los datos del personal en SISOL.' : 'La solicitud quedará registrada como rechazada.',
+            icon: 'question', showCancelButton: true, confirmButtonText: decision === 'APROBADA' ? 'Aprobar' : 'Rechazar', cancelButtonText: 'Volver'
+        });
+        if (!confirmacion.isConfirmed) return;
+        try {
+            const { data } = await axios.post(`${API_URL}/dj/solicitudes-sip/${encodeURIComponent(solicitudSipActual)}/resolver`, { decision });
+            await Swal.fire('Listo', data.message, 'success');
+            cerrarRevisionSolicitudSip();
+            cargarDatosEtapa2();
+        } catch (error) {
+            Swal.fire('No se pudo resolver', error.response?.data?.message || error.message || 'Intenta nuevamente.', 'error');
+        }
+    }
+    document.getElementById('aprobarSolicitudSip')?.addEventListener('click', () => resolverSolicitudSip('APROBADA'));
+    document.getElementById('rechazarSolicitudSip')?.addEventListener('click', () => resolverSolicitudSip('RECHAZADA'));
 
     // ============================================================
     // 3° ETAPA: CONTROL DE IMPRESIONES (MISMO SP + BOTONES ACTIVOS)
@@ -3320,6 +3618,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function makeFamilyRow() {
         return `
         <div class="family-row grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg relative" data-familia-row>
+            <input type="hidden" name="familiar_id[]" value="">
             <div>
                 <label class="text-sm font-medium inline-block mb-2">Parentesco</label>
                 <select name="parentesco[]" class="form-select w-full">
@@ -3978,38 +4277,74 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
 
-                // DNI obligatorio: solo para hijos MENORES de edad
-                // (la regla NO aplica para el rol ADMINS RRHH)
-                if (!esAdminRrhhDj()) {
-                    const filasHijosDni = filasHijosDj();
-                    for (let i = 0; i < filasHijosDni.length; i++) {
-                        const fechaH = filasHijosDni[i].querySelector('input[name="fechaNacimiento[]"]')?.value;
-                        if (!esMenorDeEdadDj(fechaH)) continue;   // solo menores de edad
-                        const stH = estadoDniHijo(filasHijosDni[i]);
-                        const okA = !!(stH.anverso || stH.tieneAnverso);
-                        const okR = !!(stH.reverso || stH.tieneReverso);
-                        if (!okA || !okR) {
-                            const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Falta el DNI del hijo ' + (i + 1),
-                                text: 'Debe subir el ' + falta + ' del DNI para continuar.',
-                                confirmButtonText: 'Entendido',
-                            });
-                            if (btnGuardar) btnGuardar.disabled = false;
-                            return;
-                        }
+                const filasHijosDni = filasHijosDj();
+                for (let i = 0; i < filasHijosDni.length; i++) {
+                    if (!requiereDniHijoDj(filasHijosDni[i])) continue;
+                    const stH = estadoDniHijo(filasHijosDni[i]);
+                    const okA = !!(stH.anverso || stH.tieneAnverso);
+                    const okR = !!(stH.reverso || stH.tieneReverso);
+                    if (!okA || !okR) {
+                        const falta = (!okA && !okR) ? 'anverso y reverso' : (!okA ? 'anverso' : 'reverso');
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Falta el DNI del hijo ' + (i + 1),
+                            text: 'Debe subir el ' + falta + ' del DNI para continuar.',
+                            confirmButtonText: 'Entendido',
+                        });
+                        if (btnGuardar) btnGuardar.disabled = false;
+                        return;
                     }
                 }
 
+                // La decisión de desactivar se solicita antes de guardar cuando un
+                // hijo registrado como menor ya cumplió 18 años.
+                let desactivarAsignacionFamiliar = false;
+                let mantenerAsignacionFamiliar = false;
+                const hijosMayorEdad = filasHijosDj().filter(fila =>
+                    fila.querySelector('select[name="parentesco[]"]')?.value?.trim().toUpperCase() === 'HIJO MENOR DE EDAD'
+                    && !esMenorDeEdadDj(fila.querySelector('input[name="fechaNacimiento[]"]')?.value)
+                    && !!fila.querySelector('input[name="fechaNacimiento[]"]')?.value
+                );
+                if (hijosMayorEdad.length) {
+                    const decision = await Swal.fire({
+                        icon: 'warning',
+                        title: 'El hijo ya cumplió la mayoría de edad',
+                        text: '¿Desactivar asignación familiar?',
+                        showDenyButton: true,
+                        confirmButtonText: 'Sí',
+                        denyButtonText: 'No',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                    });
+                    desactivarAsignacionFamiliar = decision.isConfirmed;
+                    mantenerAsignacionFamiliar = decision.isDenied;
+                    if (mantenerAsignacionFamiliar) {
+                        for (const fila of hijosMayorEdad) {
+                            const st = estadoDniHijo(fila);
+                            if (!st.anverso || !st.reverso) {
+                                Swal.fire({ icon: 'warning', title: 'DNI del hijo obligatorio', text: 'Para conservar la asignación familiar, vuelva a subir el anverso y el reverso del DNI de cada hijo mayor de edad.', confirmButtonText: 'Entendido' });
+                                abrirModalDniHijosDj(fila);
+                                if (btnGuardar) btnGuardar.disabled = false;
+                                return;
+                            }
+                        }
+                    }
+                }
                 const payload = {
                     ...data,
                     cambios: cambios,
+                    // Discrimina esta pantalla de Gestión DJ: el backend archiva la
+                    // notificación SIP solo cuando el guardado viene de aquí.
+                    origen: 'actualizar_dj',
                     source: tabActiva,
+                    desactivar_asignacion_familiar: desactivarAsignacionFamiliar ? '1' : '0',
+                    mantener_asignacion_familiar: mantenerAsignacionFamiliar ? '1' : '0',
                     no_caduca_dni: data.no_caduca_dni === 'on' ? '1' : '0',
                     FAM_PARENTESCO: formData.getAll('parentesco[]'),
                     FAM_NOMBRES: formData.getAll('apellidosNombres[]'),
                     FAM_FECHA_NACI: formData.getAll('fechaNacimiento[]'),
+                    FAM_ID: formData.getAll('familiar_id[]'),
+                    FAM_PRESENTE: '1',
                     dj2026_descripcion: formData.getAll('ocupacion_alterna[]')
                 };
 
@@ -4039,6 +4374,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (fotoAdjuntaAdj)         formDataSave.append('foto', fotoAdjuntaAdj);
                 if (dniAdjuntoAdj.anverso)  formDataSave.append('dni_anverso', dniAdjuntoAdj.anverso);
                 if (dniAdjuntoAdj.reverso) formDataSave.append('dni_reverso', dniAdjuntoAdj.reverso);
+                filasHijosDj().forEach((fila, i) => {
+                    const st = estadoDniHijo(fila);
+                    if (st.anverso) formDataSave.append(`dni_hijos_anverso[${i + 1}]`, st.anverso);
+                    if (st.reverso) formDataSave.append(`dni_hijos_reverso[${i + 1}]`, st.reverso);
+                });
 
                 const csrfTokenSave = document.querySelector('meta[name="csrf-token"]')?.content || '';
                 const response = await axios.post(url, formDataSave, {
@@ -5337,6 +5677,7 @@ async function llenarFormulario(data) {
 
     setValue('#ocupacion_principal', data.dj2026_ocupacion_principal);
     setValue('#experiencia_anios', data.dj2026_experiencia_anios ? String(data.dj2026_experiencia_anios).replace(/[^0-9]/g, '') : '');
+    setValue('#experiencia_meses', data.dj2026_experiencia_meses !== null && data.dj2026_experiencia_meses !== undefined ? String(data.dj2026_experiencia_meses).replace(/[^0-9]/g, '') : '');
     setValue('#familiar_empresa', data.dj2026_familiar_empresa ? data.dj2026_familiar_empresa.trim() : '');
     setValue('#familiar_nombre', data.dj2026_familiar_nombre ? data.dj2026_familiar_nombre.trim() : '');
     setValue('#familiar_parentesco', data.dj2026_familiar_parentesco ? data.dj2026_familiar_parentesco.trim() : '');
@@ -5349,7 +5690,7 @@ async function llenarFormulario(data) {
     setValue('#brevete', data.PERS_BREVETE ? data.PERS_BREVETE.trim() : '');
     setValue('#clase_brevete', data.CLASE_BREVETE ? data.CLASE_BREVETE.trim() : '');
     actualizarCategorias();  // ← puebla el select tipo_vehiculo según la clase
-    setValue('#tipo_vehiculo', data.CATEGORIA_BREVETE ? data.CATEGORIA_BREVETE.trim() : '');
+    setValue('#tipo_vehiculo', data.CATEGORIA_BREVETE ?? data.PERS_TIPO_VEHICULO ?? '');
     setValue('#vehiculo_propio', data.PERS_VEHICULO_PROPIO ? data.PERS_VEHICULO_PROPIO.trim() : '');
 
     setValue('#empresa_anterior', data.PERS_CTRABANT ? data.PERS_CTRABANT.trim() : '');
@@ -5416,8 +5757,15 @@ function estadoDniHijo(fila) {
     return st;
 }
 
-// Regla DNI del hijo: OBLIGATORIO solo para menores de edad.
-// El rol ADMINS RRHH (tipo 17) está exento de la regla.
+function requiereDniHijoDj(fila) {
+    const parentesco = (fila?.querySelector('select[name="parentesco[]"]')?.value || '').trim().toUpperCase();
+    const discapacitadoPermanente = parentesco.startsWith('HIJO MAYOR DE EDAD')
+        && /INCAPACITADO|DISCAPACIDAD/.test(parentesco)
+        && parentesco.includes('PERMANENT');
+    return discapacitadoPermanente
+        || (parentesco === 'HIJO MENOR DE EDAD' && esMenorDeEdadDj(fila.querySelector('input[name="fechaNacimiento[]"]')?.value));
+}
+
 function esMenorDeEdadDj(fecha) {
     if (!fecha) return false;
     const nac = new Date(String(fecha).slice(0, 10) + 'T00:00:00');
@@ -5427,10 +5775,6 @@ function esMenorDeEdadDj(fecha) {
     const m = hoy.getMonth() - nac.getMonth();
     if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) anios--;
     return anios < 18;
-}
-
-function esAdminRrhhDj() {
-    return String(window.tipoUsuario ?? '').trim() === '17';
 }
 
 function actualizarEstadoDniHijo(fila) {
@@ -5447,8 +5791,7 @@ function actualizarEstadoDniHijo(fila) {
         span.style.color = '#16a34a';
         return;
     }
-    const fecha = fila.querySelector('input[name="fechaNacimiento[]"]')?.value;
-    const obligatorio = esMenorDeEdadDj(fecha) && !esAdminRrhhDj();
+    const obligatorio = requiereDniHijoDj(fila);
     const detalle = (okA || okR) ? 'falta ' + (okA ? 'reverso' : 'anverso') : 'sin DNI';
     if (obligatorio) {
         span.textContent = '⚠ ' + detalle + ' (obligatorio)';
@@ -5551,7 +5894,7 @@ function configDniHijosDj() {
             if (btn) abrirModalDniHijosDj(btn.closest('.family-row'));
         });
         cont.addEventListener('change', (e) => {
-            if (e.target.matches('input[name="fechaNacimiento[]"]')) {
+            if (e.target.matches('input[name="fechaNacimiento[]"], select[name="parentesco[]"]')) {
                 actualizarExtrasFilaHijo(e.target.closest('.family-row'));
             }
         });
@@ -5692,6 +6035,7 @@ function addFamiliarRow(data = {}, container = null) {
     row.className = 'family-row';
     row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:8px;align-items:start;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:8px 10px;';
     row.innerHTML = `
+        <input type="hidden" name="familiar_id[]" value="${data.CODI_DERE_HABI || ''}">
         <div>
             <label class="dj-label">Parentesco</label>
             <select name="parentesco[]" class="dj-select">

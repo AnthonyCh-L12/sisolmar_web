@@ -13,9 +13,11 @@ class BiometricoController extends Controller
         $baseHttp = "http://190.116.178.163/Biblioteca_Grafica";
 
         $rutaHuellaAntigua     = ['tipo' => 'http', 'base' => "$baseHttp/HUELLAS_DIGITALES/PERSONAL"];
-        $rutaHuellaNueva       = ['tipo' => 'http', 'base' => "$baseHttp/DOCUMENTOS_PERS/DJ_2026/huellas"];
+        // Las biometrías extraídas de una DJ se guardan en las carpetas
+        // PERSONAL; el modal debe consultar el mismo destino para mostrarlas.
+        $rutaHuellaNueva       = ['tipo' => 'http', 'base' => "$baseHttp/HUELLAS_DIGITALES/PERSONAL"];
         $rutaFirmaAntigua      = ['tipo' => 'http', 'base' => "$baseHttp/FIRMAS/PERSONAL"];
-        $rutaFirmaNueva        = ['tipo' => 'http', 'base' => "$baseHttp/DOCUMENTOS_PERS/DJ_2026/firmas"];
+        $rutaFirmaNueva        = ['tipo' => 'http', 'base' => "$baseHttp/FIRMAS/PERSONAL"];
         $rutaDNIanversoAntigua = ['tipo' => 'http', 'base' => "$baseHttp/DNI1_1"];
         $rutaDNIreversoAntigua = ['tipo' => 'http', 'base' => "$baseHttp/DNI2_1"];
         $rutaFotoActual        = ['tipo' => 'http', 'base' => "$baseHttp/Fotos"];

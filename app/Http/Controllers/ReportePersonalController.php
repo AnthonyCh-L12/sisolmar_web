@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Models\NotificacionModel;
+use Barryvdh\DomPDF\Facade\Pdf;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -95,7 +97,7 @@ class ReportePersonalController extends Controller
     {
         $codSucursal  = trim($request->get('codSucursal',  ''));
         $tipoPer      = trim($request->get('tipoPer',      ''));
-        $vigente      = $request->get('vigente', '1');
+        $vigente      = $request->get('vigente', '');
         $apPaterno    = trim($request->get('apPaterno',    ''));
         $docIdentidad = trim($request->get('docIdentidad', ''));
 
@@ -156,7 +158,9 @@ class ReportePersonalController extends Controller
             ]);
 
         // ── Vigente ───────────────────────────────────────────
-        $query->where('p.PERS_VIGENCIA', $vigente === '1' ? 'SI' : 'NO');
+        if ($vigente === '1' || $vigente === '0') {
+            $query->where('p.PERS_VIGENCIA', $vigente === '1' ? 'SI' : 'NO');
+        }
 
         // ── Sucursal ──────────────────────────────────────────
         if ($codSucursal !== '') {
@@ -220,7 +224,7 @@ class ReportePersonalController extends Controller
     /**
      * GET /api/reporte/personal-documentos   (?refrescar=1&solo_faltantes=1)
      *
-     * Devuelve un .xlsx con el personal vigente e indica:
+     * Devuelve un .xlsx con el personal que coincide con los filtros e indica:
      *   · Foto     → Sí / No / Sin verificar
      *   · DNI      → Completo / Solo anverso / Solo reverso / No / Sin verificar
      *   · Quién lo registró (y cuándo) y quién lo modificó (y cuándo)
@@ -234,7 +238,7 @@ class ReportePersonalController extends Controller
      */
     public function documentosPendientes(Request $request)
     {
-        // El reporte expone el DNI y la trazabilidad de todo el personal vigente:
+        // El reporte expone el DNI y la trazabilidad del personal filtrado:
         // solo ADMINS RRHH (17) y SUPERUSUARIO (11). Mismo criterio que el @if
         // del botón en gestion_dj.blade.php, para que ambos siempre concuerden.
         if (!in_array((int) session('tipo_rol'), self::ROLES_REPORTE_DOCUMENTOS, true)) {
@@ -246,15 +250,28 @@ class ReportePersonalController extends Controller
         $forzar = in_array((string) $request->query('refrescar'), ['1', 'true'], true);
         $soloFaltantes = in_array((string) $request->query('solo_faltantes'), ['1', 'true'], true);
 
+        $filtros = $request->validate([
+            'codSucursal' => 'nullable|string|max:20',
+            'tipoPer' => 'nullable|in:01,02,03,05',
+            'cargo' => 'nullable|string|max:20',
+            'vigente' => 'nullable|in:SI,NO',
+        ]);
+        $incremental = $request->boolean('incremental');
+        $scanId = $request->query('scan_id');
+        if ($incremental && (!is_string($scanId) || !preg_match('/^[a-f0-9-]{36}$/i', $scanId))) {
+            abort(422, 'Identificador de escaneo inválido.');
+        }
+
         // ── 1. Población ──────────────────────────────────────
-        // Réplica de SW_LISTAR_PERSONAL_DJ_2026_GESTION (la misma que
-        // alimenta la pantalla de Gestión DJ): todos los vigentes,
-        // todos los tipos de personal y todas las sucursales.
+        // Parte de la misma fuente que Gestión DJ y aplica los mismos filtros
+        // elegidos en la pantalla antes de revisar archivos.
         $sql = <<<'SQL'
             SELECT
                 LTRIM(RTRIM(p.CODI_PERS))  AS CODI_PERS,
                 p.APEL_1, p.APEL_2, p.NOMB_1, p.NOMB_2,
                 p.NRO_DOCU_IDEN,
+                p.FECH_INGRE,
+                p.FECH_INGRE_PLANILLA,
                 ISNULL(s.SUCU_ABREVIATURA, p.SUCU_CODIGO)    AS SUCURSAL,
                 ISNULL(tp.TIPE_DESCRIPCION, p.PERS_TIPOTRAB) AS TIPO_DESCRIPCION,
                 ISNULL(c.DESC_CARGO, p.CODI_CARG)            AS CARGO_DESC,
@@ -287,12 +304,25 @@ class ReportePersonalController extends Controller
                 FROM si_solm.dbo.USUARIOS u
                 WHERE u.LOGIN = LTRIM(RTRIM(p.USUA_CODIGO_MOD))
             ) mod
-            WHERE p.PERS_VIGENCIA = 'SI'
-              AND p.EMPR_CODIGO   = '01'
-            ORDER BY p.APEL_1, p.APEL_2, p.NOMB_1
             SQL;
 
-        $personal = DB::select($sql);
+        $condiciones = ['p.EMPR_CODIGO = ?'];
+        $parametros = ['01'];
+        foreach ([
+            'codSucursal' => 'p.SUCU_CODIGO',
+            'tipoPer' => 'p.PERS_TIPOTRAB',
+            'cargo' => 'p.CODI_CARG',
+            'vigente' => 'p.PERS_VIGENCIA',
+        ] as $filtro => $columna) {
+            if (!empty($filtros[$filtro])) {
+                $condiciones[] = $columna . ' = ?';
+                $parametros[] = $filtros[$filtro];
+            }
+        }
+        $sql .= " WHERE " . implode(' AND ', $condiciones)
+              . ' ORDER BY p.APEL_1, p.APEL_2, p.NOMB_1';
+
+        $personal = DB::select($sql, $parametros);
 
         $filas   = [];
         $codigos = [];
@@ -316,6 +346,8 @@ class ReportePersonalController extends Controller
                 'sucursal' => trim((string) ($r->SUCURSAL         ?? '')),
                 'tipo'     => trim((string) ($r->TIPO_DESCRIPCION ?? '')),
                 'cargo'    => trim((string) ($r->CARGO_DESC       ?? '')),
+                'ingreso_solmar' => $this->formatFecha($r->FECH_INGRE ?? null),
+                'ingreso_planilla' => $this->formatFecha($r->FECH_INGRE_PLANILLA ?? null),
                 'reg'      => $this->usuarioLegible($r->USUA_CODIGO_REG, $r->REG_NOMBRE),
                 'freg'     => $this->formatFechaHora($r->USUA_FECHA_REG),
                 'mod'      => $this->usuarioLegible($r->USUA_CODIGO_MOD, $r->MOD_NOMBRE),
@@ -324,7 +356,14 @@ class ReportePersonalController extends Controller
         }
 
         // ── 2. Escaneo del servidor de archivos (siempre, en paralelo) ──
-        $estado = $this->estadoDocumentos($codigos, $forzar);
+        $estado = $this->estadoDocumentos($codigos, $forzar, $scanId, $incremental);
+        if ($incremental && !$estado['completo']) {
+            return response()->json([
+                'completo' => false,
+                'procesados' => $estado['procesados'],
+                'total' => $estado['total'],
+            ]);
+        }
 
         // ── 3. Enriquecer filas + estadísticas ────────────────
         $fotoOk   = 0;
@@ -356,11 +395,10 @@ class ReportePersonalController extends Controller
 
         $stats = [
             'generado' => date('d/m/Y H:i:s'),
-            'vigentes' => count($filas),
+            'personal' => count($filas),
             'foto_ok'  => $fotoOk,
             'dni_ok'   => $dniOk,
             'faltan'   => $faltan,
-            'scan_at'  => $estado['scan_at'] ? $this->formatFechaHora($estado['scan_at']) : '—',
         ];
 
         if ($soloFaltantes) {
@@ -370,11 +408,53 @@ class ReportePersonalController extends Controller
             ));
         }
 
+        if ($request->boolean('previsualizar')) {
+            $muestra = array_map(static fn (array $fila, int $indice): array => [
+                'numero' => $indice + 1,
+                'codigo' => $fila['codi'],
+                'personal' => $fila['nombre'],
+                'dni' => $fila['doc'],
+                'sucursal' => $fila['sucursal'],
+                'tipo' => $fila['tipo'],
+                'cargo' => $fila['cargo'],
+                'ingreso_solmar' => $fila['ingreso_solmar'],
+                'ingreso_planilla' => $fila['ingreso_planilla'],
+                'foto' => $fila['foto_txt'],
+                'dni_estado' => $fila['dni_txt'],
+                'registrado_por' => $fila['reg'],
+                'fecha_registro' => $fila['freg'],
+                'modificado_por' => $fila['mod'],
+                'fecha_modificacion' => $fila['fmod'],
+            ], array_values($filas), array_keys(array_values($filas)));
+
+            return response()->json([
+                'preview' => $muestra,
+                'total' => count($filas),
+            ]);
+        }
+
+        if ($request->query('formato') === 'pdf') {
+            $tituloPdf = $this->tituloExcelDocumentos($filtros, $soloFaltantes);
+            return $this->descargarPdfReporte(
+                'file_control.reportes_dj_pdf',
+                $this->nombreArchivoExcel($tituloPdf, 'pdf'),
+                $tituloPdf,
+                array_values($filas),
+                [
+                    'N°' => 'numero', 'Código' => 'codi', 'Apellidos y nombres' => 'nombre',
+                    'N° documento' => 'doc', 'Cargo' => 'cargo', 'Ingreso a Solmar' => 'ingreso_solmar',
+                    'Ingreso a planillas' => 'ingreso_planilla', 'Foto' => 'foto_txt',
+                    'DNI' => 'dni_txt', 'Registrado por' => 'reg', 'F. registro' => 'freg',
+                    'Modificado por' => 'mod', 'F. modificación' => 'fmod',
+                ],
+                $stats
+            );
+        }
+
         // ── 4. Excel ──────────────────────────────────────────
-        $nombreArchivo = ($soloFaltantes
-            ? 'Reporte_Personal_Sin_Foto_DNI_'
-            : 'Reporte_Documentos_Personal_') . date('Y-m-d_His') . '.xlsx';
-        $rutaArchivo   = $this->generarExcelDocumentos(array_values($filas), $stats);
+        $tituloExcel = $this->tituloExcelDocumentos($filtros, $soloFaltantes);
+        $nombreArchivo = $this->nombreArchivoExcel($tituloExcel);
+        $rutaArchivo   = $this->generarExcelDocumentos(array_values($filas), $stats, $tituloExcel);
 
         // Copiar a storage/app/public/reportes para servir vía URL directa
         // (evita el problema de espacio prepended en respuestas AJAX del servidor built-in)
@@ -397,6 +477,84 @@ class ReportePersonalController extends Controller
         ]);
     }
 
+    private function tituloExcelDocumentos(array $filtros, bool $soloFaltantes): string
+    {
+        $sucursal = 'TODAS';
+        if (!empty($filtros['codSucursal'])) {
+            $registro = DB::selectOne(
+                'SELECT TOP 1 SUCU_ABREVIATURA FROM si_solm.dbo.SISO_SUCURSAL WHERE SUCU_CODIGO = ?',
+                [$filtros['codSucursal']]
+            );
+            $sucursal = trim((string) ($registro->SUCU_ABREVIATURA ?? $filtros['codSucursal']));
+        }
+
+        $tipo = 'TODOS';
+        if (!empty($filtros['tipoPer'])) {
+            $registro = DB::selectOne(
+                'SELECT TOP 1 TIPE_DESCRIPCION FROM si_solm.dbo.ADMI_TIPO_PERSONAL WHERE TIPE_CODIGO = ?',
+                [$filtros['tipoPer']]
+            );
+            $tipo = trim((string) ($registro->TIPE_DESCRIPCION ?? $filtros['tipoPer']));
+        }
+
+        $cargo = 'TODOS';
+        if (!empty($filtros['cargo'])) {
+            $registro = DB::selectOne(
+                'SELECT TOP 1 DESC_CARGO FROM si_solm.dbo.CARGOS WHERE CODI_CARG = ?',
+                [$filtros['cargo']]
+            );
+            $cargo = trim((string) ($registro->DESC_CARGO ?? $filtros['cargo']));
+        }
+
+        $estado = match ($filtros['vigente'] ?? '') {
+            'SI' => 'ACTIVOS',
+            'NO' => 'CESADOS',
+            default => 'ACTIVOS Y CESADOS',
+        };
+
+        $reporte = $soloFaltantes ? 'REPORTE DE PENDIENTES DE FOTOS / DNI' : 'REPORTE DE DOCUMENTOS';
+
+        return "{$reporte} | {$sucursal} | {$tipo} | {$cargo} | {$estado}";
+    }
+
+    private function nombreArchivoExcel(string $titulo, string $extension = 'xlsx'): string
+    {
+        $titulo = str_replace('|', ' ', $titulo);
+        $titulo = preg_replace('/^PENDIENTES\b/u', 'REPORTE DE PENDIENTES', $titulo) ?? $titulo;
+        $titulo = preg_replace('/([45])\s*[°º]/u', '$1TA', $titulo) ?? $titulo;
+        $ascii = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $titulo);
+        $nombre = strtoupper($ascii === false ? $titulo : $ascii);
+        $nombre = preg_replace('/[^A-Z0-9]+/', '_', $nombre) ?? 'REPORTE';
+        $nombre = trim(substr($nombre, 0, 210), '_');
+
+        return $nombre . '_' . date('Y-m-d') . '.' . $extension;
+    }
+
+    private function descargarPdfReporte(string $vista, string $nombre, string $titulo, array $filas, array $columnas, array $stats)
+    {
+        // Dompdf conserva el árbol de estilos y las páginas completas en
+        // memoria. El límite PHP predeterminado de 128 MB no alcanza para los
+        // reportes de personal con cientos o miles de filas.
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(0);
+
+        $filas = array_values(array_map(static function (array $fila, int $indice): array {
+            $fila['numero'] = $indice + 1;
+            return $fila;
+        }, $filas, array_keys($filas)));
+
+        $rutaLogo = public_path('images/logo_sol.png');
+        $logoDataUri = is_file($rutaLogo)
+            ? 'data:image/png;base64,' . base64_encode(file_get_contents($rutaLogo))
+            : null;
+
+        $pdf = Pdf::loadView($vista, compact('titulo', 'filas', 'columnas', 'stats', 'logoDataUri'))
+            ->setPaper('a3', 'landscape')
+            ->setOption('dpi', 72);
+
+        return $pdf->download($nombre);
+    }
+
     public function descargarReporte(Request $request, string $archivo)
     {
         $ruta = storage_path('app/public/reportes/' . $archivo);
@@ -406,7 +564,7 @@ class ReportePersonalController extends Controller
         }
 
         // Verificar que el archivo sea un reporte válido (seguridad básica)
-        if (!preg_match('/^Reporte_(Documentos_Personal|Personal_Sin_Foto_DNI|DNI_Hijos_Pendientes)_\d{4}-\d{2}-\d{2}_\d{6}\.xlsx$/', $archivo)) {
+        if (!preg_match('/^[A-Z0-9]+(?:_[A-Z0-9]+)*_\d{4}-\d{2}-\d{2}\.xlsx$/', $archivo)) {
             abort(403, 'Archivo no válido');
         }
 
@@ -421,7 +579,7 @@ class ReportePersonalController extends Controller
     // La v1 guardaba el último escaneo completo por 6 h, así que se cambia de
     // clave para que ninguna lectura previa quede como "dato fresco".
     private const HIJOS_CACHE_KEY = 'reporte_dni_hijos_estado_v2';
-    private const HIJOS_LOTE      = 100;
+    private const HIJOS_LOTE      = 10;
 
     /**
      * GET /api/dj/reporte/dni-hijos   (?refrescar=1)
@@ -452,6 +610,17 @@ class ReportePersonalController extends Controller
         @set_time_limit(0);
 
         $forzar = in_array((string) $request->query('refrescar'), ['1', 'true'], true);
+        $filtros = $request->validate([
+            'codSucursal' => 'nullable|string|max:20',
+            'tipoPer' => 'nullable|in:01,02,03,05',
+            'cargo' => 'nullable|string|max:20',
+            'vigente' => 'nullable|in:SI,NO',
+        ]);
+        $incremental = $request->boolean('incremental');
+        $scanId = $request->query('scan_id');
+        if ($incremental && (!is_string($scanId) || !preg_match('/^[a-f0-9-]{36}$/i', $scanId))) {
+            abort(422, 'Identificador de escaneo inválido.');
+        }
 
         // ── 1. Personal vigente con al menos un hijo menor de edad ──────
         // Mismo universo que el reporte de documentos: todos los vigentes,
@@ -461,6 +630,9 @@ class ReportePersonalController extends Controller
                 LTRIM(RTRIM(p.CODI_PERS))  AS CODI_PERS,
                 p.APEL_1, p.APEL_2, p.NOMB_1, p.NOMB_2,
                 p.NRO_DOCU_IDEN,
+                p.FECH_INGRE,
+                p.FECH_INGRE_PLANILLA,
+                p.ASIG_FAMI,
                 ISNULL(s.SUCU_ABREVIATURA, p.SUCU_CODIGO)    AS SUCURSAL,
                 ISNULL(tp.TIPE_DESCRIPCION, p.PERS_TIPOTRAB) AS TIPO_DESCRIPCION,
                 ISNULL(c.DESC_CARGO, p.CODI_CARG)            AS CARGO_DESC
@@ -471,8 +643,7 @@ class ReportePersonalController extends Controller
                     ON tp.TIPE_CODIGO = p.PERS_TIPOTRAB
             LEFT JOIN si_solm.dbo.CARGOS c
                     ON c.CODI_CARG = p.CODI_CARG
-            WHERE p.PERS_VIGENCIA = 'SI'
-              AND p.EMPR_CODIGO   = '01'
+            WHERE p.EMPR_CODIGO = '01'
               AND EXISTS (
                     SELECT 1
                     FROM si_solm.dbo.DERECHO_HABIENTE d
@@ -486,7 +657,23 @@ class ReportePersonalController extends Controller
             ORDER BY p.APEL_1, p.APEL_2, p.NOMB_1
             SQL;
 
-        $personal = DB::select($sql);
+        $parametros = [];
+        $condiciones = [];
+        foreach ([
+            'codSucursal' => 'p.SUCU_CODIGO',
+            'tipoPer' => 'p.PERS_TIPOTRAB',
+            'cargo' => 'p.CODI_CARG',
+            'vigente' => 'p.PERS_VIGENCIA',
+        ] as $filtro => $columna) {
+            if (!empty($filtros[$filtro])) {
+                $condiciones[] = $columna . ' = ?';
+                $parametros[] = $filtros[$filtro];
+            }
+        }
+        if ($condiciones !== []) {
+            $sql = str_replace('AND EXISTS (', 'AND ' . implode(' AND ', $condiciones) . ' AND EXISTS (', $sql);
+        }
+        $personal = DB::select($sql, $parametros);
 
         $filas   = [];
         $codigos = [];
@@ -507,6 +694,13 @@ class ReportePersonalController extends Controller
                     trim((string) ($r->NOMB_2 ?? '')),
                 ], fn ($v) => $v !== ''))),
                 'doc'      => trim((string) ($r->NRO_DOCU_IDEN ?? '')),
+                'ingreso_solmar' => $this->formatFecha($r->FECH_INGRE ?? null),
+                'ingreso_planilla' => $this->formatFecha($r->FECH_INGRE_PLANILLA ?? null),
+                'asignacion_familiar' => match (strtoupper(trim((string) ($r->ASIG_FAMI ?? '')))) {
+                    'SI', 'SÍ', '1' => 'Sí',
+                    'NO', '0' => 'No',
+                    default => 'Sin dato',
+                },
                 'sucursal' => trim((string) ($r->SUCURSAL         ?? '')),
                 'tipo'     => trim((string) ($r->TIPO_DESCRIPCION ?? '')),
                 'cargo'    => trim((string) ($r->CARGO_DESC       ?? '')),
@@ -514,7 +708,14 @@ class ReportePersonalController extends Controller
         }
 
         // ── 2. Escaneo del servidor de archivos (siempre, en paralelo) ─────
-        $estado = $this->estadoDniHijos($codigos, $forzar);
+        $estado = $this->estadoDniHijos($codigos, $forzar, $scanId, $incremental);
+        if ($incremental && !$estado['completo']) {
+            return response()->json([
+                'completo' => false,
+                'procesados' => $estado['procesados'],
+                'total' => $estado['total'],
+            ]);
+        }
 
         // ── 3. Enriquecer filas + estadísticas ──────────────────────────
         $evaluados    = 0;
@@ -599,7 +800,32 @@ class ReportePersonalController extends Controller
             'scan_at'   => $estado['scan_at'] ? $this->formatFechaHora($estado['scan_at']) : '—',
         ];
 
-        if ($filas === []) {
+        if ($request->boolean('previsualizar')) {
+            $muestra = array_map(static fn (array $fila, int $indice): array => [
+                'numero' => $indice + 1,
+                'codigo' => $fila['codi'],
+                'personal' => $fila['nombre'],
+                'dni' => $fila['doc'],
+                'sucursal' => $fila['sucursal'],
+                'tipo' => $fila['tipo'],
+                'cargo' => $fila['cargo'],
+                'ingreso_solmar' => $fila['ingreso_solmar'],
+                'ingreso_planilla' => $fila['ingreso_planilla'],
+                'asignacion_familiar' => $fila['asignacion_familiar'],
+                'hijos_menores' => $fila['total'],
+                'anverso' => $fila['anverso_txt'],
+                'reverso' => $fila['reverso_txt'],
+                'sin_imagen' => $fila['sin'],
+                'detalle' => $fila['detalle'],
+            ], array_values($filas), array_keys(array_values($filas)));
+
+            return response()->json([
+                'preview' => $muestra,
+                'total' => count($filas),
+            ]);
+        }
+
+        if ($filas === [] && $request->query('formato') !== 'pdf') {
             return response()->json([
                 'success' => false,
                 'message' => 'Sin faltantes: todos los hijos menores de edad cuentan con anverso y reverso del DNI cargados.',
@@ -607,8 +833,30 @@ class ReportePersonalController extends Controller
         }
 
         // ── 4. Excel ────────────────────────────────────────────────────
-        $nombreArchivo = 'Reporte_DNI_Hijos_Pendientes_' . date('Y-m-d_His') . '.xlsx';
-        $rutaArchivo   = $this->generarExcelDniHijos(array_values($filas), $stats);
+        $titulo = str_replace(
+            'REPORTE DE PENDIENTES DE FOTOS / DNI',
+            'PERSONAL CON ASIGNACIÓN FAMILIAR SIN SUSTENTO',
+            $this->tituloExcelDocumentos($filtros, true)
+        );
+
+        if ($request->query('formato') === 'pdf') {
+            return $this->descargarPdfReporte(
+                'file_control.reportes_dj_pdf',
+                $this->nombreArchivoExcel($titulo, 'pdf'),
+                $titulo,
+                array_values($filas),
+                [
+                    'N°' => 'numero', 'Código' => 'codi', 'Apellidos y nombres' => 'nombre',
+                    'N° documento' => 'doc', 'Cargo' => 'cargo', 'Ingreso a Solmar' => 'ingreso_solmar',
+                    'Ingreso a planillas' => 'ingreso_planilla', 'Asignación familiar' => 'asignacion_familiar',
+                    'Hijos <18' => 'total', 'Anverso' => 'anverso_txt', 'Reverso' => 'reverso_txt',
+                    'Sin imagen' => 'sin', 'Detalle de faltantes' => 'detalle',
+                ],
+                $stats
+            );
+        }
+        $nombreArchivo = $this->nombreArchivoExcel($titulo);
+        $rutaArchivo   = $this->generarExcelDniHijos(array_values($filas), $stats, $titulo);
 
         // Mismo mecanismo que documentosPendientes: se sirve desde
         // storage/app/public/reportes vía la ruta autenticada reporte.descargar.
@@ -624,6 +872,490 @@ class ReportePersonalController extends Controller
             'url'    => route('reporte.descargar', ['archivo' => $nombreArchivo]),
             'nombre' => $nombreArchivo,
         ]);
+    }
+
+    /**
+     * Personal con ASIG_FAMI = SI y exclusivamente hijos mayores de edad.
+     * Excluye a cualquier persona con un hijo menor o sin fecha de nacimiento
+     * verificable, para cumplir la condición de que TODOS sean mayores.
+     */
+    public function asignacionFamiliarHijosMayores(Request $request)
+    {
+        if (!in_array((int) session('tipo_rol'), self::ROLES_REPORTE_DOCUMENTOS, true)) {
+            abort(403, 'Este reporte es exclusivo para ADMINS RRHH y SUPERUSUARIO.');
+        }
+
+        $filtros = $request->validate([
+            'codSucursal' => 'nullable|string|max:20',
+            'tipoPer' => 'nullable|in:01,02,03,05',
+            'cargo' => 'nullable|string|max:20',
+            'vigente' => 'nullable|in:SI,NO',
+        ]);
+
+        $condiciones = [
+            "p.EMPR_CODIGO = '01'",
+            "UPPER(LTRIM(RTRIM(ISNULL(p.ASIG_FAMI, '')))) IN ('SI', 'SÍ', '1')",
+            "EXISTS (SELECT 1 FROM si_solm.dbo.DERECHO_HABIENTE dh WHERE LTRIM(RTRIM(dh.CODI_PERS)) = LTRIM(RTRIM(p.CODI_PERS)) AND dh.TIPO_RELA LIKE 'HIJ%' AND UPPER(LTRIM(RTRIM(ISNULL(dh.DEHA_VIGENCIA, 'SI')))) = 'SI')",
+            "NOT EXISTS (SELECT 1 FROM si_solm.dbo.DERECHO_HABIENTE dm WHERE LTRIM(RTRIM(dm.CODI_PERS)) = LTRIM(RTRIM(p.CODI_PERS)) AND dm.TIPO_RELA LIKE 'HIJ%' AND UPPER(LTRIM(RTRIM(ISNULL(dm.DEHA_VIGENCIA, 'SI')))) = 'SI' AND (dm.FECH_NACI IS NULL OR dm.FECH_NACI > DATEADD(YEAR, -18, CAST(GETDATE() AS DATE))))",
+        ];
+        $parametros = [];
+        foreach ([
+            'codSucursal' => 'p.SUCU_CODIGO',
+            'tipoPer' => 'p.PERS_TIPOTRAB',
+            'cargo' => 'p.CODI_CARG',
+            'vigente' => 'p.PERS_VIGENCIA',
+        ] as $filtro => $columna) {
+            if (!empty($filtros[$filtro])) {
+                $condiciones[] = $columna . ' = ?';
+                $parametros[] = $filtros[$filtro];
+            }
+        }
+
+        $sql = <<<'SQL'
+            SELECT LTRIM(RTRIM(p.CODI_PERS)) AS CODI_PERS,
+                   p.APEL_1, p.APEL_2, p.NOMB_1, p.NOMB_2, p.NRO_DOCU_IDEN,
+                   p.FECH_INGRE, p.FECH_INGRE_PLANILLA, p.ASIG_FAMI, p.PERS_VIGENCIA,
+                   ISNULL(s.SUCU_ABREVIATURA, p.SUCU_CODIGO) AS SUCURSAL,
+                   ISNULL(tp.TIPE_DESCRIPCION, p.PERS_TIPOTRAB) AS TIPO_DESCRIPCION,
+                   ISNULL(c.DESC_CARGO, p.CODI_CARG) AS CARGO_DESC,
+                   LTRIM(RTRIM(ISNULL(d.APEL_1, ''))) + ' ' + LTRIM(RTRIM(ISNULL(d.APEL_2, ''))) + ' ' +
+                   LTRIM(RTRIM(ISNULL(d.NOMB_1, ''))) + ' ' + LTRIM(RTRIM(ISNULL(d.NOMB_2, ''))) AS HIJO_NOMBRE,
+                   LTRIM(RTRIM(ISNULL(d.NRO_DOCU_IDEN, ''))) AS HIJO_DNI,
+                   CONVERT(CHAR(10), d.FECH_NACI, 103) AS HIJO_FECHA_NACIMIENTO,
+                   DATEDIFF(YEAR, d.FECH_NACI, GETDATE()) -
+                       CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, d.FECH_NACI, GETDATE()), d.FECH_NACI) > CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END AS HIJO_EDAD
+            FROM si_solm.dbo.PERSONAL p
+            INNER JOIN si_solm.dbo.DERECHO_HABIENTE d
+                    ON LTRIM(RTRIM(d.CODI_PERS)) = LTRIM(RTRIM(p.CODI_PERS))
+                   AND d.TIPO_RELA LIKE 'HIJ%'
+                   AND UPPER(LTRIM(RTRIM(ISNULL(d.DEHA_VIGENCIA, 'SI')))) = 'SI'
+            LEFT JOIN si_solm.dbo.SISO_SUCURSAL s ON s.SUCU_CODIGO = p.SUCU_CODIGO
+            LEFT JOIN si_solm.dbo.ADMI_TIPO_PERSONAL tp ON tp.TIPE_CODIGO = p.PERS_TIPOTRAB
+            LEFT JOIN si_solm.dbo.CARGOS c ON c.CODI_CARG = p.CODI_CARG
+            WHERE __CONDICIONES__
+              AND d.FECH_NACI IS NOT NULL
+              AND d.FECH_NACI <= DATEADD(YEAR, -18, CAST(GETDATE() AS DATE))
+            ORDER BY p.APEL_1, p.APEL_2, p.NOMB_1, d.TIPO_RELA, d.APEL_1, d.APEL_2, d.NOMB_1
+            SQL;
+        $sql = str_replace('__CONDICIONES__', implode(' AND ', $condiciones), $sql);
+
+        $registros = DB::select($sql, $parametros);
+        $porPersonal = [];
+        foreach ($registros as $r) {
+            $codigo = trim((string) ($r->CODI_PERS ?? ''));
+            if ($codigo === '') continue;
+            if (!isset($porPersonal[$codigo])) {
+                $porPersonal[$codigo] = [
+                    'codi' => $codigo,
+                    'nombre' => trim(implode(' ', array_filter([
+                        trim((string) ($r->APEL_1 ?? '')), trim((string) ($r->APEL_2 ?? '')),
+                        trim((string) ($r->NOMB_1 ?? '')), trim((string) ($r->NOMB_2 ?? '')),
+                    ], static fn ($v) => $v !== ''))),
+                    'doc' => trim((string) ($r->NRO_DOCU_IDEN ?? '')),
+                    'sucursal' => trim((string) ($r->SUCURSAL ?? '')),
+                    'tipo' => trim((string) ($r->TIPO_DESCRIPCION ?? '')),
+                    'cargo' => trim((string) ($r->CARGO_DESC ?? '')),
+                    'estado' => strtoupper(trim((string) ($r->PERS_VIGENCIA ?? ''))) === 'SI' ? 'Activo' : 'Cesado',
+                    'ingreso_solmar' => $this->formatFecha($r->FECH_INGRE ?? null),
+                    'ingreso_planilla' => $this->formatFecha($r->FECH_INGRE_PLANILLA ?? null),
+                    'asignacion_familiar' => 'Sí',
+                    'hijos' => [],
+                ];
+            }
+            $nombreHijo = trim((string) ($r->HIJO_NOMBRE ?? ''));
+            $porPersonal[$codigo]['hijos'][] = trim($nombreHijo
+                . ' | DNI: ' . (trim((string) ($r->HIJO_DNI ?? '')) ?: 'Sin dato')
+                . ' | Nac.: ' . (trim((string) ($r->HIJO_FECHA_NACIMIENTO ?? '')) ?: 'Sin dato')
+                . ' | Edad: ' . (int) ($r->HIJO_EDAD ?? 0));
+        }
+
+        $filas = array_values(array_map(static function (array $fila): array {
+            $fila['numero_hijos'] = count($fila['hijos']);
+            $fila['detalle_hijos'] = implode("\n", $fila['hijos']);
+            return $fila;
+        }, $porPersonal));
+
+        $titulo = str_replace(
+            'REPORTE DE DOCUMENTOS',
+            'ASIGNACIÓN FAMILIAR POR HIJOS MAYORES DE EDAD',
+            $this->tituloExcelDocumentos($filtros, false)
+        );
+        $stats = [
+            'generado' => date('d/m/Y H:i:s'),
+            'personal' => count($filas),
+            'hijos_mayores' => array_sum(array_column($filas, 'numero_hijos')),
+        ];
+
+        $columnas = [
+            'N°' => 'numero', 'Código' => 'codi', 'Apellidos y nombres' => 'nombre', 'N° documento' => 'doc',
+            'Cargo' => 'cargo', 'Estado' => 'estado',
+            'Ingreso a Solmar' => 'ingreso_solmar', 'Ingreso a planillas' => 'ingreso_planilla',
+            'N° hijos mayores' => 'numero_hijos',
+            'Detalle de hijos mayores' => 'detalle_hijos',
+        ];
+
+        if ($request->boolean('previsualizar')) {
+            $preview = array_map(static fn (array $fila, int $i): array => [
+                'numero' => $i + 1, 'codigo' => $fila['codi'], 'personal' => $fila['nombre'],
+                'dni' => $fila['doc'], 'sucursal' => $fila['sucursal'], 'tipo' => $fila['tipo'],
+                'cargo' => $fila['cargo'], 'estado' => $fila['estado'],
+                'ingreso_solmar' => $fila['ingreso_solmar'], 'ingreso_planilla' => $fila['ingreso_planilla'],
+                'asignacion_familiar' => $fila['asignacion_familiar'], 'numero_hijos' => $fila['numero_hijos'],
+                'detalle_hijos' => $fila['detalle_hijos'],
+            ], $filas, array_keys($filas));
+            return response()->json(['preview' => $preview, 'total' => count($preview)]);
+        }
+
+        if ($request->query('formato') === 'pdf') {
+            return $this->descargarPdfReporte('file_control.reportes_dj_pdf', $this->nombreArchivoExcel($titulo, 'pdf'), $titulo, $filas, $columnas, $stats);
+        }
+
+        $nombreArchivo = $this->nombreArchivoExcel($titulo);
+        $rutaArchivo = $this->generarExcelHijosMayoresAsignacion($filas, $stats, $titulo, $columnas);
+        $publicDir = storage_path('app/public/reportes');
+        if (!is_dir($publicDir)) @mkdir($publicDir, 0755, true);
+        copy($rutaArchivo, $publicDir . DIRECTORY_SEPARATOR . $nombreArchivo);
+        @unlink($rutaArchivo);
+        return response()->json(['url' => route('reporte.descargar', ['archivo' => $nombreArchivo]), 'nombre' => $nombreArchivo]);
+    }
+
+    /** Reporte de hijos registrados en DJ que cumplen 18 dentro de los próximos 30 días. */
+    public function asignacionFamiliarProximaVencer(Request $request)
+    {
+        if (!in_array((int) session('tipo_rol'), self::ROLES_REPORTE_DOCUMENTOS, true)) {
+            abort(403, 'Este reporte es exclusivo para ADMINS RRHH y SUPERUSUARIO.');
+        }
+
+        $filtros = $request->validate([
+            'codSucursal' => 'nullable|string|max:20',
+            'tipoPer' => 'nullable|in:01,02,03,05',
+            'cargo' => 'nullable|string|max:20',
+            'vigente' => 'nullable|in:SI,NO',
+        ]);
+
+        $filas = [];
+        $personasEvaluadas = [];
+        foreach (NotificacionModel::hijosPorCumplirMayoriaEdad($filtros, false) as $r) {
+            $personasEvaluadas[trim((string) $r->codigo_personal)] = true;
+            $filas[] = [
+                'sucursal' => trim((string) $r->sucursal),
+                'personal' => trim((string) $r->personal),
+                'dni' => trim((string) ($r->dni ?? '')),
+                'hijo' => trim((string) $r->hijo),
+                'fecha_nacimiento' => $r->fecha_nacimiento,
+                'fecha_mayoria' => $r->fecha_mayoria,
+                'dias_restantes' => (int) $r->dias_restantes,
+                'aviso' => (int) $r->dias_aviso === 15
+                    ? 'Recordatorio (15 días o menos)'
+                    : 'Aviso inicial (hasta 30 días)',
+            ];
+        }
+
+        $columnas = [
+            'N°' => 'numero', 'Sucursal' => 'sucursal', 'Personal' => 'personal',
+            'DNI del personal' => 'dni', 'Hijo(a)' => 'hijo',
+            'Fecha de nacimiento' => 'fecha_nacimiento', 'Cumple 18 años' => 'fecha_mayoria',
+            'Días restantes' => 'dias_restantes', 'Aviso' => 'aviso',
+        ];
+
+        if ($request->boolean('previsualizar')) {
+            $preview = array_map(static fn (array $fila, int $i): array => ['numero' => $i + 1] + $fila, $filas, array_keys($filas));
+            return response()->json(['preview' => $preview, 'total' => count($preview)]);
+        }
+
+        $titulo = str_replace(
+            'REPORTE DE DOCUMENTOS',
+            'REPORTE DE ASIGNACIÓN FAMILIAR PRÓXIMA A VENCER',
+            $this->tituloExcelDocumentos($filtros, false)
+        );
+        $stats = [
+            'generado' => date('d/m/Y H:i:s'),
+            'personal' => count($personasEvaluadas),
+            'mayoria_edad' => count($filas),
+        ];
+
+        if ($request->query('formato') === 'pdf') {
+            return $this->descargarPdfReporte(
+                'file_control.reportes_dj_pdf',
+                $this->nombreArchivoExcel($titulo, 'pdf'),
+                $titulo,
+                $filas,
+                $columnas,
+                $stats
+            );
+        }
+
+        $nombreArchivo = $this->nombreArchivoExcel($titulo);
+        $rutaArchivo = $this->generarExcelHijosMayoresAsignacion($filas, $stats, $titulo, $columnas);
+        $publicDir = storage_path('app/public/reportes');
+        if (!is_dir($publicDir)) @mkdir($publicDir, 0755, true);
+        copy($rutaArchivo, $publicDir . DIRECTORY_SEPARATOR . $nombreArchivo);
+        @unlink($rutaArchivo);
+
+        return response()->json([
+            'url' => route('reporte.descargar', ['archivo' => $nombreArchivo]),
+            'nombre' => $nombreArchivo,
+        ]);
+    }
+
+    /** Personal sin DJ escaneada ni registrada en las ubicaciones de carga conocidas. */
+    public function personalSinDjEscaneada(Request $request)
+    {
+        if (!in_array((int) session('tipo_rol'), self::ROLES_REPORTE_DOCUMENTOS, true)) {
+            abort(403, 'Este reporte es exclusivo para ADMINS RRHH y SUPERUSUARIO.');
+        }
+
+        $filtros = $request->validate([
+            'codSucursal' => 'nullable|string|max:20',
+            'tipoPer' => 'nullable|in:01,02,03,05',
+            'cargo' => 'nullable|string|max:20',
+            'vigente' => 'nullable|in:SI,NO',
+        ]);
+
+        $condiciones = ["p.EMPR_CODIGO = '01'"];
+        $parametros = [];
+        foreach ([
+            'codSucursal' => 'p.SUCU_CODIGO',
+            'tipoPer' => 'p.PERS_TIPOTRAB',
+            'cargo' => 'p.CODI_CARG',
+            'vigente' => 'p.PERS_VIGENCIA',
+        ] as $filtro => $columna) {
+            if (!empty($filtros[$filtro])) {
+                $condiciones[] = $columna . ' = ?';
+                $parametros[] = $filtros[$filtro];
+            }
+        }
+
+        $sql = <<<'SQL'
+            SELECT LTRIM(RTRIM(p.CODI_PERS)) AS CODI_PERS,
+                   p.APEL_1, p.APEL_2, p.NOMB_1, p.NOMB_2, p.NRO_DOCU_IDEN,
+                   p.PERS_VIGENCIA, p.FECH_INGRE, p.FECH_INGRE_PLANILLA,
+                   p.USUA_CODIGO_REG, p.USUA_FECHA_REG,
+                   ISNULL(s.SUCU_ABREVIATURA, p.SUCU_CODIGO) AS SUCURSAL,
+                   ISNULL(tp.TIPE_DESCRIPCION, p.PERS_TIPOTRAB) AS TIPO_DESCRIPCION,
+                   ISNULL(c.DESC_CARGO, p.CODI_CARG) AS CARGO_DESC,
+                   reg.NOMBRE_USUARIO AS REG_NOMBRE
+            FROM si_solm.dbo.PERSONAL p
+            LEFT JOIN si_solm.dbo.SISO_SUCURSAL s ON s.SUCU_CODIGO = p.SUCU_CODIGO
+            LEFT JOIN si_solm.dbo.ADMI_TIPO_PERSONAL tp ON tp.TIPE_CODIGO = p.PERS_TIPOTRAB
+            LEFT JOIN si_solm.dbo.CARGOS c ON c.CODI_CARG = p.CODI_CARG
+            OUTER APPLY (
+                SELECT TOP 1
+                       LTRIM(RTRIM(ISNULL(u.NOMB_1, ''))) + ' ' +
+                       LTRIM(RTRIM(ISNULL(u.NOMB_2, ''))) + ' ' +
+                       LTRIM(RTRIM(ISNULL(u.APEL_1, ''))) + ' ' +
+                       LTRIM(RTRIM(ISNULL(u.APEL_2, ''))) AS NOMBRE_USUARIO
+                FROM si_solm.dbo.USUARIOS u
+                WHERE u.LOGIN = LTRIM(RTRIM(p.USUA_CODIGO_REG))
+            ) reg
+            WHERE __CONDICIONES__
+            ORDER BY p.APEL_1, p.APEL_2, p.NOMB_1
+            SQL;
+        $personal = DB::select(str_replace('__CONDICIONES__', implode(' AND ', $condiciones), $sql), $parametros);
+
+        // El folio 25 registra las cargas de DJ. También se consideran PDFs
+        // que aparezcan en las carpetas aunque no tengan registro asociado.
+        $registrosDj = DB::table('sw_folios_detalles')
+            ->where('codFolio', 25)
+            ->get(['codPersonal']);
+        $codigosRegistrados = [];
+        foreach ($registrosDj as $registro) {
+            $codigo = trim((string) ($registro->codPersonal ?? ''));
+            if ($codigo === '') continue;
+            $codigosRegistrados[$codigo] = true;
+        }
+
+        // Enumerar cada carpeta una sola vez evita comprobar cientos/miles de
+        // archivos de forma serial contra la carpeta compartida de red.
+        $codigosConArchivo = [];
+        $directoriosDj = [
+            storage_path('app/dj/2026'),
+            '\\\\192.168.10.2\\Biblioteca_Grafica\\DOCUMENTOS_PERS\\DJ_2026',
+            '\\\\192.168.10.5\\Extranet_2024\\apps\\sisolmar\\storage\\app\\dj\\2026',
+        ];
+        foreach ($directoriosDj as $directorio) {
+            $archivos = @scandir($directorio);
+            if ($archivos === false) continue;
+            foreach ($archivos as $archivo) {
+                if (strtolower(pathinfo($archivo, PATHINFO_EXTENSION)) !== 'pdf') continue;
+                $codigosConArchivo[pathinfo($archivo, PATHINFO_FILENAME)] = true;
+            }
+        }
+
+        $filas = [];
+        foreach ($personal as $r) {
+            $codigo = trim((string) ($r->CODI_PERS ?? ''));
+            if ($codigo === '' || isset($codigosRegistrados[$codigo]) || isset($codigosConArchivo[$codigo])) continue;
+
+            $filas[] = [
+                'codi' => $codigo,
+                'nombre' => trim(implode(' ', array_filter([
+                    trim((string) ($r->APEL_1 ?? '')), trim((string) ($r->APEL_2 ?? '')),
+                    trim((string) ($r->NOMB_1 ?? '')), trim((string) ($r->NOMB_2 ?? '')),
+                ], static fn ($v) => $v !== ''))),
+                'doc' => trim((string) ($r->NRO_DOCU_IDEN ?? '')),
+                'sucursal' => trim((string) ($r->SUCURSAL ?? '')),
+                'tipo' => trim((string) ($r->TIPO_DESCRIPCION ?? '')),
+                'cargo' => trim((string) ($r->CARGO_DESC ?? '')),
+                'estado' => strtoupper(trim((string) ($r->PERS_VIGENCIA ?? ''))) === 'SI' ? 'Activo' : 'Cesado',
+                'ingreso_solmar' => $this->formatFecha($r->FECH_INGRE ?? null),
+                'ingreso_planilla' => $this->formatFecha($r->FECH_INGRE_PLANILLA ?? null),
+                'dj' => 'No encontrada',
+                'usuario_registro' => $this->usuarioLegible($r->USUA_CODIGO_REG ?? null, $r->REG_NOMBRE ?? null),
+                'fecha_registro' => $this->formatFechaHora($r->USUA_FECHA_REG ?? null),
+            ];
+        }
+
+        $titulo = str_replace('REPORTE DE DOCUMENTOS', 'REPORTE DE PERSONAL SIN DJ ESCANEADA', $this->tituloExcelDocumentos($filtros, false));
+        $columnas = [
+            'N°' => 'numero', 'Código' => 'codi', 'Apellidos y nombres' => 'nombre', 'N° documento' => 'doc',
+            'Cargo' => 'cargo',
+            'Ingreso a Solmar' => 'ingreso_solmar', 'Ingreso a planillas' => 'ingreso_planilla', 'DJ escaneada' => 'dj',
+            'Usuario de registro' => 'usuario_registro', 'Fecha de registro' => 'fecha_registro',
+        ];
+        $stats = ['generado' => date('d/m/Y H:i:s'), 'personal' => count($personal), 'sin_dj' => count($filas)];
+
+        if ($request->boolean('previsualizar')) {
+            $preview = array_map(static fn (array $fila, int $i): array => [
+                'numero' => $i + 1, 'codigo' => $fila['codi'], 'personal' => $fila['nombre'], 'dni' => $fila['doc'],
+                'sucursal' => $fila['sucursal'], 'tipo' => $fila['tipo'], 'cargo' => $fila['cargo'], 'estado' => $fila['estado'],
+                'ingreso_solmar' => $fila['ingreso_solmar'], 'ingreso_planilla' => $fila['ingreso_planilla'], 'dj' => $fila['dj'],
+                'usuario_registro' => $fila['usuario_registro'], 'fecha_registro' => $fila['fecha_registro'],
+            ], $filas, array_keys($filas));
+            return response()->json(['preview' => $preview, 'total' => count($preview)]);
+        }
+
+        if ($request->query('formato') === 'pdf') {
+            return $this->descargarPdfReporte('file_control.reportes_dj_pdf', $this->nombreArchivoExcel($titulo, 'pdf'), $titulo, $filas, $columnas, $stats);
+        }
+
+        $nombreArchivo = $this->nombreArchivoExcel($titulo);
+        $rutaArchivo = $this->generarExcelHijosMayoresAsignacion($filas, $stats, $titulo, $columnas);
+        $publicDir = storage_path('app/public/reportes');
+        if (!is_dir($publicDir)) @mkdir($publicDir, 0755, true);
+        copy($rutaArchivo, $publicDir . DIRECTORY_SEPARATOR . $nombreArchivo);
+        @unlink($rutaArchivo);
+        return response()->json(['url' => route('reporte.descargar', ['archivo' => $nombreArchivo]), 'nombre' => $nombreArchivo]);
+    }
+
+    private function generarExcelHijosMayoresAsignacion(array $filas, array $stats, string $titulo, array $columnas): string
+    {
+        $ss = new Spreadsheet();
+        $hoja = $ss->getActiveSheet();
+        $hoja->setTitle(isset($stats['sin_dj']) ? 'Sin DJ escaneada' : (isset($stats['mayoria_edad']) ? 'Mayoria de edad' : 'Hijos mayores'));
+        $hoja->setShowGridlines(false);
+        $totalColumnas = count($columnas);
+        $ultima = Coordinate::stringFromColumnIndex($totalColumnas);
+
+        $anchosPorColumna = [
+            'numero' => 6, 'codi' => 16, 'nombre' => 34, 'doc' => 15,
+            'sucursal' => 16, 'tipo' => 20, 'cargo' => 26, 'estado' => 13,
+            'ingreso_solmar' => 20, 'ingreso_planilla' => 23, 'asignacion_familiar' => 20,
+            'numero_hijos' => 16, 'detalle_hijos' => 78, 'dj' => 16,
+            'usuario_registro' => 40, 'fecha_registro' => 20,
+            'personal' => 48, 'dni' => 16, 'hijo' => 34, 'fecha_nacimiento' => 20,
+            'fecha_mayoria' => 20, 'dias_restantes' => 16, 'aviso' => 30,
+        ];
+        foreach (array_values($columnas) as $i => $clave) {
+            $hoja->getColumnDimension(Coordinate::stringFromColumnIndex($i + 1))
+                ->setWidth($anchosPorColumna[$clave] ?? 16);
+        }
+        $rutaLogo = public_path('images/logo_sol.png');
+        if (is_file($rutaLogo)) {
+            $logo = new Drawing();
+            $logo->setPath($rutaLogo);
+            $logo->setResizeProportional(false);
+            $logo->setCoordinates('A1');
+            $logo->setWidth(130);
+            $logo->setHeight(62);
+            $logo->setWorksheet($hoja);
+        }
+
+        $hoja->getRowDimension(1)->setRowHeight(64);
+        $hoja->mergeCells('C1:' . $ultima . '1');
+        $hoja->setCellValue('C1', $titulo);
+        $hoja->getStyle('C1')->getFont()->setBold(true)->setSize(12)->getColor()->setRGB('990000');
+        $hoja->getStyle('C1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
+        $hoja->mergeCells('C2:' . $ultima . '2');
+        $hoja->getRowDimension(4)->setRowHeight(6);
+
+        $bloquesStats = isset($stats['mayoria_edad'])
+            ? ['A' => 'C', 'D' => 'F', 'G' => $ultima]
+            : (isset($stats['sin_dj'])
+                ? ['A' => 'B', 'C' => 'F', 'G' => $ultima]
+                : ['A' => 'B', 'C' => 'H', 'I' => $ultima]);
+        $etiquetasStats = isset($stats['mayoria_edad'])
+            ? ['Generado', 'Personal', 'Hijos por cumplir 18']
+            : (isset($stats['sin_dj'])
+                ? ['Generado', 'Personal evaluado', 'Sin DJ escaneada']
+                : ['Generado', 'Personal evaluado', 'Hijos mayores de edad']);
+        $valoresStats = [
+            $stats['generado'],
+            number_format($stats['personal'], 0, ',', '.'),
+            number_format($stats['sin_dj'] ?? $stats['mayoria_edad'] ?? $stats['hijos_mayores'], 0, ',', '.'),
+        ];
+        $indiceStats = 0;
+        foreach ($bloquesStats as $desde => $hasta) {
+            $hoja->mergeCells($desde . '5:' . $hasta . '5');
+            $hoja->mergeCells($desde . '6:' . $hasta . '6');
+            $hoja->setCellValue($desde . '5', $etiquetasStats[$indiceStats]);
+            $hoja->setCellValue($desde . '6', $valoresStats[$indiceStats]);
+            $indiceStats++;
+        }
+        $hoja->getStyle('A5:' . $ultima . '6')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E5E7EB');
+        $hoja->getStyle('A5:' . $ultima . '5')->getFont()->setBold(true)->setSize(9)->getColor()->setRGB('374151');
+        $hoja->getStyle('A6:' . $ultima . '6')->getFont()->setBold(true)->setSize(10)->getColor()->setRGB('111827');
+        $hoja->getStyle('A5:' . $ultima . '6')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('D1D5DB');
+        $hoja->getStyle('A5:' . $ultima . '6')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+        $hoja->getRowDimension(7)->setRowHeight(6);
+
+        $filaCabecera = 8;
+        foreach (array_keys($columnas) as $i => $etiqueta) {
+            $hoja->setCellValue(Coordinate::stringFromColumnIndex($i + 1) . $filaCabecera, $etiqueta);
+        }
+        $matriz = [];
+        foreach ($filas as $i => $fila) {
+            $fila['numero'] = $i + 1;
+            $matriz[] = array_map(static fn (string $clave) => $fila[$clave] ?? '', array_values($columnas));
+        }
+        $filaInicial = $filaCabecera + 1;
+        $filaFinal = $filaCabecera + count($matriz);
+        if ($matriz !== []) {
+            $hoja->fromArray($matriz, null, 'A' . $filaInicial, true);
+            $base = $hoja->getStyle('A' . $filaInicial . ':' . $ultima . $filaFinal);
+            $base->getFont()->setSize(9);
+            $base->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('D1D5DB');
+            $base->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+            foreach (array_filter(['A', 'D', 'H', 'I', 'J', 'K', 'L'], static fn (string $col): bool => Coordinate::columnIndexFromString($col) <= $totalColumnas) as $col) {
+                $hoja->getStyle($col . $filaInicial . ':' . $col . $filaFinal)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            }
+            if (isset($stats['sin_dj'])) {
+                $hoja->getStyle($ultima . $filaInicial . ':' . $ultima . $filaFinal)->getFont()->setBold(true)->getColor()->setRGB('B91C1C');
+            } else {
+                $hoja->getStyle($ultima . $filaInicial . ':' . $ultima . $filaFinal)
+                    ->getAlignment()->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
+            }
+            $hoja->getStyle('A' . $filaInicial . ':' . $ultima . $filaFinal)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB(isset($stats['sin_dj']) ? 'FEE2E2' : 'FEF3C7');
+        }
+        $hoja->getStyle('A' . $filaCabecera . ':' . $ultima . $filaCabecera)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4B5563');
+        $hoja->getStyle('A' . $filaCabecera . ':' . $ultima . $filaCabecera)->getFont()->setBold(true)->setSize(9)->getColor()->setRGB('FFFFFF');
+        $hoja->getStyle('A' . $filaCabecera . ':' . $ultima . $filaCabecera)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
+        $hoja->getStyle('A' . $filaCabecera . ':' . $ultima . $filaCabecera)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('4B5563');
+        $hoja->getRowDimension($filaCabecera)->setRowHeight(30);
+        if ($matriz !== []) {
+            $hoja->getStyle('A' . $filaCabecera . ':' . $ultima . $filaFinal)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('D1D5DB');
+        }
+        $hoja->setAutoFilter('A' . $filaCabecera . ':' . $ultima . $filaCabecera);
+        $hoja->freezePane('A' . ($filaCabecera + 1));
+
+        $dir = sys_get_temp_dir();
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $prefijo = isset($stats['sin_dj']) ? 'rep_sin_dj_' : (isset($stats['mayoria_edad']) ? 'rep_mayoria_edad_' : 'rep_hijos_mayores_');
+        $ruta = $dir . DIRECTORY_SEPARATOR . $prefijo . date('Ymd_His') . '_' . uniqid() . '.xlsx';
+        (new Xlsx($ss))->save($ruta);
+        $ss->disconnectWorksheets();
+        unset($ss);
+        return $ruta;
     }
 
     // ── Escaneo del servidor de archivos ───────────────────────
@@ -642,53 +1374,48 @@ class ReportePersonalController extends Controller
     private const SCAN_AVANCE_MIN = 10;
 
     /**
-     * Verifica un conjunto de URLs con HEAD en paralelo y devuelve
-     * [URL => 'si'|'no'|'desconocido'].
-     *
-     * Los lotes corren de a self::SCAN_CONCURRENCIA peticiones simultáneas
-     * (~330 req/s frente a los ~64 req/s del escaneo secuencial), que es lo
-     * que permite revisar los archivos en cada generación del reporte.
+     * Verifica URLs en lotes paralelos. Si el servidor remoto no responde,
+     * los archivos quedan como desconocidos y se detiene el escaneo tras tres
+     * lotes fallidos; nunca se reintentan en serie, lo que bloquearía PHP.
      *
      * 200 = existe · 404 = no existe · cualquier otra cosa (timeout, 429,
      * 5xx) = desconocido: un fallo NUNCA se reporta como "faltante".
      */
-    private function verificarUrlsEnLotes(array $urls, int $concurrencia = self::SCAN_CONCURRENCIA): array
+    private function verificarUrlsEnLotes(array $urls, int $concurrencia = self::SCAN_CONCURRENCIA, ?bool &$servidorNoDisponible = null): array
     {
         $urls      = array_values(array_unique($urls));
         $salida    = [];
         $limitadas = 0;
         $sinLote   = 0;
+        $servidorNoDisponible = false;
 
         foreach (array_chunk($urls, $concurrencia) as $lote) {
             try {
                 $respuestas = Http::pool(fn ($pool) => array_map(
-                    fn (string $url) => $pool->as($url)->timeout(8)->connectTimeout(5)->head($url),
+                    fn (string $url) => $pool->as($url)->timeout(5)->connectTimeout(2)->head($url),
                     $lote
                 ));
             } catch (\Throwable $e) {
                 // Una caída de red rechaza la promesa y tira el lote entero.
                 $sinLote++;
+                foreach ($lote as $url) {
+                    $salida[$url] = 'desconocido';
+                }
 
-                // Si el servidor dejó de responder (3 lotes seguidos caídos) se
-                // abandona el escaneo: lo que queda pasa a "Sin verificar" (que
-                // nunca se cuenta como faltante) y no se le sigue martillando.
-                if ($sinLote >= 3) {
+                // Si el servidor dejó de responder, no se sigue ocupando PHP
+                // con peticiones en serie ni se le sigue martillando.
+                if ($sinLote >= 2) {
+                    $servidorNoDisponible = true;
                     Log::error('reportes: el servidor de imágenes dejó de responder; se interrumpe el escaneo.', [
                         'error'    => $e->getMessage(),
                         'quedaron' => count($urls) - count($salida),
                     ]);
                     break;
                 }
-
-                // Caída puntual: se reintenta URL por URL, cada una en lo suyo.
-                foreach ($lote as $url) {
-                    $salida[$url] = $this->existeUrl($url);
-                }
-
                 continue;
             }
 
-            $sinLote = 0;
+            $sinVerificarLote = 0;
 
             foreach ($respuestas as $url => $respuesta) {
                 $codigo = $respuesta instanceof \Illuminate\Http\Client\Response ? $respuesta->status() : 0;
@@ -699,10 +1426,27 @@ class ReportePersonalController extends Controller
                     $salida[$url] = 'no';
                 } else {
                     $salida[$url] = 'desconocido';
+                    $sinVerificarLote++;
                     if ($codigo === 429) {
                         $limitadas++;
                     }
                 }
+            }
+
+            // Incluye respuestas de timeout, 429 y errores 5xx: si casi todo
+            // el lote es inconcluso, cuenta como una caída del servidor remoto.
+            if ($sinVerificarLote >= max(1, (int) ceil(count($lote) * 0.8))) {
+                $sinLote++;
+                if ($sinLote >= 2) {
+                    $servidorNoDisponible = true;
+                    Log::error('reportes: el servidor de imágenes no dio respuestas concluyentes; se interrumpe el escaneo.', [
+                        'lote_inconcluso' => $sinVerificarLote,
+                        'quedaron' => count($urls) - count($salida),
+                    ]);
+                    break;
+                }
+            } else {
+                $sinLote = 0;
             }
         }
 
@@ -729,19 +1473,26 @@ class ReportePersonalController extends Controller
      * instante un DNI recién subido); la caché solo conserva el avance de una
      * petición interrumpida (10 min) y se borra cuando el escaneo termina.
      */
-    private function estadoDniHijos(array $codigos, bool $forzar): array
+    private function estadoDniHijos(array $codigos, bool $forzar, ?string $scanId = null, bool $incremental = false): array
     {
+        $cacheKey = $scanId
+            ? self::HIJOS_CACHE_KEY . ':' . hash('sha256', session()->getId() . '|' . $scanId)
+            : self::HIJOS_CACHE_KEY;
         if ($forzar) {
-            Cache::forget(self::HIJOS_CACHE_KEY);
+            Cache::forget($cacheKey);
         }
 
         // Avance de un escaneo anterior que no llegó a terminar (si existe).
-        $estado = Cache::get(self::HIJOS_CACHE_KEY) ?? ['datos' => [], 'scan_at' => null];
+        $estado = Cache::get($cacheKey) ?? ['datos' => [], 'scan_at' => null];
         $estado['datos'] = array_intersect_key($estado['datos'], array_flip($codigos));
 
         $pendientes = array_values(array_diff($codigos, array_keys($estado['datos'])));
+        $bloques = array_chunk($pendientes, self::HIJOS_LOTE);
+        if ($incremental) {
+            $bloques = array_slice($bloques, 0, 1);
+        }
 
-        foreach (array_chunk($pendientes, self::HIJOS_LOTE) as $bloque) {
+        foreach ($bloques as $bloque) {
             $planes = [];
             $urls   = [];
 
@@ -755,24 +1506,35 @@ class ReportePersonalController extends Controller
                 }
             }
 
-            // Un solo barrido en paralelo para todo el bloque.
-            $verificados = $this->verificarUrlsEnLotes(array_keys($urls));
+            // Si ya falló el servidor remoto en un lote anterior, no se vuelve
+            // a esperar timeouts por cada bloque restante de personal.
+            $servidorNoDisponible = (bool) ($estado['servidor_no_disponible'] ?? false);
+            if ($servidorNoDisponible) {
+                $verificados = array_fill_keys(array_keys($urls), 'desconocido');
+            } else {
+                $verificados = $this->verificarUrlsEnLotes(array_keys($urls), self::SCAN_CONCURRENCIA, $servidorNoDisponible);
+            }
+            $estado['servidor_no_disponible'] = $servidorNoDisponible;
 
             foreach ($planes as $codi => $plan) {
                 $estado['datos'][$codi] = $this->evaluarDniHijos($plan, $verificados);
             }
 
             // Avance: si la petición se corta aquí, la siguiente continúa.
-            Cache::put(self::HIJOS_CACHE_KEY, $estado, now()->addMinutes(self::SCAN_AVANCE_MIN));
+            Cache::put($cacheKey, $estado, now()->addMinutes(self::SCAN_AVANCE_MIN));
         }
 
-        $estado['scan_at'] = now()->toDateTimeString();
-
-        if ($pendientes !== []) {
-            // Escaneo terminado: no queda nada que retomar (ni nada viejo que usar).
-            Cache::forget(self::HIJOS_CACHE_KEY);
+        $completo = count($estado['datos']) >= count($codigos);
+        if ($completo) {
+            $estado['scan_at'] = now()->toDateTimeString();
+            Cache::forget($cacheKey);
+        } else {
+            Cache::put($cacheKey, $estado, now()->addMinutes(self::SCAN_AVANCE_MIN));
         }
 
+        $estado['completo'] = $completo;
+        $estado['procesados'] = count($estado['datos']);
+        $estado['total'] = count($codigos);
         return $estado;
     }
 
@@ -892,7 +1654,7 @@ class ReportePersonalController extends Controller
 
     // v2: ver comentario de HIJOS_CACHE_KEY (antes guardaba el escaneo 6 h).
     private const DOC_CACHE_KEY = 'reporte_documentos_estado_v2';
-    private const DOC_LOTE      = 100;
+    private const DOC_LOTE      = 20;
     private const DOC_BASE      = 'http://190.116.178.163/Biblioteca_Grafica';
 
     /**
@@ -904,19 +1666,26 @@ class ReportePersonalController extends Controller
      * para retomar un escaneo que se cortó a mitad de camino y se borra apenas
      * el escaneo termina.
      */
-    private function estadoDocumentos(array $codigos, bool $forzar): array
+    private function estadoDocumentos(array $codigos, bool $forzar, ?string $scanId = null, bool $incremental = false): array
     {
+        $cacheKey = $scanId
+            ? self::DOC_CACHE_KEY . ':' . hash('sha256', session()->getId() . '|' . $scanId)
+            : self::DOC_CACHE_KEY;
         if ($forzar) {
-            Cache::forget(self::DOC_CACHE_KEY);
+            Cache::forget($cacheKey);
         }
 
         // Avance de un escaneo anterior que no llegó a terminar (si existe).
-        $estado = Cache::get(self::DOC_CACHE_KEY) ?? ['datos' => [], 'scan_at' => null];
+        $estado = Cache::get($cacheKey) ?? ['datos' => [], 'scan_at' => null];
         $estado['datos'] = array_intersect_key($estado['datos'], array_flip($codigos));
 
         $pendientes = array_values(array_diff($codigos, array_keys($estado['datos'])));
+        $bloques = array_chunk($pendientes, self::DOC_LOTE);
+        if ($incremental) {
+            $bloques = array_slice($bloques, 0, 1);
+        }
 
-        foreach (array_chunk($pendientes, self::DOC_LOTE) as $bloque) {
+        foreach ($bloques as $bloque) {
             $urls = [];
 
             foreach ($bloque as $codi) {
@@ -925,49 +1694,34 @@ class ReportePersonalController extends Controller
                 }
             }
 
-            $verificados = $this->verificarUrlsEnLotes(array_keys($urls));
+            $servidorNoDisponible = (bool) ($estado['servidor_no_disponible'] ?? false);
+            if ($servidorNoDisponible) {
+                $verificados = array_fill_keys(array_keys($urls), 'desconocido');
+            } else {
+                $verificados = $this->verificarUrlsEnLotes(array_keys($urls), self::SCAN_CONCURRENCIA, $servidorNoDisponible);
+            }
+            $estado['servidor_no_disponible'] = $servidorNoDisponible;
 
             foreach ($urls as $url => [$codi, $clave]) {
                 $estado['datos'][$codi][$clave] = $verificados[$url] ?? 'desconocido';
             }
 
             // Avance: si la petición se corta aquí, la siguiente continúa.
-            Cache::put(self::DOC_CACHE_KEY, $estado, now()->addMinutes(self::SCAN_AVANCE_MIN));
+            Cache::put($cacheKey, $estado, now()->addMinutes(self::SCAN_AVANCE_MIN));
         }
 
-        $estado['scan_at'] = now()->toDateTimeString();
-
-        if ($pendientes !== []) {
-            // Escaneo terminado: no queda nada que retomar (ni nada viejo que usar).
-            Cache::forget(self::DOC_CACHE_KEY);
+        $completo = count($estado['datos']) >= count($codigos);
+        if ($completo) {
+            $estado['scan_at'] = now()->toDateTimeString();
+            Cache::forget($cacheKey);
+        } else {
+            Cache::put($cacheKey, $estado, now()->addMinutes(self::SCAN_AVANCE_MIN));
         }
 
+        $estado['completo'] = $completo;
+        $estado['procesados'] = count($estado['datos']);
+        $estado['total'] = count($codigos);
         return $estado;
-    }
-
-    /**
-     * 200 = sí existe · 404 = no existe · cualquier otra cosa = desconocido.
-     * Un fallo de red NUNCA se reporta como "faltante".
-     */
-    private function existeUrl(string $url): string
-    {
-        try {
-            $codigo = Http::timeout(8)
-                ->connectTimeout(5)
-                ->head($url)
-                ->status();
-
-            if ($codigo === 200) {
-                return 'si';
-            }
-            if ($codigo === 404) {
-                return 'no';
-            }
-
-            return 'desconocido';
-        } catch (\Throwable) {
-            return 'desconocido';
-        }
     }
 
     private function estadoFoto(string $valor): string
@@ -994,11 +1748,12 @@ class ReportePersonalController extends Controller
     /**
      * Devuelve la ruta temporal del .xlsx generado.
      */
-    private function generarExcelDocumentos(array $filas, array $stats): string
+    private function generarExcelDocumentos(array $filas, array $stats, string $titulo): string
     {
         $columnas = [
-            'N°', 'Código', 'Apellidos y Nombres', 'N° Documento', 'Sucursal',
-            'Tipo', 'Cargo', 'Foto', 'DNI', 'Registrado por', 'F. Registro',
+            'N°', 'Código', 'Apellidos y Nombres', 'N° Documento', 'Cargo',
+            'Fecha de ingreso a Solmar', 'Fecha de ingreso a planillas',
+            'Foto', 'DNI', 'Registrado por', 'F. Registro',
             'Modificado por', 'F. Modificación',
         ];
         $ultima = 'M';
@@ -1011,7 +1766,7 @@ class ReportePersonalController extends Controller
         // ── Anchos de columna ─────────────────────────────────
         // B = 16 deja A+B en ~164 px, por encima de los 130 px del logo
         // anclado en A1: así el logo no invade el título de C1.
-        $anchos = [6, 16, 34, 15, 16, 20, 26, 9, 15, 26, 17, 26, 17];
+        $anchos = [6, 16, 34, 15, 26, 20, 23, 9, 15, 26, 17, 26, 17];
         foreach ($anchos as $i => $ancho) {
             $hoja->getColumnDimension(Coordinate::stringFromColumnIndex($i + 1))->setWidth($ancho);
         }
@@ -1033,40 +1788,35 @@ class ReportePersonalController extends Controller
         // ── Encabezado ────────────────────────────────────────
         $hoja->getRowDimension(1)->setRowHeight(64);
         $hoja->mergeCells('C1:' . $ultima . '1');
-        $hoja->setCellValue('C1', 'REPORTE DE DOCUMENTOS DE PERSONAL VIGENTE');
-        $hoja->getStyle('C1')->getFont()->setBold(true)->setSize(14)
+        $hoja->setCellValue('C1', $titulo);
+        $hoja->getStyle('C1')->getFont()->setBold(true)->setSize(12)
               ->getColor()->setRGB('990000');
         $hoja->getStyle('C1')->getAlignment()
               ->setHorizontal(Alignment::HORIZONTAL_LEFT)
-              ->setVertical(Alignment::VERTICAL_CENTER);
+              ->setVertical(Alignment::VERTICAL_CENTER)
+              ->setWrapText(true);
 
         $hoja->mergeCells('C2:' . $ultima . '2');
-        $hoja->setCellValue('C2', 'Sistema Integrado Solmar — SISOL Web');
-        $hoja->getStyle('C2')->getFont()->setBold(true)->setSize(11)
-              ->getColor()->setRGB('990000');
-        $hoja->getStyle('C2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         $hoja->getRowDimension(4)->setRowHeight(6);
 
         // ── Bloque de estadísticas ────────────────────────────
         $bloquesStats = [
             'A' => 'B',  // Generado
-            'C' => 'D',  // Vigentes
+            'C' => 'D',  // Personal evaluado
             'E' => 'F',  // Foto OK
             'G' => 'H',  // DNI completo
-            'I' => 'J',  // Incompletos
-            'K' => 'M',  // Últ. escaneo
+            'I' => 'M',  // Incompletos
         ];
-        $etiquetas = ['Generado', 'Vigentes', 'Foto OK', 'DNI completo', 'Incompletos', 'Últ. escaneo de archivos'];
+        $etiquetas = ['Generado', 'Personal evaluado', 'Foto OK', 'DNI completo', 'Incompletos'];
 
-        $total = max($stats['vigentes'], 1);
+        $total = max($stats['personal'], 1);
         $valores = [
             $stats['generado'],
-            number_format($stats['vigentes'], 0, ',', '.'),
+            number_format($stats['personal'], 0, ',', '.'),
             number_format($stats['foto_ok'], 0, ',', '.') . '  (' . number_format($stats['foto_ok'] / $total * 100, 1, ',', '.') . '%)',
             number_format($stats['dni_ok'],  0, ',', '.') . '  (' . number_format($stats['dni_ok'] / $total * 100, 1, ',', '.') . '%)',
             number_format($stats['faltan'],  0, ',', '.'),
-            $stats['scan_at'],
         ];
 
         $indice = 0;
@@ -1134,9 +1884,9 @@ class ReportePersonalController extends Controller
                 $d['codi'],
                 $d['nombre'],
                 $d['doc'],
-                $d['sucursal'],
-                $d['tipo'],
                 $d['cargo'],
+                $d['ingreso_solmar'],
+                $d['ingreso_planilla'],
                 $d['foto_txt'],
                 $d['dni_txt'],
                 $d['reg'],
@@ -1160,10 +1910,10 @@ class ReportePersonalController extends Controller
             $base->getFont()->setSize(9);
             $base->getBorders()->getAllBorders()
                  ->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('D1D5DB');
-            $base->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $base->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
 
-            // Columnas cortas centradas (6 rangos en vez de 1.135 x 6)
-            foreach (['A', 'D', 'H', 'I', 'K', 'M'] as $col) {
+            // Columnas compactas con alineación centrada.
+            foreach (['A', 'D', 'F', 'G', 'H', 'I', 'K', 'M'] as $col) {
                 $hoja->getStyle($col . $filaInicial . ':' . $col . $filaFinal)->getAlignment()
                      ->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
@@ -1219,14 +1969,15 @@ class ReportePersonalController extends Controller
      * Devuelve la ruta temporal del .xlsx generado con el personal que tiene
      * hijos menores de edad sin el DNI (anverso/reverso) cargado.
      */
-    private function generarExcelDniHijos(array $filas, array $stats): string
+    private function generarExcelDniHijos(array $filas, array $stats, string $titulo): string
     {
         $columnas = [
-            'N°', 'Código', 'Apellidos y Nombres', 'N° Documento', 'Sucursal',
-            'Tipo', 'Cargo', 'Hijos <18', 'Anverso', 'Reverso', 'Sin imagen',
+            'N°', 'Código', 'Apellidos y Nombres', 'N° Documento', 'Cargo',
+            'Fecha de ingreso a Solmar', 'Fecha de ingreso a planillas',
+            'Asignación familiar', 'Hijos <18', 'Anverso', 'Reverso', 'Sin imagen',
             'Detalle de faltantes',
         ];
-        $ultima = 'L';
+        $ultima = 'M';
 
         $ss   = new Spreadsheet();
         $hoja = $ss->getActiveSheet();
@@ -1234,7 +1985,7 @@ class ReportePersonalController extends Controller
         $hoja->setShowGridlines(false);
 
         // ── Anchos de columna ─────────────────────────────────────────────
-        $anchos = [6, 16, 34, 15, 16, 20, 26, 11, 11, 11, 11, 64];
+        $anchos = [6, 16, 34, 15, 26, 20, 23, 20, 11, 11, 11, 11, 82];
         foreach ($anchos as $i => $ancho) {
             $hoja->getColumnDimension(Coordinate::stringFromColumnIndex($i + 1))->setWidth($ancho);
         }
@@ -1254,18 +2005,15 @@ class ReportePersonalController extends Controller
         // ── Encabezado ────────────────────────────────────────────────────
         $hoja->getRowDimension(1)->setRowHeight(64);
         $hoja->mergeCells('C1:' . $ultima . '1');
-        $hoja->setCellValue('C1', 'REPORTE DE DNI DE HIJOS MENORES DE EDAD PENDIENTES');
-        $hoja->getStyle('C1')->getFont()->setBold(true)->setSize(14)
+        $hoja->setCellValue('C1', $titulo);
+        $hoja->getStyle('C1')->getFont()->setBold(true)->setSize(12)
               ->getColor()->setRGB('990000');
         $hoja->getStyle('C1')->getAlignment()
               ->setHorizontal(Alignment::HORIZONTAL_LEFT)
-              ->setVertical(Alignment::VERTICAL_CENTER);
+              ->setVertical(Alignment::VERTICAL_CENTER)
+              ->setWrapText(true);
 
         $hoja->mergeCells('C2:' . $ultima . '2');
-        $hoja->setCellValue('C2', 'Sistema Integrado Solmar — SISOL Web');
-        $hoja->getStyle('C2')->getFont()->setBold(true)->setSize(11)
-              ->getColor()->setRGB('990000');
-        $hoja->getStyle('C2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         $hoja->getRowDimension(4)->setRowHeight(6);
 
@@ -1275,12 +2023,11 @@ class ReportePersonalController extends Controller
             'C' => 'D',  // Personal evaluado
             'E' => 'F',  // Con DNI completo
             'G' => 'H',  // Con faltantes
-            'I' => 'J',  // Hijos <18
-            'K' => 'L',  // Últ. escaneo
+            'I' => 'M',  // Hijos <18
         ];
         $etiquetas = [
             'Generado', 'Personal evaluado', 'Sin faltantes',
-            'Con faltantes', 'Hijos <18', 'Últ. escaneo de archivos',
+            'Con faltantes', 'Hijos <18',
         ];
 
         $totalEval = max($stats['evaluados'], 1);
@@ -1290,7 +2037,6 @@ class ReportePersonalController extends Controller
             number_format($stats['ok'], 0, ',', '.') . '  (' . number_format($stats['ok'] / $totalEval * 100, 1, ',', '.') . '%)',
             number_format($stats['faltan'], 0, ',', '.'),
             number_format($stats['hijos'], 0, ',', '.'),
-            $stats['scan_at'],
         ];
 
         $indice = 0;
@@ -1354,9 +2100,10 @@ class ReportePersonalController extends Controller
                 $d['codi'],
                 $d['nombre'],
                 $d['doc'],
-                $d['sucursal'],
-                $d['tipo'],
                 $d['cargo'],
+                $d['ingreso_solmar'],
+                $d['ingreso_planilla'],
+                $d['asignacion_familiar'],
                 $d['total'],
                 $d['anverso_txt'],
                 $d['reverso_txt'],
@@ -1375,18 +2122,18 @@ class ReportePersonalController extends Controller
             $base->getFont()->setSize(9);
             $base->getBorders()->getAllBorders()
                  ->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('D1D5DB');
-            $base->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            $base->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
 
             // Columnas cortas centradas
-            foreach (['A', 'D', 'H', 'I', 'J', 'K'] as $col) {
+            foreach (['A', 'D', 'F', 'G', 'H', 'I', 'J', 'K', 'L'] as $col) {
                 $hoja->getStyle($col . $filaInicial . ':' . $col . $filaFinal)->getAlignment()
                      ->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
 
             // Semáforo de Anverso/Reverso: Sí = verde, No = rojo.
-            $hoja->getStyle('I' . $filaInicial . ':' . 'I' . $filaFinal)
-                 ->getFont()->setBold(true)->getColor()->setRGB('15803D');
             $hoja->getStyle('J' . $filaInicial . ':' . 'J' . $filaFinal)
+                 ->getFont()->setBold(true)->getColor()->setRGB('15803D');
+            $hoja->getStyle('K' . $filaInicial . ':' . 'K' . $filaFinal)
                  ->getFont()->setBold(true)->getColor()->setRGB('15803D');
 
             // Fondo: rojo claro si algún hijo quedó sin ninguna imagen,
@@ -1398,14 +2145,14 @@ class ReportePersonalController extends Controller
                      ->setFillType(Fill::FILL_SOLID)
                      ->getStartColor()->setRGB($d['sin'] > 0 ? 'FEE2E2' : 'FEF3C7');
 
-                $hoja->getStyle('I' . $f)->getFont()->setBold(true)
+                $hoja->getStyle('J' . $f)->getFont()->setBold(true)
                      ->getColor()->setRGB($d['anverso_txt'] === 'No' ? 'B91C1C' : '15803D');
 
-                $hoja->getStyle('J' . $f)->getFont()->setBold(true)
+                $hoja->getStyle('K' . $f)->getFont()->setBold(true)
                      ->getColor()->setRGB($d['reverso_txt'] === 'No' ? 'B91C1C' : '15803D');
 
                 if ((int) $d['sin'] > 0) {
-                    $hoja->getStyle('K' . $f)->getFont()->setBold(true)->getColor()->setRGB('B91C1C');
+                    $hoja->getStyle('L' . $f)->getFont()->setBold(true)->getColor()->setRGB('B91C1C');
                 }
             }
         }
@@ -1472,13 +2219,17 @@ class ReportePersonalController extends Controller
 
     private function formatFecha($valor): string
     {
-        if (empty($valor)) return '—';
-        $str = trim((string) $valor);
-        if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $str, $m))
-            return "{$m[3]}/{$m[2]}/{$m[1]}";
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $str, $m))
-            return "{$m[3]}/{$m[2]}/{$m[1]}";
-        return $str;
+        if ($valor === null || $valor === '') return '—';
+
+        try {
+            $fecha = $valor instanceof \DateTimeInterface
+                ? $valor
+                : new \DateTime(trim((string) $valor));
+
+            return $fecha->format('d/m/Y');
+        } catch (\Throwable) {
+            return trim((string) $valor);
+        }
     }
 
     private function calcularEdad($fechNaci): string

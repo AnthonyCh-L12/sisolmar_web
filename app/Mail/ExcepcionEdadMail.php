@@ -18,9 +18,9 @@ class ExcepcionEdadMail extends Mailable
 
     public function build()
     {
-        $asunto = 'Excepción de Edad - ' . $this->datosCorreo['nombre'];
+        $asunto = 'GRUPO SOLAR | Excepción de edad - ' . $this->datosCorreo['nombre'];
 
-        return $this->from(config('mail.from.address'), config('mail.from.name'))
+        return $this->from(config('mail.from.address'), 'GRUPO SOLAR')
                     ->subject($asunto)
                     ->to([
                         ['email' => 'rrhh@solsecurity.pe', 'name' => 'RRHH'],

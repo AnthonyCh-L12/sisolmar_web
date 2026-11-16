@@ -81,11 +81,11 @@ return [
 
         'sip' => [
             'transport' => 'smtp',
-            'host' => 'smtp.gmail.com',
-            'port' => 465,
-            'encryption' => 'ssl',
-            'username' => 'robotsisolmar@solsecurity.pe',
-            'password' => 'dpmw ethh oabr byak',
+            'host' => env('MAIL_SIP_HOST', 'smtp.gmail.com'),
+            'port' => env('MAIL_SIP_PORT', 465),
+            'encryption' => env('MAIL_SIP_ENCRYPTION', 'ssl'),
+            'username' => env('MAIL_SIP_USERNAME'),
+            'password' => env('MAIL_SIP_PASSWORD'),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ],
@@ -122,6 +122,27 @@ return [
         'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Copia de la carta de bienvenida SIP
+    |--------------------------------------------------------------------------
+    |
+    | Destinatarios que reciben SIEMPRE una copia de la carta de bienvenida SIP
+    | (se envía a la vez que la copia al usuario). Se pueden indicar varios
+    | separados por coma en MAIL_SIP_CC, p. ej.: "a@sol.pe,b@sol.pe".
+    |
+    */
+
+    'sip_cc' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('MAIL_SIP_CC', 'filecontrol@solsecurity.pe'))
+    ))),
+
+    'dj_aprobada_cc' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('MAIL_DJ_APROBADA_CC', 'filecontrol@solsecurity.pe,jhordantapiaespinoza@gmail.com'))
+    ))),
 
     /*
     |--------------------------------------------------------------------------
