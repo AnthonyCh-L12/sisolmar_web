@@ -83,60 +83,220 @@ function _imagenAPngDataUrl(img) {
     }
 }
 
-async function _cargarFirma(url) {
-    if (!url) return null;
-    try {
-        const respuesta = await fetch(url);
-        if (!respuesta.ok) return null;
-        let buffer = await respuesta.arrayBuffer();
-        let bytes = new Uint8Array(buffer);
+function _limpiarBytesJpeg(bytes) {
+    // Buscar el marcador JPEG real (FF D8 FF) y descartar basura previa.
+    const jpegStart = bytes.findIndex(
+        (b, i) =>
+            b === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff,
+    );
+    if (jpegStart < 0) {
+        return { bytes, esJpeg: false };
+    }
+    return {
+        bytes: jpegStart > 0 ? bytes.slice(jpegStart) : bytes,
+        esJpeg: true,
+    };
+}
 
-        // Buscar el marcador JPEG real (FF D8 FF) y descartar basura previa
-        const jpegStart = bytes.findIndex(
-            (b, i) =>
-                b === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff,
-        );
-        if (jpegStart > 0) {
-            bytes = bytes.slice(jpegStart);
+function _aliasFirma(url) {
+    let hash = 5381;
+    for (let i = 0; i < url.length; i++) {
+        hash = ((hash << 5) + hash + url.charCodeAt(i)) | 0;
+    }
+    return `firma_${(hash >>> 0).toString(36)}_${url.length}`;
+}
+
+async function _decodificarFirma(blob) {
+    if (typeof createImageBitmap === "function") {
+        try {
+            return await createImageBitmap(blob);
+        } catch (e) {
+            // Fallback con Image si el navegador no puede decodificar el blob.
+        }
+    }
+
+    const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = dataUrl;
+    });
+}
+
+function _canvasAJpegBytesFallback(canvas, quality) {
+    try {
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        const binario = atob(dataUrl.split(",")[1] || "");
+        const bytes = new Uint8Array(binario.length);
+        for (let i = 0; i < binario.length; i++) {
+            bytes[i] = binario.charCodeAt(i);
+        }
+        return bytes;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _canvasAJpegBytes(canvas, quality) {
+    return new Promise((resolve) => {
+        if (typeof canvas.toBlob !== "function") {
+            resolve(_canvasAJpegBytesFallback(canvas, quality));
+            return;
         }
 
+        canvas.toBlob(
+            async (blob) => {
+                if (!blob) {
+                    resolve(_canvasAJpegBytesFallback(canvas, quality));
+                    return;
+                }
+                try {
+                    resolve(new Uint8Array(await blob.arrayBuffer()));
+                } catch (e) {
+                    resolve(_canvasAJpegBytesFallback(canvas, quality));
+                }
+            },
+            "image/jpeg",
+            quality,
+        );
+    });
+}
+
+async function _cargarFirma(url, opts = {}) {
+    if (!url) return null;
+
+    const maxSide = opts.maxSide || 500;
+    const quality = opts.quality ?? 0.68;
+    const maxBytes = opts.maxBytes ?? 25 * 1024;
+    let controller = null;
+    let timeout = null;
+
+    try {
+        if (typeof AbortController === "function") {
+            controller = new AbortController();
+            timeout = setTimeout(
+                () => controller.abort(),
+                opts.timeoutMs || 15000,
+            );
+        }
+
+        const respuesta = await fetch(
+            url,
+            controller ? { signal: controller.signal } : undefined,
+        );
+        if (timeout) {
+            clearTimeout(timeout);
+            timeout = null;
+        }
+        if (!respuesta.ok) return null;
+
+        const original = new Uint8Array(await respuesta.arrayBuffer());
+        const { bytes, esJpeg } = _limpiarBytesJpeg(original);
+        if (bytes.length === 0) return null;
+
         const blob = new Blob([bytes], { type: "image/jpeg" });
+        const img = await _decodificarFirma(blob);
+        const anchoOriginal = img.naturalWidth || img.width || 0;
+        const altoOriginal = img.naturalHeight || img.height || 0;
 
-        const dataUrl = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
+        if (!anchoOriginal || !altoOriginal) {
+            if (typeof img.close === "function") img.close();
+            return null;
+        }
 
-        const img = await new Promise((resolve, reject) => {
-            const image = new Image();
-            image.onload = () => resolve(image);
-            image.onerror = reject;
-            image.src = dataUrl;
-        });
-
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-
-        const pngDataUrl = canvas.toDataURL("image/png");
-        const pngBytes = Uint8Array.from(atob(pngDataUrl.split(",")[1]), (c) =>
-            c.charCodeAt(0),
+        const alias = opts.alias || _aliasFirma(url);
+        const escala = Math.min(
+            1,
+            maxSide / Math.max(anchoOriginal, altoOriginal),
         );
 
+        // Si la firma ya es pequeña, reutilizar el JPEG original evita
+        // decodificarla y volverla a comprimir.
+        if (esJpeg && escala === 1 && bytes.length <= maxBytes) {
+            if (typeof img.close === "function") img.close();
+            return {
+                src: bytes,
+                format: "JPEG",
+                width: anchoOriginal,
+                height: altoOriginal,
+                alias,
+            };
+        }
+
+        const ancho = Math.max(1, Math.round(anchoOriginal * escala));
+        const alto = Math.max(1, Math.round(altoOriginal * escala));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = ancho;
+        canvas.height = alto;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+            if (typeof img.close === "function") img.close();
+            return null;
+        }
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, ancho, alto);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, ancho, alto);
+        if (typeof img.close === "function") img.close();
+
+        let jpegBytes = await _canvasAJpegBytes(canvas, quality);
+        if (!jpegBytes || jpegBytes.length === 0) return null;
+
+        // Evitar casos atípicos (firmas escaneadas con mucho ruido) que
+        // podrían inflar el PDF; baja la calidad solo si supera el límite.
+        const maxOutputBytes = opts.maxOutputBytes ?? 60 * 1024;
+        let calidadAjustada = quality;
+        while (
+            jpegBytes.length > maxOutputBytes &&
+            calidadAjustada > 0.4
+        ) {
+            calidadAjustada = Math.max(0.4, calidadAjustada - 0.08);
+            jpegBytes = await _canvasAJpegBytes(canvas, calidadAjustada);
+            if (!jpegBytes || jpegBytes.length === 0) return null;
+        }
+
         return {
-            src: pngBytes,
-            format: "PNG",
-            width: img.naturalWidth,
-            height: img.naturalHeight,
+            src: jpegBytes,
+            format: "JPEG",
+            width: ancho,
+            height: alto,
+            alias,
         };
     } catch (e) {
         console.error("Error cargando firma:", e);
         return null;
+    } finally {
+        if (timeout) clearTimeout(timeout);
     }
+}
+
+async function _mapearConLimite(items, limite, fn) {
+    const resultados = new Array(items.length);
+    let siguiente = 0;
+    const cantidad = Math.max(1, Math.min(limite, items.length));
+    const trabajadores = Array.from({ length: cantidad }, async () => {
+        while (true) {
+            const indice = siguiente++;
+            if (indice >= items.length) return;
+            try {
+                resultados[indice] = await fn(items[indice], indice);
+            } catch (e) {
+                resultados[indice] = null;
+            }
+        }
+    });
+    await Promise.all(trabajadores);
+    return resultados;
 }
 
 let _catalogosCapacitacionPromise = null;
@@ -5869,9 +6029,10 @@ export default document.addEventListener("alpine:init", () => {
                 const { jsPDF } = window.jspdf;
 
                 const data = this.reporteData;
-                const logoSol = await _cargarImagen(
+                const logoImagen = await _cargarImagen(
                     _assetUrl("/images/logo_sol.png"),
                 );
+                const logoSol = _imagenAPngDataUrl(logoImagen) || logoImagen;
 
                 // Proxy server-side: convierte la URL cross-origin de la firma
                 // en una URL del mismo origen para poder leer sus bytes en el JS.
@@ -5881,19 +6042,48 @@ export default document.addEventListener("alpine:init", () => {
                         ? `${VITE_URL_APP}/api/dj/reporte/proxy-imagen?url=${encodeURIComponent(u)}`
                         : u;
 
-                const firmaResponsable = await _cargarFirma(
+                const cacheFirmas = new Map();
+                const cargarFirma = (u, opts) => {
+                    if (!u) return Promise.resolve(null);
+                    if (!cacheFirmas.has(u)) {
+                        cacheFirmas.set(u, _cargarFirma(u, opts));
+                    }
+                    return cacheFirmas.get(u);
+                };
+
+                const firmaResponsable = await cargarFirma(
                     proxyFirma(data.Firma_Responsable || ""),
+                    { maxSide: 600, quality: 0.72, maxOutputBytes: 90 * 1024 },
                 );
-                console.log("firmaResponsable:", firmaResponsable);
+
+                const personal = data.Personal || [];
+                const firmaOptsPersonal =
+                    personal.length > 300
+                        ? {
+                              maxSide: 450,
+                              quality: 0.65,
+                              maxOutputBytes: 40 * 1024,
+                          }
+                        : {
+                              maxSide: 500,
+                              quality: 0.68,
+                              maxOutputBytes: 50 * 1024,
+                          };
+                const firmasPersonal = await _mapearConLimite(
+                    personal,
+                    10,
+                    (p) =>
+                        cargarFirma(
+                            proxyFirma(p.Firma_Personal || ""),
+                            firmaOptsPersonal,
+                        ),
+                );
                 const personalFirmas = {};
-                await Promise.all(
-                    (data.Personal || []).map(async (p) => {
-                        if (p.Firma_Personal) {
-                            personalFirmas[p.DNI_Personal] =
-                                await _cargarFirma(proxyFirma(p.Firma_Personal));
-                        }
-                    }),
-                );
+                personal.forEach((p, i) => {
+                    if (firmasPersonal[i]) {
+                        personalFirmas[p.DNI_Personal] = firmasPersonal[i];
+                    }
+                });
 
                 const margenIzq = 14.1;
 
@@ -5981,6 +6171,7 @@ export default document.addEventListener("alpine:init", () => {
                             y0 + (alturaTotal - 15) / 2,
                             26,
                             15,
+                            "logo_sol",
                         );
                     }
                     doc.rect(x0, y0, widths[0], alturaTotal);
@@ -6230,15 +6421,16 @@ export default document.addEventListener("alpine:init", () => {
                     const y = cell.y + (cell.height - h) / 2;
                     doc.addImage(
                         firma.src,
-                        firma.format || "PNG",
+                        firma.format || "JPEG",
                         x,
                         y,
                         w,
                         h,
+                        firma.alias || opts.alias,
                     );
                 }
 
-                const renderContenido = (doc, totalPaginas) => {
+                const renderContenido = (doc) => {
                     // Encabezado en todas las hojas (arriba) y pie con
                     // OBSERVACIONES + RESPONSABLE DEL REGISTRO (abajo). El
                     // margen reserva ambos espacios para no superponerlos.
@@ -6524,20 +6716,14 @@ export default document.addEventListener("alpine:init", () => {
                     });
                 };
 
-                const docConteo = new jsPDF({
-                    orientation: "portrait",
-                    unit: "mm",
-                    format: "a4",
-                });
-                renderContenido(docConteo, null);
-                const totalPaginas = docConteo.internal.getNumberOfPages();
-
                 const doc = new jsPDF({
                     orientation: "portrait",
                     unit: "mm",
                     format: "a4",
+                    compress: true,
                 });
-                renderContenido(doc, totalPaginas);
+                renderContenido(doc);
+                const totalPaginas = doc.internal.getNumberOfPages();
 
                 // Encabezado y pie (OBSERVACIONES + RESPONSABLE DEL REGISTRO)
                 // en todas las hojas, respetando el orden del formato.
