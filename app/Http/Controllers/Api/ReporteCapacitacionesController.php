@@ -9,6 +9,7 @@ use App\Models\CursoNew;
 use App\Services\FirmaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -738,6 +739,19 @@ class ReporteCapacitacionesController extends Controller
                 ? mb_strtoupper($tipoCurso)
                 : $this->mapearCategoriaCurso(null, $cursoIdFallback);
 
+            // La FECHA del formato se toma de la fecha de creación del curso
+            // y se muestra como el último día de ese mes (patrón t/m/Y).
+            $fechaCreacion = $cursoLocal?->fecha_creacion;
+
+            if (! $fechaCreacion) {
+                $tsCreacion = $this->toTimestamp($curso->created_at ?? null);
+                $fechaCreacion = $tsCreacion ? Carbon::createFromTimestamp($tsCreacion) : null;
+            }
+
+            $fechaReporte = $fechaCreacion
+                ? $fechaCreacion->format('t/m/Y')
+                : date('t/m/Y');
+
             return response()->json([
                 'success' => true,
                 'Moodle_Id' => $cursoLocal?->SW_CURS_AV_COD ?? $cursoIdFallback,
@@ -748,7 +762,7 @@ class ReporteCapacitacionesController extends Controller
                 'Personal' => $personal,
                 'Tipo_Curso' => $tipoCursoFinal,
                 'Total_Aprobados' => count($personal),
-                'Fecha_Reporte' => date('t/m/Y'),
+                'Fecha_Reporte' => $fechaReporte,
             ]);
         } catch (\Exception $e) {
             Log::error('Error en ReporteCapacitacionesController@formato', [

@@ -6116,7 +6116,29 @@ class CapacitacionController extends Controller
                 ->sortBy('Nombre_Personal', SORT_NATURAL | SORT_FLAG_CASE)
                 ->values();
 
-            $fechaReporte = date('t/m/Y');
+            // La FECHA del formato se toma de la fecha de creación del curso
+            // y se muestra como el último día de ese mes (patrón t/m/Y).
+            $fechaCreacion = null;
+
+            if (!empty($cursoLocal?->fecha_creacion)) {
+                try {
+                    $fechaCreacion = Carbon::parse($cursoLocal->fecha_creacion);
+                } catch (\Exception $e) {
+                    $fechaCreacion = null;
+                }
+            }
+
+            if (!$fechaCreacion && !empty($curso->created_at ?? null)) {
+                try {
+                    $fechaCreacion = Carbon::parse($curso->created_at);
+                } catch (\Exception $e) {
+                    $fechaCreacion = null;
+                }
+            }
+
+            $fechaReporte = $fechaCreacion
+                ? $fechaCreacion->format('t/m/Y')
+                : date('t/m/Y');
 
             return response()->json([
                 'success'            => true,
