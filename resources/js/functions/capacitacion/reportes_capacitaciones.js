@@ -5897,6 +5897,12 @@ export default document.addEventListener("alpine:init", () => {
 
                 const margenIzq = 14.1;
 
+                // Altura del pie que se repite en cada hoja
+                // (OBSERVACIONES + RESPONSABLE DEL REGISTRO).
+                const alturaObservaciones = 14;
+                const alturaFooterReporte = alturaObservaciones + 6 + 8 + 8 + 8 + 18;
+                const espacioSobreFooter = 8;
+
                 const headerStyle = {
                     fillColor: [167, 203, 240],
                     textColor: [0, 0, 0],
@@ -6099,6 +6105,73 @@ export default document.addEventListener("alpine:init", () => {
                     );
                 }
 
+                function dibujarFooterPagina(doc) {
+                    const anchoTotal = 185;
+                    const x0 = margenIzq;
+                    const pageHeight = doc.internal.pageSize.getHeight();
+                    let y =
+                        pageHeight - margenIzq - alturaFooterReporte;
+
+                    doc.setDrawColor(0, 0, 0);
+                    doc.setLineWidth(0.2);
+                    doc.setFontSize(8);
+
+                    // OBSERVACIONES
+                    doc.rect(x0, y, anchoTotal, alturaObservaciones);
+                    doc.setFont(undefined, "bold");
+                    doc.text("OBSERVACIONES:", x0 + 2, y + 4.5);
+                    doc.setFont(undefined, "normal");
+                    y += alturaObservaciones;
+
+                    // RESPONSABLE DEL REGISTRO
+                    doc.setFillColor(167, 203, 240);
+                    doc.rect(x0, y, anchoTotal, 6, "FD");
+                    doc.setFont(undefined, "bold");
+                    doc.text(
+                        "RESPONSABLE DEL REGISTRO",
+                        x0 + anchoTotal / 2,
+                        y + 4,
+                        { align: "center" },
+                    );
+                    doc.setFont(undefined, "normal");
+                    y += 6;
+
+                    const filas = [
+                        ["Nombre:", data.Nombre_Responsable || "", 8],
+                        ["Cargo:", data.Cargo_Responsable || "", 8],
+                        ["Fecha:", data.Fecha_Reporte || "", 8],
+                        ["Firma:", "", 18],
+                    ];
+
+                    filas.forEach(([label, valor, alto], index) => {
+                        doc.rect(x0, y, 33, alto);
+                        doc.rect(x0 + 33, y, anchoTotal - 33, alto);
+
+                        doc.setFont(undefined, "bold");
+                        doc.text(label, x0 + 2, y + alto / 2 + 1.2);
+                        doc.setFont(undefined, "normal");
+                        if (valor) {
+                            doc.text(String(valor), x0 + 35, y + alto / 2 + 1.2);
+                        }
+
+                        if (index === 3) {
+                            dibujarFirmaEnCelda(
+                                doc,
+                                firmaResponsable,
+                                {
+                                    x: x0 + 33,
+                                    y,
+                                    width: anchoTotal - 33,
+                                    height: alto,
+                                },
+                                { pad: 0.5, align: "left", height: 13 },
+                            );
+                        }
+
+                        y += alto;
+                    });
+                }
+
                 function dibujarFirmaEnCelda(doc, firma, cell, opts = {}) {
                     if (
                         !firma ||
@@ -6166,27 +6239,17 @@ export default document.addEventListener("alpine:init", () => {
                 }
 
                 const renderContenido = (doc, totalPaginas) => {
-                    let ultimaPaginaEncabezado = 0;
-
-                    // El encabezado del formato solo debe dibujarse una vez,
-                    // al inicio del documento (página 1). En las páginas
-                    // siguientes el contenido continúa sin repetir la cabecera.
-                    const onDidDrawPage = (tableData) => {
-                        if (!totalPaginas) return;
-                        if (tableData.pageNumber !== 1) return;
-                        if (ultimaPaginaEncabezado === 1) return;
-                        ultimaPaginaEncabezado = 1;
-                        dibujarEncabezadoPagina(doc, 1, totalPaginas);
-                    };
-
-                    // En la página 1 la primera tabla arranca debajo del
-                    // encabezado (startY 49). En las páginas siguientes no hay
-                    // cabecera, por lo que el margen superior es el normal.
+                    // Encabezado en todas las hojas (arriba) y pie con
+                    // OBSERVACIONES + RESPONSABLE DEL REGISTRO (abajo). El
+                    // margen reserva ambos espacios para no superponerlos.
                     const margenContenido = {
-                        top: margenIzq,
+                        top: 49,
                         left: margenIzq,
                         right: margenIzq,
-                        bottom: margenIzq,
+                        bottom:
+                            margenIzq +
+                            alturaFooterReporte +
+                            espacioSobreFooter,
                     };
 
                     const normalizarTipo = (s) =>
@@ -6210,7 +6273,6 @@ export default document.addEventListener("alpine:init", () => {
                         startY: 49,
                         margin: margenContenido,
                         theme: "grid",
-                        didDrawPage: onDidDrawPage,
                         styles: {
                             fontSize: 8,
                             cellPadding: 2,
@@ -6291,7 +6353,6 @@ export default document.addEventListener("alpine:init", () => {
                         startY: doc.lastAutoTable.finalY,
                         margin: margenContenido,
                         theme: "grid",
-                        didDrawPage: onDidDrawPage,
                         styles: {
                             fontSize: 8,
                             cellPadding: 2,
@@ -6330,7 +6391,6 @@ export default document.addEventListener("alpine:init", () => {
                         startY: doc.lastAutoTable.finalY,
                         margin: margenContenido,
                         theme: "grid",
-                        didDrawPage: onDidDrawPage,
                         didDrawCell: (cellData) => {
                             if (
                                 cellData.section === "body" &&
@@ -6410,7 +6470,6 @@ export default document.addEventListener("alpine:init", () => {
                         startY: doc.lastAutoTable.finalY,
                         margin: margenContenido,
                         theme: "grid",
-                        didDrawPage: onDidDrawPage,
                         didDrawCell: (cellData) => {
                             if (
                                 cellData.section === "body" &&
@@ -6463,113 +6522,6 @@ export default document.addEventListener("alpine:init", () => {
                             4: { cellWidth: 30 },
                         },
                     });
-
-                    // Responsable del registro
-                    // Evita que el bloque se corte entre páginas: si no hay
-                    // espacio suficiente, se dibuja completo en la siguiente.
-                    let startYResponsable = doc.lastAutoTable.finalY + 10;
-                    const alturaResponsable = 7 + 9 + 9 + 9 + 17;
-                    const limiteInferior =
-                        doc.internal.pageSize.getHeight() - margenIzq;
-                    if (
-                        startYResponsable + alturaResponsable >
-                        limiteInferior
-                    ) {
-                        doc.addPage();
-                        startYResponsable = margenContenido.top;
-                    }
-
-                    doc.autoTable({
-                        startY: startYResponsable,
-                        margin: margenContenido,
-                        theme: "grid",
-                        didDrawPage: onDidDrawPage,
-                        didDrawCell: (cellData) => {
-                            if (
-                                cellData.section === "body" &&
-                                cellData.row.index === 4 &&
-                                cellData.column.index === 1
-                            ) {
-                                dibujarFirmaEnCelda(doc, firmaResponsable, cellData.cell, {
-                                    pad: 0.5,
-                                    align: "left",
-                                    height: 13,
-                                });
-                            }
-                        },
-                        styles: {
-                            fontSize: 8,
-                            cellPadding: 2,
-                            valign: "middle",
-                            textColor: [0, 0, 0],
-                            lineColor: [0, 0, 0],
-                            lineWidth: 0.2,
-                        },
-                        body: [
-                            [
-                                {
-                                    content: "RESPONSABLE DEL REGISTRO",
-                                    colSpan: 2,
-                                    styles: headerStyle,
-                                },
-                            ],
-                            [
-                                {
-                                    content: "Nombre:",
-                                    styles: {
-                                        fontStyle: "bold",
-                                        halign: "left",
-                                        cellWidth: 33,
-                                    },
-                                },
-                                {
-                                    content: data.Nombre_Responsable || "",
-                                },
-                            ],
-                            [
-                                {
-                                    content: "Cargo:",
-                                    styles: {
-                                        fontStyle: "bold",
-                                        halign: "left",
-                                    },
-                                },
-                                {
-                                    content: data.Cargo_Responsable || "",
-                                },
-                            ],
-                            [
-                                {
-                                    content: "Fecha:",
-                                    styles: {
-                                        fontStyle: "bold",
-                                        halign: "left",
-                                    },
-                                },
-                                {
-                                    content: data.Fecha_Reporte || "",
-                                },
-                            ],
-                            [
-                                {
-                                    content: "Firma:",
-                                    styles: {
-                                        fontStyle: "bold",
-                                        halign: "left",
-                                        minCellHeight: 17,
-                                    },
-                                },
-                                {
-                                    content: "",
-                                    styles: { minCellHeight: 17 },
-                                },
-                            ],
-                        ],
-                        columnStyles: {
-                            0: { cellWidth: 33 },
-                            1: { cellWidth: 152 },
-                        },
-                    });
                 };
 
                 const docConteo = new jsPDF({
@@ -6586,6 +6538,14 @@ export default document.addEventListener("alpine:init", () => {
                     format: "a4",
                 });
                 renderContenido(doc, totalPaginas);
+
+                // Encabezado y pie (OBSERVACIONES + RESPONSABLE DEL REGISTRO)
+                // en todas las hojas, respetando el orden del formato.
+                for (let i = 1; i <= totalPaginas; i++) {
+                    doc.setPage(i);
+                    dibujarEncabezadoPagina(doc, i, totalPaginas);
+                    dibujarFooterPagina(doc);
+                }
 
                 const d = new Date();
                 const fechaRep = `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, "0")}_${String(d.getDate()).padStart(2, "0")}_${String(d.getHours()).padStart(2, "0")}_${String(d.getMinutes()).padStart(2, "0")}`;
