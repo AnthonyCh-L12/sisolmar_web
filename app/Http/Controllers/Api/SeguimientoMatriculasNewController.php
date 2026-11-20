@@ -270,7 +270,6 @@ class SeguimientoMatriculasNewController extends Controller
                 ->pluck('nombre', 'codigo');
 
             $cursosLocal = DB::table('sw_cursos_new')
-                ->where('habilitado', 1)
                 ->whereNotNull('SW_CURS_AV_COD')
                 ->get()
                 ->keyBy('SW_CURS_AV_COD');
@@ -278,22 +277,25 @@ class SeguimientoMatriculasNewController extends Controller
             $resultado = [];
 
             foreach ($cursosMoodle as $cursoMoodle) {
-                if (!isset($cursosLocal[$cursoMoodle->course_id])) {
+                $cursoLocal = $cursosLocal[$cursoMoodle->course_id] ?? null;
+
+                if ($cursoLocal !== null && (int) $cursoLocal->habilitado !== 1) {
                     continue;
                 }
 
-                $cursoLocal = $cursosLocal[$cursoMoodle->course_id];
-
                 $resultado[] = [
-                    'codigo' => $cursoLocal->SW_CURS_COD,
-                    'descripcion' => $cursoLocal->SW_CURS_DESCRIPCION,
-                    'tipo_curso' => $planes[$cursoLocal->SW_CURS_PLAN_CAPAC_COD] ?? null,
+                    'codigo' => $cursoLocal->SW_CURS_COD ?? null,
+                    'descripcion' => $cursoLocal->SW_CURS_DESCRIPCION ?? null,
+                    'tipo_curso' => $cursoLocal !== null
+                        ? ($planes[$cursoLocal->SW_CURS_PLAN_CAPAC_COD] ?? null)
+                        : null,
                     'nombre_curso' => $cursoMoodle->course_name,
                     'fecha_creacion_curso' => $cursoMoodle->course_created_date,
                     'fecha_creacion_matricula' => $cursoMoodle->enrolment_start_date,
                     'fecha_ultimo_acceso' => $cursoMoodle->last_access_date ?? null,
                     'nota_final' => $cursoMoodle->final_grade ?? null,
                     'estado' => $cursoMoodle->estado,
+                    'sin_info_extra' => $cursoLocal === null,
                 ];
             }
 

@@ -1693,14 +1693,24 @@
                                 <tr class="hover:bg-default-50 transition-colors">
                                     <td class="py-2.5 px-3 text-default-400 text-xs font-mono" x-text="index + 1"></td>
                                     <td class="py-2.5 px-3">
-                                        <p class="font-medium text-default-800 text-xs" x-text="c.codigo || ''"></p>
+                                        <p class="font-medium text-default-800 text-xs" x-text="c.codigo || '—'"></p>
                                     </td>
                                     <td class="py-2.5 px-3">
-                                        <p class="font-medium text-default-800 text-xs"
-                                            x-text="c.nombre_curso || c.curso_nombre || c.nombre || ''"></p>
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <p class="font-medium text-default-800 text-xs"
+                                                x-text="c.nombre_curso || c.curso_nombre || c.nombre || ''"></p>
+                                            <template x-if="c.sin_info_extra">
+                                                <span
+                                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold bg-default-100 text-default-500 border border-default-200">
+                                                    <i class="ti ti-info-circle text-[8px]"></i>
+                                                    Sin info. extra
+                                                </span>
+                                            </template>
+                                        </div>
                                     </td>
                                     <td class="py-2.5 px-3 text-center">
-                                        <p class="font-medium text-default-800 text-xs" x-text="c.tipo_curso || ''"></p>
+                                        <p class="font-medium text-default-800 text-xs"
+                                            x-text="c.tipo_curso || (c.sin_info_extra ? 'Sin info. extra' : '—')"></p>
                                     </td>
                                     <td class="py-2.5 px-3 text-center">
                                         <span x-show="c.estado === 'En curso'"
@@ -2962,7 +2972,8 @@
                     const q = this.busquedaCurso.toLowerCase().trim();
                     const nombre = c.nombre_curso || '';
                     if (q && !nombre.toLowerCase().includes(q)) return false;
-                    if (this.filtroTipoCurso && c.tipo_curso !== this.filtroTipoCurso) return false;
+                    const tipo = c.tipo_curso || (c.sin_info_extra ? 'Sin info. extra' : '');
+                    if (this.filtroTipoCurso && tipo !== this.filtroTipoCurso) return false;
                     if (this.filtroUltimoAccesoDesde) {
                         const desde = new Date(this.filtroUltimoAccesoDesde);
                         const val = c.fecha_ultimo_acceso ? new Date(c.fecha_ultimo_acceso) : null;
@@ -3003,7 +3014,9 @@
             },
 
             get tiposCurso() {
-                return [...new Set(this.cursos.map(c => c.tipo_curso).filter(Boolean))].sort();
+                return [...new Set(this.cursos
+                    .map(c => c.tipo_curso || (c.sin_info_extra ? 'Sin info. extra' : null))
+                    .filter(Boolean))].sort();
             },
 
             formatearFecha(val) {
