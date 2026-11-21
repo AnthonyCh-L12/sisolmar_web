@@ -372,7 +372,7 @@ class ReporteCapacitacionesController extends Controller
                         'NombreCompleto' => $persona->NOMBRE_COMPLETO ?? null,
                         'NroDoc' => $persona->NRO_DOC ?? null,
                         'Sucursal' => $persona->SUCURSAL ?? null,
-                        'TipoTrabajador' => $persona->TIPO_TRABAJADOR ?? null,
+                        'TipoTrabajador' => TipoTrabajadorHelper::normalizar($persona->TIPO_TRABAJADOR ?? ''),
                         'Correo' => $persona->CORREO ?? null,
                         'Cargo' => $persona->CARGO ?? null,
                         'Cliente' => $persona->CLIENTE ?? 'Sin cliente',
@@ -590,7 +590,7 @@ class ReporteCapacitacionesController extends Controller
                         'Sucursal' => trim($persona->SUCURSAL ?? ''),
                         'Empresa' => $empresa,
                         'Cargo' => trim($persona->CARGO ?? ''),
-                        'TipoTrabajador' => trim($persona->TIPO_TRABAJADOR ?? ''),
+                        'TipoTrabajador' => TipoTrabajadorHelper::normalizar($persona->TIPO_TRABAJADOR ?? ''),
                         'Cursos' => $cursosList,
                     ];
                 })
@@ -868,7 +868,7 @@ class ReporteCapacitacionesController extends Controller
                     'NombreCompleto' => $persona->NOMBRE_COMPLETO,
                     'DNI' => $persona->NRO_DOC,
                     'Cargo' => $persona->CARGO ?? 'Sin asignar',
-                    'TipoTrabajador' => $persona->TIPO_TRABAJADOR,
+                    'TipoTrabajador' => TipoTrabajadorHelper::normalizar($persona->TIPO_TRABAJADOR ?? ''),
                     'Nota_Final' => $desdeJson ? null : ($moodle->final_grade ?? null),
                     'Estado' => strtoupper($moodle->estado ?? ''),
                 ];

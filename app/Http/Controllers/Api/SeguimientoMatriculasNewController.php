@@ -564,7 +564,7 @@ class SeguimientoMatriculasNewController extends Controller
                         'correo'          => trim($l->CORREO ?? '') ?: $p['email'],
                         'nota_final'      => $p['nota'],
                         'ultimo_acceso'   => $p['ultimo_acceso'],
-                        'tipo_trabajador' => trim($l->TIPO_TRABAJADOR ?? ''),
+                        'tipo_trabajador' => TipoTrabajadorHelper::normalizar($l->TIPO_TRABAJADOR ?? ''),
                         'cargo'           => trim($l->CARGO ?? ''),
                         'sucursal'        => trim($l->SUCURSAL ?? ''),
                         'cliente'         => $l->CLIENTE ?? 'Sin cliente',

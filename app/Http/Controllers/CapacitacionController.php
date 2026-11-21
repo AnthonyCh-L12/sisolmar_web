@@ -5680,6 +5680,14 @@ class CapacitacionController extends Controller
         try {
             $resultados = DB::select("EXEC SP_OBTENER_MEMOS_ENVIADOS");
 
+            $resultados = array_map(function ($row) {
+                if (isset($row->TIPO_TRABAJADOR)) {
+                    $row->TIPO_TRABAJADOR = TipoTrabajadorHelper::normalizar($row->TIPO_TRABAJADOR);
+                }
+
+                return $row;
+            }, $resultados);
+
             return response()->json([
                 "success" => true,
                 "data" => $resultados,
