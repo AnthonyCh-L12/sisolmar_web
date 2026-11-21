@@ -336,8 +336,11 @@ export default document.addEventListener("alpine:init", () => {
 
         async abrirPDF() {
             this.pdfTitulo = "Plan de Capacitación Estándar (PCE)";
-            this.pdfDownloadNombre = "Plan_Capacitacion_Estandar_PCE_" + new Date().getFullYear() + ".pdf";
+            this.pdfDownloadNombre = "PCE OFICIAL 2026.pdf";
+            await this.cargarPdfPlan("pce-oficial-2026", { cerrarSeleccion: false });
+        },
 
+        async cargarPdfPlan(tipo, { cerrarSeleccion = true } = {}) {
             Swal.fire({
                 title: "Generando PDF...",
                 allowOutsideClick: false,
@@ -346,19 +349,21 @@ export default document.addEventListener("alpine:init", () => {
 
             try {
                 const { data } = await axios.get(
-                    `${VITE_URL_APP}/api/obtener-plan-pce-new`,
+                    `${VITE_URL_APP}/api/planes-capacitacion/pdf/${tipo}`,
+                    { responseType: "blob" },
                 );
 
-                const doc = this.generarDocEstiloPCE(
-                    data,
-                    `PROGRAMA DE CAPACITACIÓN ESTÁNDAR DEL AÑO ${data.Anio}`,
-                );
+                const blob = data instanceof Blob
+                    ? data
+                    : new Blob([data], { type: "application/pdf" });
 
-                const blob = doc.output("blob");
-                if (this.pdfUrl && this.pdfUrl.startsWith("blob:")) URL.revokeObjectURL(this.pdfUrl);
+                if (this.pdfUrl && this.pdfUrl.startsWith("blob:")) {
+                    URL.revokeObjectURL(this.pdfUrl);
+                }
                 this.pdfUrl = URL.createObjectURL(blob);
 
                 Swal.close();
+                if (cerrarSeleccion) this.openSeleccionCliente = false;
                 this.open = true;
             } catch (e) {
                 Swal.close();
@@ -366,7 +371,7 @@ export default document.addEventListener("alpine:init", () => {
                 Swal.fire({
                     icon: "error",
                     title: "Error",
-                    text: "No se pudo generar el PDF.",
+                    text: "No se pudo obtener el PDF del plan.",
                 });
             }
         },
@@ -529,11 +534,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 this.pdfTitulo = `Plan de Capacitación Aliado | ${nombreCliente}`;
                 this.pdfDownloadNombre = "Plan_Capacitacion_Aliado_COSCO.pdf";
-                if (this.pdfUrl && this.pdfUrl.startsWith("blob:")) URL.revokeObjectURL(this.pdfUrl);
-                this.pdfUrl = `${VITE_URL_APP}/pdfs/PCA_COSCO.pdf`;
-
-                this.openSeleccionCliente = false;
-                this.open = true;
+                await this.cargarPdfPlan("pca-cosco");
                 return;
             }
 
@@ -547,12 +548,7 @@ export default document.addEventListener("alpine:init", () => {
 
                 this.pdfTitulo = `Plan de Capacitación Aliado | ${nombreCliente}`;
                 this.pdfDownloadNombre = "Plan_Capacitacion_Aliado_MLL2.pdf";
-                if (this.pdfUrl && this.pdfUrl.startsWith("blob:"))
-                    URL.revokeObjectURL(this.pdfUrl);
-                this.pdfUrl = `${VITE_URL_APP}/pdfs/PCA_MLL2.pdf`;
-
-                this.openSeleccionCliente = false;
-                this.open = true;
+                await this.cargarPdfPlan("pca-mll2");
                 return;
             }
 

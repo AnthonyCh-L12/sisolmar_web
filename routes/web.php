@@ -226,6 +226,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-plan-pce-new', [PlanesCapacitacionNewController::class, 'obtenerPlanPCENew']);
         Route::get('/obtener-plan-pca-new/{codCliente}', [PlanesCapacitacionNewController::class, 'obtenerPlanPCANew']);
         Route::get('/obtener-cursos-por-plan-new/{tipo_curso}', [PlanesCapacitacionNewController::class, 'obtenerCursosPorPlanNew']);
+        // Sirve los PDFs oficiales de los planes evitando el acceso directo a /public/pdfs
+        Route::get('/planes-capacitacion/pdf/{tipo}', [PlanesCapacitacionNewController::class, 'obtenerPdfPlan']);
         Route::get('/obtener-cursos-new', [NewCapacController::class, 'obtenerCursos']);
         Route::get('/obtener-cursos-matriculas-new', [NewCapacController::class, 'obtenerCursosMatriculas']);
         Route::get('/obtener-curso-new/{codigoCurso}', [NewCapacController::class, 'obtenerCurso']);
