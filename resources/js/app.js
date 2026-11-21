@@ -42,36 +42,30 @@ class App {
 
     initSidenav() {
         var self = this;
-        var pageUrl = window.location.href.split(/[?#]/)[0];
+        const currentPath = window.location.pathname.replace(/\/+$/, "");
         document
             .querySelectorAll("ul.admin-menu .menu-item a")
             .forEach((element) => {
-                if (element.href === pageUrl) {
+                const linkPath = new URL(element.href, window.location.origin).pathname.replace(/\/+$/, "");
+                if (linkPath === currentPath) {
                     element.classList.add("active");
 
                     let parentMenuItem = element.closest(".menu-item");
-                    parentMenuItem.classList.add("active");
+                    parentMenuItem?.classList.add("active");
 
-                    let parentMenu =
-                        element.parentElement.parentElement.parentElement
-                            .parentElement;
-                    if (
-                        parentMenu &&
-                        parentMenu.classList.contains("menu-item")
-                    ) {
-                        const collapseElement = parentMenu.querySelector(
-                            ".hs-accordion-toggle",
-                        );
-
-                        if (collapseElement) {
-                            // collapseElement.classList.add("active");
-                            collapseElement.classList.add("open");
-                            parentMenu.classList.add("active");
-                            const nextE = collapseElement.nextElementSibling;
-                            if (nextE) {
-                                nextE.classList.remove("hidden");
-                            }
+                    // Expand the active module and any wrapping group so the
+                    // sidebar remains open after navigating to a submenu.
+                    let accordion = parentMenuItem?.closest("li.hs-accordion");
+                    while (accordion && accordion.closest("ul.admin-menu") ) {
+                        accordion.classList.add("active");
+                        const toggle = accordion.querySelector(":scope > .hs-accordion-toggle");
+                        const content = toggle?.nextElementSibling;
+                        if (toggle) toggle.classList.add("open");
+                        if (content?.classList.contains("hs-accordion-content")) {
+                            content.classList.remove("hidden");
+                            content.style.height = "auto";
                         }
+                        accordion = accordion.parentElement?.closest("li.hs-accordion") || null;
                     }
                 }
             });

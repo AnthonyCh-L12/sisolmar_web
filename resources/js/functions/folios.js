@@ -57,7 +57,12 @@ const tblFolios = new Tabulator("#tblFolios", {
             responsive: false 
         },
         { title: "Folios", field: "nombre", hozAlign: "left", widthGrow: 3 },
-        { title: "Categoría", field: "nombre_categoria", hozAlign: "center", widthGrow: 3 },
+        {
+            title: "Categoría", field: "nombre_categoria", hozAlign: "center", widthGrow: 3,
+            formatter: function (cell) {
+                return String(cell.getValue() || '').replace(/^Documentos\s+/i, '');
+            }
+        },
         {
             title: "Tipo", field: "tipoFolio", hozAlign: "center", widthGrow: 2,
             formatter: function (cell) {
@@ -78,19 +83,14 @@ const tblFolios = new Tabulator("#tblFolios", {
             }
         },
         {
-            title: "Prioridad", field: "prioridad", hozAlign: "center", widthGrow: 2,
+            title: "Obligatorio", field: "obligatorio", hozAlign: "center", widthGrow: 2,
             formatter: function (cell) {
-                let val = cell.getValue() || '';
-                
-                let color = 'border-teal-500 bg-teal-100 text-teal-800 shadow-sm'; 
-
-                if (val === "PRINCIPAL") {
-                    // 🔥 Índigo a 500 para que resalte bien contra el rosa
-                    color = 'border-indigo-500 bg-indigo-100 text-indigo-800 shadow-sm';
-                }
-
-                const etiqueta = val === 'PRINCIPAL' ? 'OBLIGATORIO' : val;
-                return val ? `<span class="inline-flex items-center justify-center rounded-full border ${color} px-3 py-1 text-[11px] font-bold tracking-wider whitespace-nowrap" style="min-width: 95px;">${etiqueta}</span>` : '—';
+                const esObligatorio = cell.getValue() == 1;
+                const color = esObligatorio
+                    ? 'border-indigo-500 bg-indigo-100 text-indigo-800 shadow-sm'
+                    : 'border-teal-500 bg-teal-100 text-teal-800 shadow-sm';
+                const etiqueta = esObligatorio ? 'SI' : 'NO';
+                return `<span class="inline-flex items-center justify-center rounded-full border ${color} px-3 py-1 text-[11px] font-bold tracking-wider whitespace-nowrap" style="min-width: 95px;">${etiqueta}</span>`;
             }
         },
         {
@@ -268,19 +268,20 @@ const tblFolios = new Tabulator("#tblFolios", {
     }
 });
 
-// =========================================================
-// INYECCIÓN DE NUMERACIÓN ESTÁTICA
-// =========================================================
+// Enumerar las filas en el orden que Tabulator realmente está mostrando:
+// filtros, ordenamiento y página actuales.
 tblFolios.on("renderComplete", function () {
-    // Usamos 20 por defecto porque así lo definiste en paginationSize
-    const page = this.getPage() || 1;
-    const size = this.getPageSize() || 20; 
-    const offset = (page - 1) * size;
-    
-    this.getRows("active").forEach((row, index) => {
-        const cell = row.getCell("nro_fila_estatico");
-        if (cell) {
-            cell.getElement().innerHTML = `<span class="text-gray-700 font-medium">${offset + index + 1}</span>`;
+    const paginaActiva = this.element.querySelector(".tabulator-page.active[data-page]");
+    const pagina = parseInt(paginaActiva?.dataset.page, 10) || 1;
+    const tamanoPagina = parseInt(document.getElementById("page-size")?.value, 10)
+        || this.getPageSize()
+        || 20;
+    const desplazamiento = (pagina - 1) * tamanoPagina;
+
+    this.getRows("display").forEach((row, indice) => {
+        const celdaNumero = row.getCell("nro_fila_estatico");
+        if (celdaNumero) {
+            celdaNumero.getElement().innerHTML = `<span class="text-gray-700 font-medium">${desplazamiento + indice + 1}</span>`;
         }
     });
 });
@@ -431,7 +432,7 @@ document.getElementById("buscar").addEventListener("keyup", function () {
 
 // Función para actualizar la tabla con TODOS los filtros
 function aplicarTodosFiltros() {
-      const filtroTipos          = document.getElementById('filtroTipos')?.value;
+      const filtroObligatorio    = document.getElementById('filtroTipos')?.value;
       const filtroClasificacion  = document.getElementById('filtroClasificacion')?.value;
       const filtroCategoria      = document.getElementById('filtroCategoria')?.value;
       const vencimientoFiltro    = document.getElementById('vencimientoFiltro')?.value;
@@ -448,17 +449,15 @@ function aplicarTodosFiltros() {
       }
       // Si es "TODOS", no empujamos nada, así Tabulator muestra ambos.
 
-      if (filtroTipos && filtroTipos !== "TODOS") {
-          filtros.push({ field: "prioridad", type: "=", value: filtroTipos });
+      if (filtroObligatorio && filtroObligatorio !== "TODOS") {
+          filtros.push({ field: "obligatorio", type: "=", value: filtroObligatorio });
       }
 
       if (filtroClasificacion && filtroClasificacion !== "TODOS") {
           filtros.push({ field: "tipoFolio", type: "=", value: filtroClasificacion });
       }
 
-      if (filtroCategoria === "SIN_CATEGORIA") {
-          filtros.push({ field: "nombre_categoria", type: "=", value: "SIN CATEGORÍA" });
-      } else if (filtroCategoria && filtroCategoria !== "TODOS") {
+      if (filtroCategoria && filtroCategoria !== "TODOS") {
           filtros.push({ field: "cod_categoria", type: "=", value: filtroCategoria });
       }
 
@@ -566,7 +565,7 @@ document.getElementById('formSaveFolio').addEventListener('submit', function (ev
     var nombre = document.getElementById('nombre').value;
     var tipo = document.getElementById('tipo').value;
     var tipoFolio = document.querySelector('input[name="tipo_folio"]:checked').value;
-    var obligatorio = (tipoFolio === 'PRINCIPAL') ? 1 : 0;
+    var obligatorio = (tipoFolio === '1') ? 1 : 0;
     var switchVencimiento = document.getElementById('switchVencimiento');
     var vencimiento = switchVencimiento.checked ? 1 : 0;
     var periodo = document.getElementById('periodo').value;
