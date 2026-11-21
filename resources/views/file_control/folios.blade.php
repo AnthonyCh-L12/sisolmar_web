@@ -91,13 +91,14 @@
 
                 <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t border-slate-200">
 
-                    {{-- Prioridad --}}
+                    {{-- Categoría --}}
                     <div class="flex items-center gap-2">
-                        <label for="filtroTipos" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-category text-gray-400 text-lg'></i>Prioridad</label>
-                        <select id="filtroTipos" class="form-select text-sm w-36 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
-                            <option value="TODOS" selected>Todos ({{ $todos }})</option>
-                            <option value="PRINCIPAL">Obligatorio ({{ $principal }})</option>
-                            <option value="ADICIONAL">Adicional ({{ $adicional }})</option>
+                        <label for="filtroCategoria" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-folder text-gray-400 text-lg'></i>Categoría</label>
+                        <select id="filtroCategoria" class="form-select text-sm w-48 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
+                            <option value="TODOS" selected>Todas</option>
+                            @foreach ($categorias as $categoria)
+                                <option value="{{ $categoria->codigo }}">{{ preg_replace('/^Documentos\\s+/i', '', $categoria->nombre) }}</option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -112,15 +113,13 @@
                         </select>
                     </div>
 
-                    {{-- Categoría --}}
+                    {{-- Obligatorio --}}
                     <div class="flex items-center gap-2">
-                        <label for="filtroCategoria" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-folder text-gray-400 text-lg'></i>Categoría</label>
-                        <select id="filtroCategoria" class="form-select text-sm w-48 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
-                            <option value="TODOS" selected>Todas</option>
-                            @foreach ($categorias as $categoria)
-                                <option value="{{ $categoria->codigo }}">{{ $categoria->nombre }}</option>
-                            @endforeach
-                            <option value="SIN_CATEGORIA">Sin categoría</option>
+                        <label for="filtroTipos" class="flex items-center gap-2 text-sm font-medium text-gray-600 whitespace-nowrap"><i class='bx bx-category text-gray-400 text-lg'></i>Obligatorio</label>
+                        <select id="filtroTipos" class="form-select text-sm w-36 pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-primary">
+                            <option value="TODOS" selected>Todos</option>
+                            <option value="1">SI</option>
+                            <option value="0">NO</option>
                         </select>
                     </div>
 
@@ -255,17 +254,17 @@
                             </span>
                         </div>
 
-                        {{-- Tipo de folio: Obligatorio / Adicional --}}
+                        {{-- Estado de obligatoriedad --}}
                         <div class="flex items-center gap-4 mt-2">
-                            <span class="text-sm font-bold text-gray-700 whitespace-nowrap">Prioridad:</span>
+                            <span class="text-sm font-bold text-gray-700 whitespace-nowrap">Obligatorio:</span>
                             <div class="flex items-center gap-5">
                                 <label class="flex items-center gap-1.5 cursor-pointer">
-                                    <input type="radio" class="form-radio text-primary" id="radioPrin" name="tipo_folio" value="PRINCIPAL" checked>
-                                    <span class="text-sm font-medium">Obligatorio</span>
+                                    <input type="radio" class="form-radio text-primary" id="radioPrin" name="tipo_folio" value="1" checked>
+                                    <span class="text-sm font-medium">SI</span>
                                 </label>
                                 <label class="flex items-center gap-1.5 cursor-pointer">
-                                    <input type="radio" class="form-radio text-primary" id="radioAdi" name="tipo_folio" value="ADICIONAL">
-                                    <span class="text-sm font-medium">Adicional</span>
+                                    <input type="radio" class="form-radio text-primary" id="radioAdi" name="tipo_folio" value="0">
+                                    <span class="text-sm font-medium">NO</span>
                                 </label>
                             </div>
                         </div>

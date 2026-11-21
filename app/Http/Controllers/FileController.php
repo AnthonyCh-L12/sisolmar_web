@@ -50,12 +50,36 @@ class FileController extends Controller
 
         $tipoPerLimitar = session('limitarTipoPer');
         $tipoUsuario = session('tipo_rol');
-        $categoriasFolio = DB::table('sw_folios_categoria')
-            ->where('habilitado', 1)
-            ->orderBy('nombre')
-            ->get(['codigo', 'nombre']);
+        $tiposFolio = DB::table('sw_tipo_folio')
+            ->orderBy('descripcion')
+            ->get(['codigo', 'descripcion']);
+        $instituciones = DB::select(
+            'SELECT INST_CODIGO AS codigo, INST_DESCRIPCION AS descripcion
+             FROM si_solm.dbo.REDO_INSTITUCION WITH (NOLOCK)
+             WHERE INST_DESCRIPCION IS NOT NULL
+             ORDER BY INST_DESCRIPCION'
+        );
+        $areasEvaluacion = DB::select(
+            'SELECT AREA_CODIGO AS codigo, AREA_DESCRIPCION AS nombre
+             FROM si_solm.dbo.REDO_AREA WITH (NOLOCK)
+             ORDER BY AREA_DESCRIPCION'
+        );
+        $cargosEvaluacion = DB::select(
+            "SELECT CODI_CARG AS codigo, DESC_CARGO AS nombre
+             FROM si_solm.dbo.CARGOS WITH (NOLOCK)
+             WHERE DESC_CARGO IS NOT NULL
+             ORDER BY DESC_CARGO"
+        );
+        $evaluadoresPostulante = DB::select(
+            "SELECT v.VERI_CODIGO AS codigo,
+                LTRIM(RTRIM(COALESCE(v.VERI_NOMB1, '') + ' ' + COALESCE(v.VERI_NOMB2, '') + ' ' +
+                    COALESCE(v.VERI_APEL1, '') + ' ' + COALESCE(v.VERI_APEL2, ''))) AS nombre
+             FROM si_solm.dbo.REDO_VERIFICADORES AS v WITH (NOLOCK)
+             WHERE v.VERI_INSTRUCTOR = '0'
+             ORDER BY v.VERI_APEL1, v.VERI_APEL2, v.VERI_NOMB1, v.VERI_NOMB2"
+        );
 
-        return view('file_control.chargefile', compact('personal', 'clientes', 'sucursales', 'tipoPerLimitar', 'tipoUsuario', 'categoriasFolio'));
+        return view('file_control.chargefile', compact('personal', 'clientes', 'sucursales', 'tipoPerLimitar', 'tipoUsuario', 'tiposFolio', 'instituciones', 'areasEvaluacion', 'cargosEvaluacion', 'evaluadoresPostulante'));
     }
 
     public function indexGestionDj()
@@ -81,8 +105,32 @@ class FileController extends Controller
             'SELECT cod, descripcion FROM sisolm_web.dbo.TIPO_VINCULO_FAMILIAR ORDER BY cod'
         );
 
-        $sucursalesAsignadas = $this->obtenerSucursalesAsignadasUsuario();
-        $restringirSucursalesGestionDj = $this->usuarioTieneSucursalLimitada();
+        // Resolver permisos desde el usuario guardado en la sesión. Algunas
+        // rutas de Gestión DJ no tienen un usuario disponible vía Auth, pero
+        // sí conservan session('usuario'); el modal debe respetar sus permisos.
+        $usuarioSesion = trim((string) session('usuario', ''));
+        $usuarioGestionDj = $usuarioSesion !== ''
+            ? DB::table('sw_usuarios')
+                ->where('usuario', $usuarioSesion)
+                ->where('habilitado', 1)
+                ->first(['codigo', 'limitarSucursal'])
+            : null;
+
+        $restringirSucursalesGestionDj = $usuarioGestionDj
+            ? (int) $usuarioGestionDj->limitarSucursal === 1
+            : $this->usuarioTieneSucursalLimitada();
+
+        $sucursalesAsignadas = $usuarioGestionDj
+            ? DB::table('sw_permisos_usuario_sucursal')
+                ->where('codUsuario', $usuarioGestionDj->codigo)
+                ->where('habilitado', 1)
+                ->pluck('codSucursal')
+                ->map(fn ($codigo) => trim((string) $codigo))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all()
+            : $this->obtenerSucursalesAsignadasUsuario();
 
         // Cuando el usuario tiene asignaciones activas, el filtro solo debe
         // exponer esas sucursales. Los usuarios sin asignaciones mantienen
@@ -95,11 +143,16 @@ class FileController extends Controller
             };
             $sucursalesAsignadasNormalizadas = array_map($normalizarCodigoSucursal, $sucursalesAsignadas);
 
-            $sucursales = array_values(array_filter($sucursales, function ($sucursal) use ($normalizarCodigoSucursal, $sucursalesAsignadasNormalizadas) {
-                $codigo = trim((string) ($sucursal->codigo ?? ''));
+            $filtrarSucursalesPermitidas = static function (array $lista) use ($normalizarCodigoSucursal, $sucursalesAsignadasNormalizadas): array {
+                return array_values(array_filter($lista, function ($sucursal) use ($normalizarCodigoSucursal, $sucursalesAsignadasNormalizadas) {
+                    $codigo = trim((string) ($sucursal->codigo ?? ''));
 
-                return in_array($normalizarCodigoSucursal($codigo), $sucursalesAsignadasNormalizadas, true);
-            }));
+                    return in_array($normalizarCodigoSucursal($codigo), $sucursalesAsignadasNormalizadas, true);
+                }));
+            };
+
+            $sucursales = $filtrarSucursalesPermitidas($sucursales);
+            $todasLasSucursales = $filtrarSucursalesPermitidas($todasLasSucursales);
         }
 
         $sucursalesGestionDj = array_values(array_filter($sucursales, function ($sucursal) {
@@ -506,7 +559,7 @@ class FileController extends Controller
         // ─── Traer TODOS sin paginar para poder filtrar ───
         // Solo si hay filtro activo de DJ, traemos todo y filtramos
         if ($tieneFolio !== null) {
-            $todosDatos = DB::select('EXEC SW_LISTAR_PERSONAL_X_SUCURSAL_TOTAL_CARGA_DE_ARCHIVOS ?, ?, ?, ?, ?, ?, ?', [
+            $todosDatos = DB::select('EXEC SW_LISTAR_PERSONAL_CARGA_DE_ARCHIVOS_JHORDAN ?, ?, ?, ?, ?, ?, ?', [
                 $codSucursal, 1, 99999, $search, $tipo_per, $vigencia, $usuario,
             ]);
 
@@ -530,7 +583,7 @@ class FileController extends Controller
 
         } else {
             // Sin filtro DJ — SP nuevo que ya trae el TotalRows integrado y limpieza de guiones
-            $data = DB::select('EXEC SW_LISTAR_PERSONAL_X_SUCURSAL_TOTAL_CARGA_DE_ARCHIVOS ?, ?, ?, ?, ?, ?, ?', [
+            $data = DB::select('EXEC SW_LISTAR_PERSONAL_CARGA_DE_ARCHIVOS_JHORDAN ?, ?, ?, ?, ?, ?, ?', [
                 $codSucursal, $page, $size, $search, $tipo_per, $vigencia, $usuario,
             ]);
 
@@ -816,6 +869,601 @@ class FileController extends Controller
         $docs_personal = FileControl::getDocsXPersona($codPersonal, $usuario);
 
         return response()->json($docs_personal);
+    }
+
+    public function getDatosCVPersonal(string $codPersonal)
+    {
+        $datos = DB::selectOne(
+            "SELECT TOP 1
+                p.CODI_PERS AS cod_personal,
+                LTRIM(RTRIM(COALESCE(p.NOMB_1, '') + ' ' + COALESCE(p.NOMB_2, ''))) AS nombres,
+                LTRIM(RTRIM(COALESCE(p.APEL_1, '') + ' ' + COALESCE(p.APEL_2, ''))) AS apellidos,
+                LTRIM(RTRIM(COALESCE(p.NOMB_1, '') + ' ' + COALESCE(p.NOMB_2, '') + ' ' + COALESCE(p.APEL_1, '') + ' ' + COALESCE(p.APEL_2, ''))) AS nombres_apellidos,
+                p.NRO_DOCU_IDEN AS documento,
+                pa.PAIS_DESCRIPCION AS pais,
+                CONVERT(VARCHAR(10), p.FECH_NACI, 103) AS fecha_nacimiento,
+                CASE WHEN p.FECH_NACI IS NULL THEN NULL
+                    ELSE DATEDIFF(YEAR, p.FECH_NACI, GETDATE())
+                        - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, p.FECH_NACI, GETDATE()), p.FECH_NACI) > GETDATE() THEN 1 ELSE 0 END
+                END AS edad,
+                ad.DEPA_DESCRIPCION AS departamento,
+                ap.PROVI_DESCRIPCION AS provincia,
+                ax.DIST_DESCRIPCION AS distrito,
+                LTRIM(RTRIM(
+                    COALESCE(ad.DEPA_DESCRIPCION, '')
+                    + CASE WHEN ad.DEPA_DESCRIPCION IS NOT NULL AND (ap.PROVI_DESCRIPCION IS NOT NULL OR ax.DIST_DESCRIPCION IS NOT NULL) THEN ' / ' ELSE '' END
+                    + COALESCE(ap.PROVI_DESCRIPCION, '')
+                    + CASE WHEN ap.PROVI_DESCRIPCION IS NOT NULL AND ax.DIST_DESCRIPCION IS NOT NULL THEN ' / ' ELSE '' END
+                    + COALESCE(ax.DIST_DESCRIPCION, '')
+                )) AS residencia,
+                NULLIF(LTRIM(RTRIM(p.DIRECCION)), '') AS direccion,
+                COALESCE(NULLIF(LTRIM(RTRIM(c.TELEFONO)), ''), NULLIF(LTRIM(RTRIM(p.PERS_TELEFONO)), ''), NULLIF(LTRIM(RTRIM(c.TELEFONO1)), '')) AS telefono,
+                cargo.DESC_CARGO AS cargo,
+                ec.ESCI_DESCRIPCION AS estado_civil,
+                p.PERS_CONYUGE AS conyuge_nombre,
+                p.PERS_EMAIL AS correo,
+                p.PERS_NROEMERGENCIA AS emergencia
+            FROM si_solm.dbo.PERSONAL AS p
+            LEFT JOIN si_solm.dbo.ADMI_PAIS AS pa
+                ON pa.PAIS_CODIGO = p.NACIONALIDAD
+            LEFT JOIN si_solm.dbo.ADMI_DEPARTAMENTO AS ad
+                ON ad.DEPA_CODIGO = p.DEPARTAMENTO
+            LEFT JOIN si_solm.dbo.ADMI_PROVINCIA AS ap
+                ON ap.PROVI_CODIGO = p.PROVINCIA
+            LEFT JOIN si_solm.dbo.ADMI_DISTRITO AS ax
+                ON ax.DIST_CODIGO = p.DISTRITO
+            LEFT JOIN si_solm.dbo.CARGOS AS cargo
+                ON cargo.CODI_CARG = p.CODI_CARG
+            LEFT JOIN si_solm.dbo.ADMI_ESTADO_CIVIL AS ec
+                ON RTRIM(ec.ESCI_CODIGO) = RTRIM(p.ESCI_CODIGO)
+            OUTER APPLY (
+                SELECT TOP 1 TELEFONO, TELEFONO1
+                FROM si_solm.dbo.CURRICULO
+                WHERE RTRIM(CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS =
+                      RTRIM(p.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS
+                ORDER BY fecha_reg DESC, CODI_CURRICULO DESC
+            ) AS c
+            WHERE RTRIM(p.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS =
+                  RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS",
+            [$codPersonal]
+        );
+
+        if (! $datos) {
+            return response()->json(['message' => 'No se encontró el personal solicitado.'], 404);
+        }
+
+        return response()->json($datos);
+    }
+
+    public function getDatosEvaluacionPostulante(string $codPersonal)
+    {
+        $foliosVisibles = FileControl::getDocsXPersona($codPersonal, session('usuario', '0'));
+        $folioVisible = collect($foliosVisibles)->contains(fn ($item) =>
+            (int) ($item->codFolio ?? 0) === 21 && (int) ($item->codRequisito ?? 0) === 1
+        );
+        if (! $folioVisible) {
+            return response()->json(['message' => 'No tienes acceso a este folio.'], 403);
+        }
+
+        $datos = DB::selectOne(
+            "SELECT TOP 1
+                LTRIM(RTRIM(COALESCE(p.NOMB_1, '') + ' ' + COALESCE(p.NOMB_2, '') + ' ' + COALESCE(p.APEL_1, '') + ' ' + COALESCE(p.APEL_2, ''))) AS nombres_apellidos,
+                p.NRO_DOCU_IDEN AS documento,
+                ec.ESCI_DESCRIPCION AS estado_civil,
+                CASE WHEN p.FECH_NACI IS NULL THEN NULL
+                    ELSE DATEDIFF(YEAR, p.FECH_NACI, GETDATE()) - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, p.FECH_NACI, GETDATE()), p.FECH_NACI) > GETDATE() THEN 1 ELSE 0 END
+                END AS edad,
+                CASE WHEN UPPER(LTRIM(RTRIM(COALESCE(p.PERS_CONHIJOS, '')))) IN ('SI', 'S', '1', 'TRUE') THEN 1 ELSE 0 END AS numero_hijos,
+                LTRIM(RTRIM(COALESCE(dn.DIST_DESCRIPCION, p.DIST_NACI, '') + '-' + COALESCE(pn.PROVI_DESCRIPCION, p.PROVI_CODIGO_NACI, '') + '-' + COALESCE(an.DEPA_DESCRIPCION, p.DEPA_CODIGO_NACI, ''))) AS lugar_nacimiento,
+                COALESCE(NULLIF(LTRIM(RTRIM(cur.TELEFONO)), ''), NULLIF(LTRIM(RTRIM(p.PERS_TELEFONO)), ''), NULLIF(LTRIM(RTRIM(cur.TELEFONO1)), '')) AS telefono
+            FROM si_solm.dbo.PERSONAL AS p
+            LEFT JOIN si_solm.dbo.ADMI_ESTADO_CIVIL AS ec ON RTRIM(ec.ESCI_CODIGO) = RTRIM(p.ESCI_CODIGO)
+            LEFT JOIN si_solm.dbo.ADMI_DISTRITO AS dn ON dn.DIST_CODIGO = p.DIST_NACI
+            LEFT JOIN si_solm.dbo.ADMI_PROVINCIA AS pn ON pn.PROVI_CODIGO = p.PROVI_CODIGO_NACI
+            LEFT JOIN si_solm.dbo.ADMI_DEPARTAMENTO AS an ON an.DEPA_CODIGO = p.DEPA_CODIGO_NACI
+            OUTER APPLY (
+                SELECT TOP 1 TELEFONO, TELEFONO1 FROM si_solm.dbo.CURRICULO
+                WHERE RTRIM(CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(p.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS
+                ORDER BY fecha_reg DESC, CODI_CURRICULO DESC
+            ) AS cur
+            WHERE RTRIM(p.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS",
+            [$codPersonal]
+        );
+
+        if (! $datos) return response()->json(['message' => 'No se encontró el personal solicitado.'], 404);
+        return response()->json($datos);
+    }
+
+    public function getFolioRegistradoPersona(string $codPersonal, int $codFolio, int $codRequisito)
+    {
+        $foliosVisibles = FileControl::getDocsXPersona($codPersonal, session('usuario', '0'));
+        $folioVisible = collect($foliosVisibles)->contains(function ($item) use ($codFolio, $codRequisito) {
+            return (int) ($item->codFolio ?? 0) === $codFolio
+                && (int) ($item->codRequisito ?? 0) === $codRequisito;
+        });
+
+        if (! $folioVisible) {
+            return response()->json(['message' => 'No tienes acceso a este registro.'], 403);
+        }
+
+        $folio = DB::table('sw_folios as f')
+            ->leftJoin('sw_tipo_folio as tf', 'tf.codigo', '=', 'f.tipo')
+            ->where('f.codigo', $codFolio)
+            ->first([
+                'f.codigo',
+                'f.nombre',
+                'f.tipo as tipo_codigo',
+                'tf.descripcion as tipo_descripcion',
+            ]);
+
+        if (! $folio) {
+            return response()->json(['message' => 'No se encontró el folio solicitado.'], 404);
+        }
+
+        if ($codFolio === 65 && $codRequisito === 18) {
+            $registroCV = DB::selectOne(
+                "SELECT TOP 1
+                    cv.CVCA_CODIGO AS codigo_registro,
+                    cv.CODI_PERS AS cod_personal,
+                    COALESCE(cv.REQU_CODIGO, 18) AS cod_requisito,
+                    cv.CVCA_IDIOMAS AS nivel_idiomas,
+                    cv.CVCA_COMPUTACION AS nivel_computacion,
+                    cv.CVCA_OBSERVACIONES AS otras_capacidades,
+                    cv.USUA_REG AS usuario_registro,
+                    cv.FEC_REG AS fecha_registro,
+                    cv.USUA_MOD AS usuario_modificacion,
+                    cv.FEC_MOD AS fecha_modificacion,
+                    LTRIM(RTRIM(COALESCE(p.NOMB_1, '') + ' ' + COALESCE(p.NOMB_2, '') + ' ' + COALESCE(p.APEL_1, '') + ' ' + COALESCE(p.APEL_2, ''))) AS nombres_apellidos,
+                    p.NRO_DOCU_IDEN AS documento,
+                    CASE WHEN p.FECH_NACI IS NULL THEN NULL
+                        ELSE DATEDIFF(YEAR, p.FECH_NACI, GETDATE())
+                            - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, p.FECH_NACI, GETDATE()), p.FECH_NACI) > GETDATE() THEN 1 ELSE 0 END
+                    END AS edad,
+                    LTRIM(RTRIM(
+                        COALESCE(ad.DEPA_DESCRIPCION, '')
+                        + CASE WHEN ad.DEPA_DESCRIPCION IS NOT NULL AND (ap.PROVI_DESCRIPCION IS NOT NULL OR ax.DIST_DESCRIPCION IS NOT NULL) THEN ' / ' ELSE '' END
+                        + COALESCE(ap.PROVI_DESCRIPCION, '')
+                        + CASE WHEN ap.PROVI_DESCRIPCION IS NOT NULL AND ax.DIST_DESCRIPCION IS NOT NULL THEN ' / ' ELSE '' END
+                        + COALESCE(ax.DIST_DESCRIPCION, '')
+                    )) AS residencia,
+                    COALESCE(NULLIF(LTRIM(RTRIM(p.DIRECCION)), ''), NULLIF(LTRIM(RTRIM(p.PERS_DIREC_DNI)), '')) AS direccion,
+                    COALESCE(NULLIF(LTRIM(RTRIM(c.TELEFONO)), ''), NULLIF(LTRIM(RTRIM(p.PERS_TELEFONO)), ''), NULLIF(LTRIM(RTRIM(c.TELEFONO1)), '')) AS telefono
+                FROM si_solm.dbo.REDO_CV_CAB AS cv
+                INNER JOIN si_solm.dbo.PERSONAL AS p
+                    ON RTRIM(p.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS =
+                       RTRIM(cv.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS
+                LEFT JOIN si_solm.dbo.ADMI_DEPARTAMENTO AS ad
+                    ON ad.DEPA_CODIGO = p.DEPARTAMENTO
+                LEFT JOIN si_solm.dbo.ADMI_PROVINCIA AS ap
+                    ON ap.PROVI_CODIGO = p.PROVINCIA
+                LEFT JOIN si_solm.dbo.ADMI_DISTRITO AS ax
+                    ON ax.DIST_CODIGO = p.DISTRITO
+                OUTER APPLY (
+                    SELECT TOP 1 TELEFONO, TELEFONO1
+                    FROM si_solm.dbo.CURRICULO
+                    WHERE RTRIM(CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS =
+                          RTRIM(cv.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS
+                    ORDER BY fecha_reg DESC, CODI_CURRICULO DESC
+                ) AS c
+                WHERE RTRIM(cv.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS =
+                      RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+                ORDER BY cv.FEC_REG DESC, cv.CVCA_CODIGO DESC",
+                [$codPersonal]
+            );
+
+            if (! $registroCV) {
+                return response()->json(['message' => 'No se encontró un currículum registrado para este personal.'], 404);
+            }
+
+            $experienciaLaboral = DB::select(
+                "SELECT
+                    EXLA_EMPRESA AS empresa,
+                    EXLA_CARGO AS cargo,
+                    EXLA_TIEMPO AS tiempo,
+                    CONVERT(VARCHAR(10), EXLA_INIC_FECHA, 23) AS fecha_inicio,
+                    CONVERT(VARCHAR(10), EXLA_CESE_FECHA, 23) AS fecha_cese,
+                    EXLA_CESE_MOTIVO AS motivo_cese,
+                    EXLA_JEFE AS referencia,
+                    EXLA_REF_CARGO AS referencia_cargo,
+                    EXLA_REF_CORREO AS referencia_correo,
+                    EXLA_TELEFONO AS referencia_telefono,
+                    EXLA_VIGENCIA AS vigencia
+                FROM si_solm.dbo.REDO_EXPERIENCIA_LAB
+                WHERE RTRIM(CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS =
+                      RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+                ORDER BY EXLA_CODIGO",
+                [$codPersonal]
+            );
+
+            $cursosOtros = DB::select(
+                "SELECT
+                    CUOT_CODIGO AS codigo,
+                    CUOT_DESCRIPCION AS descripcion,
+                    CUOT_DESCRIPCION AS curso_capacitacion,
+                    COALESCE(gi.gradInstr_Descripcion, NULLIF(LTRIM(RTRIM(cu.CUOT_GRADO)), '')) AS grado_academico,
+                    CONVERT(VARCHAR(10), cu.CUOT_FECHA, 23) AS fecha_inicio,
+                    CONVERT(VARCHAR(10), cu.CUOT_FECHA_FIN, 23) AS fecha_fin,
+                    CONVERT(VARCHAR(10), cu.CUOT_FECHA, 23) AS fecha,
+                    CUOT_LUGAR AS lugar,
+                    CUOT_VIGENCIA AS vigencia,
+                    CASE WHEN NULLIF(LTRIM(RTRIM(cu.CUOT_GRADO)), '') IS NULL THEN 'PROFESIONAL' ELSE 'ACADEMICA' END AS tipo_formacion
+                FROM si_solm.dbo.REDO_CURSOS_OTROS AS cu
+                LEFT JOIN si_solm.dbo.grado_instruccion AS gi
+                    ON TRY_CONVERT(INT, NULLIF(LTRIM(RTRIM(cu.CUOT_GRADO)), '')) = gi.gradInstr_id
+                WHERE RTRIM(cu.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS =
+                      RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+                ORDER BY cu.CUOT_CODIGO",
+                [$codPersonal]
+            );
+            $formacionAcademica = array_values(array_filter($cursosOtros, fn ($curso) => $curso->tipo_formacion === 'ACADEMICA'));
+            $formacionProfesional = array_values(array_filter($cursosOtros, fn ($curso) => $curso->tipo_formacion === 'PROFESIONAL'));
+
+            $referenciasActuales = DB::select(
+                "SELECT
+                    LTRIM(RTRIM(COALESCE(jefe.NOMB_1, '') + COALESCE(' ' + NULLIF(LTRIM(RTRIM(jefe.NOMB_2)), ''), '') + ' ' + COALESCE(jefe.APEL_1, '') + ' ' + COALESCE(jefe.APEL_2, ''))) AS nombre,
+                    'JEFE DE OPERACIONES CORPORATIVO' AS cargo,
+                    telefono.lds_nextel AS telefono,
+                    'giannanfaro@solsecurity.pe' AS correo
+                FROM si_solm.dbo.PERSONAL AS objetivo
+                CROSS APPLY (
+                    SELECT TOP 1 p.CODI_PERS, p.NOMB_1, p.NOMB_2, p.APEL_1, p.APEL_2
+                    FROM si_solm.dbo.PERSONAL AS p
+                    WHERE p.CODI_CARG = '0074'
+                      AND p.PERS_VIGENCIA = 'SI'
+                      AND p.EMPR_CODIGO = '01'
+                    ORDER BY p.CODI_PERS
+                ) AS jefe
+                OUTER APPLY (
+                    SELECT TOP 1 ld.lds_nextel
+                    FROM [192.168.10.21].[Intranet].[dbo].[JEOSIS_Libreta_Direcciones_SOLMAR] AS ld
+                    WHERE ld.lds_correo_principal = 1
+                      AND RTRIM(ld.codi_pers) COLLATE Modern_Spanish_CI_AS = RTRIM(jefe.CODI_PERS) COLLATE Modern_Spanish_CI_AS
+                ) AS telefono
+                WHERE RTRIM(objetivo.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+                  AND objetivo.PERS_TIPOTRAB IN ('01', '03')
+                UNION ALL
+                SELECT
+                    UPPER(LTRIM(RTRIM(s.SUCU_JEF_OPER))) AS nombre,
+                    'JEFE DE OPERACIONES DE LA SUCURSAL ' + LTRIM(RTRIM(s.SUCU_ABREVIATURA)) AS cargo,
+                    telefono.lds_nextel AS telefono,
+                    s.SUCU_CORREO_JEF_OPER AS correo
+                FROM si_solm.dbo.PERSONAL AS objetivo
+                INNER JOIN si_solm.dbo.SISO_SUCURSAL AS s
+                    ON s.SUCU_CODIGO = objetivo.SUCU_CODIGO
+                OUTER APPLY (
+                    SELECT TOP 1 ld.lds_nextel
+                    FROM [192.168.10.21].[Intranet].[dbo].[JEOSIS_Libreta_Direcciones_SOLMAR] AS ld
+                    WHERE ld.lds_correo_principal = 1
+                      AND ld.lds_correo COLLATE Modern_Spanish_CI_AS = s.SUCU_CORREO_JEF_OPER COLLATE Modern_Spanish_CI_AS
+                ) AS telefono
+                WHERE RTRIM(objetivo.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+                  AND objetivo.PERS_TIPOTRAB IN ('01', '03')
+                  AND NULLIF(LTRIM(RTRIM(s.SUCU_JEF_OPER)), '') IS NOT NULL",
+                [$codPersonal, $codPersonal]
+            );
+
+            $referenciasAnteriores = DB::select(
+                "SELECT
+                    EXLA_JEFE AS nombre,
+                    EXLA_REF_CARGO AS cargo,
+                    EXLA_TELEFONO AS telefono,
+                    EXLA_REF_CORREO AS correo
+                FROM si_solm.dbo.REDO_EXPERIENCIA_LAB
+                WHERE EXLA_VIGENCIA = 'SI'
+                  AND RTRIM(CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+                  AND EXLA_JEFE IS NOT NULL
+                  AND LTRIM(RTRIM(EXLA_JEFE)) NOT IN ('', '-')
+                ORDER BY EXLA_CESE_FECHA DESC",
+                [$codPersonal]
+            );
+
+            return response()->json(array_merge((array) $registroCV, [
+                'cod_folio' => $folio->codigo,
+                'folio_nombre' => $folio->nombre,
+                'tipo_codigo' => $folio->tipo_codigo,
+                'tipo_descripcion' => $folio->tipo_descripcion,
+                'formacion_academica' => $formacionAcademica,
+                'formacion_profesional' => $formacionProfesional,
+                'experiencia_laboral' => $experienciaLaboral,
+                'referencias_actuales' => $referenciasActuales,
+                'referencias_anteriores' => $referenciasAnteriores,
+            ]));
+        }
+
+        if ($codFolio === 21 && $codRequisito === 1) {
+            $registroEvaluacion = DB::selectOne(
+                "SELECT TOP 1
+                    ep.EVPO_CODIGO AS codigo_registro,
+                    ep.CODI_PERS AS cod_personal,
+                    COALESCE(ep.REQU_CODIGO, 1) AS cod_requisito,
+                    ep.EVPO_FECHA AS fecha_emision,
+                    ep.SUCU_CODIGO AS cod_sucursal,
+                    ep.AREA_CODIGO AS area_codigo,
+                    area.AREA_DESCRIPCION AS area_nombre,
+                    ep.CODI_CARG AS cargo_codigo,
+                    cargo.DESC_CARGO AS cargo_nombre,
+                    ep.EVPO_VACANTE AS vacante,
+                    ep.EVPO_EDUCACION AS educacion,
+                    ep.EVPO_FORMACION AS formacion,
+                    ep.EVPO_EXPERIENCIA AS experiencia,
+                    ep.EVPO_HABILIDAD AS habilidad,
+                    COALESCE(ep.EVPO_EDUCACION, 0) + COALESCE(ep.EVPO_FORMACION, 0) +
+                        COALESCE(ep.EVPO_EXPERIENCIA, 0) + COALESCE(ep.EVPO_HABILIDAD, 0) AS puntaje,
+                    CAST((COALESCE(ep.EVPO_EDUCACION, 0) + COALESCE(ep.EVPO_FORMACION, 0) +
+                        COALESCE(ep.EVPO_EXPERIENCIA, 0) + COALESCE(ep.EVPO_HABILIDAD, 0)) / 4.0 AS DECIMAL(5,2)) AS promedio,
+                    ep.EVPO_FORTALEZA AS fortalezas,
+                    ep.EVPO_DEBILIDAD AS debilidades,
+                    ep.EVPO_APTO AS apto,
+                    ep.EVPO_CONSIDERA AS considera_otro_proceso,
+                    ep.EVPO_CONSIDERA1 AS motivo_otro_proceso,
+                    ep.VERI_CODIGO1 AS evaluador_1,
+                    ep.VERI_CODIGO2 AS evaluador_2,
+                    ep.EVPO_VIGENCIA AS vigencia,
+                    ep.USUA_REG AS usuario_registro,
+                    ep.FEC_REG AS fecha_registro,
+                    ep.USUA_MOD AS usuario_modificacion,
+                    ep.FEC_MOD AS fecha_modificacion,
+                    LTRIM(RTRIM(COALESCE(p.NOMB_1, '') + ' ' + COALESCE(p.NOMB_2, '') + ' ' + COALESCE(p.APEL_1, '') + ' ' + COALESCE(p.APEL_2, ''))) AS nombres_apellidos,
+                    p.NRO_DOCU_IDEN AS documento,
+                    ec.ESCI_DESCRIPCION AS estado_civil,
+                    CASE WHEN p.FECH_NACI IS NULL THEN NULL
+                        ELSE DATEDIFF(YEAR, p.FECH_NACI, GETDATE())
+                            - CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, p.FECH_NACI, GETDATE()), p.FECH_NACI) > GETDATE() THEN 1 ELSE 0 END
+                    END AS edad,
+                    CASE WHEN UPPER(LTRIM(RTRIM(COALESCE(p.PERS_CONHIJOS, '')))) IN ('SI', 'S', '1', 'TRUE') THEN 1 ELSE 0 END AS numero_hijos,
+                    LTRIM(RTRIM(COALESCE(dn.DIST_DESCRIPCION, p.DIST_NACI, '') + '-' +
+                        COALESCE(pn.PROVI_DESCRIPCION, p.PROVI_CODIGO_NACI, '') + '-' +
+                        COALESCE(an.DEPA_DESCRIPCION, p.DEPA_CODIGO_NACI, ''))) AS lugar_nacimiento,
+                    COALESCE(NULLIF(LTRIM(RTRIM(cur.TELEFONO)), ''), NULLIF(LTRIM(RTRIM(p.PERS_TELEFONO)), ''), NULLIF(LTRIM(RTRIM(cur.TELEFONO1)), '')) AS telefono
+                FROM si_solm.dbo.REDO_EVAL_POSTULA AS ep
+                LEFT JOIN si_solm.dbo.PERSONAL AS p
+                    ON RTRIM(p.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(ep.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS
+                LEFT JOIN si_solm.dbo.ADMI_ESTADO_CIVIL AS ec ON RTRIM(ec.ESCI_CODIGO) = RTRIM(p.ESCI_CODIGO)
+                LEFT JOIN si_solm.dbo.ADMI_DISTRITO AS dn ON dn.DIST_CODIGO = p.DIST_NACI
+                LEFT JOIN si_solm.dbo.ADMI_PROVINCIA AS pn ON pn.PROVI_CODIGO = p.PROVI_CODIGO_NACI
+                LEFT JOIN si_solm.dbo.ADMI_DEPARTAMENTO AS an ON an.DEPA_CODIGO = p.DEPA_CODIGO_NACI
+                LEFT JOIN si_solm.dbo.REDO_AREA AS area ON area.AREA_CODIGO = ep.AREA_CODIGO
+                LEFT JOIN si_solm.dbo.CARGOS AS cargo ON cargo.CODI_CARG = ep.CODI_CARG
+                OUTER APPLY (
+                    SELECT TOP 1 TELEFONO, TELEFONO1
+                    FROM si_solm.dbo.CURRICULO
+                    WHERE RTRIM(CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(ep.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS
+                    ORDER BY fecha_reg DESC, CODI_CURRICULO DESC
+                ) AS cur
+                WHERE RTRIM(ep.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+                  AND (ep.REQU_CODIGO = ? OR ep.REQU_CODIGO IS NULL)
+                ORDER BY ep.EVPO_FECHA DESC, ep.EVPO_CODIGO DESC",
+                [$codPersonal, $codRequisito]
+            );
+
+            if (! $registroEvaluacion) {
+                return response()->json(['message' => 'No se encontró una evaluación registrada para este postulante.'], 404);
+            }
+
+            return response()->json(array_merge((array) $registroEvaluacion, [
+                'cod_folio' => $folio->codigo,
+                'folio_nombre' => $folio->nombre,
+                'tipo_codigo' => $folio->tipo_codigo,
+                'tipo_descripcion' => $folio->tipo_descripcion,
+            ]));
+        }
+
+        if ($codFolio === 8 && $codRequisito === 7) {
+            $registroVisita = DB::selectOne(
+                "SELECT TOP 1
+                    vd.VIDO_CODIGO AS codigo_registro,
+                    vd.CODI_PERS AS cod_personal,
+                    7 AS cod_requisito,
+                    vd.VIDO_FECHA AS fecha_emision,
+                    vd.VIDO_CONYUGE_EMPRESA AS conyuge_empresa,
+                    vd.VIDO_CONYUGE_TELEF AS conyuge_telefono,
+                    vd.VIDO_CONYUGE_VIVE AS conyuge_comparte_domicilio,
+                    vd.VIDO_CONYUGE_SALUD AS conyuge_salud,
+                    vd.VIDO_VIAS_ACCESO AS vias_acceso,
+                    vd.VIDO_ILUMINA AS iluminacion,
+                    vd.VIDO_ENTORNO AS entorno,
+                    vd.VIDO_VIGILANCIA AS vigilancia,
+                    vd.VIDO_OTROS_ACCESO AS otros_acceso,
+                    vd.VIDO_CASA_MATERIAL AS casa_material,
+                    vd.VIDO_CASA_SEGURA AS casa_segura,
+                    vd.VIDO_CASA_TELEF AS casa_telefono,
+                    vd.VIDO_CASA_ESPACIO AS casa_espacio,
+                    vd.VIDO_ENFERMOS AS enfermos,
+                    vd.VIDO_DISCAPACITADO AS discapacitado,
+                    vd.VIDO_DROGAS AS drogas,
+                    vd.VIDO_NEVERA AS nevera,
+                    vd.VIDO_COCINA AS cocina,
+                    vd.VIDO_LOZA AS loza,
+                    vd.VIDO_TV AS televisores,
+                    vd.VIDO_VEHICULO AS vehiculos,
+                    vd.VIDO_COMODIDADES AS comodidades,
+                    vd.VIDO_BIENES_FAM AS bienes_familia,
+                    vd.VIDO_LIDER_SOCIAL AS lider_social,
+                    vd.VIDO_CONOCIDO AS conocido_vecinos,
+                    vd.VIDO_ACTIVIDADES AS actividades,
+                    vd.VIDO_GUSTO_FAM AS gusto_familia,
+                    vd.VIDO_CONCLUSION1 AS conclusion_fortalezas,
+                    vd.VIDO_CONCLUSION2 AS conclusion_riesgo,
+                    vd.VIDO_VIGENCIA AS vigencia,
+                    vd.USUA_REG AS usuario_registro,
+                    vd.FEC_REG AS fecha_registro,
+                    vd.USUA_MOD AS usuario_modificacion,
+                    vd.FEC_MOD AS fecha_modificacion,
+                    vd.VERI_CODIGO AS verificador_codigo,
+                    veri.CODI_PERS AS verificador_cod_personal,
+                    LTRIM(RTRIM(COALESCE(p.NOMB_1, '') + ' ' + COALESCE(p.NOMB_2, '') + ' ' + COALESCE(p.APEL_1, '') + ' ' + COALESCE(p.APEL_2, ''))) AS nombres_apellidos,
+                    p.NRO_DOCU_IDEN AS documento,
+                    c.DESC_CARGO AS cargo_personal,
+                    NULLIF(LTRIM(RTRIM(p.DIRECCION)), '') AS domicilio,
+                    LTRIM(RTRIM(COALESCE(ad.DEPA_DESCRIPCION, '') + ' / ' + COALESCE(ap.PROVI_DESCRIPCION, '') + ' / ' + COALESCE(ax.DIST_DESCRIPCION, ''))) AS ubicacion,
+                    COALESCE(NULLIF(LTRIM(RTRIM(cur.TELEFONO)), ''), NULLIF(LTRIM(RTRIM(p.PERS_TELEFONO)), ''), NULLIF(LTRIM(RTRIM(cur.TELEFONO1)), '')) AS telefono,
+                    ec.ESCI_DESCRIPCION AS estado_civil,
+                    p.PERS_CONYUGE AS conyuge_nombre,
+                    LTRIM(RTRIM(COALESCE(veri.VERI_NOMB1, '') + ' ' + COALESCE(veri.VERI_NOMB2, '') + ' ' + COALESCE(veri.VERI_APEL1, '') + ' ' + COALESCE(veri.VERI_APEL2, ''))) AS verificador_nombre
+                FROM si_solm.dbo.REDO_VISITA_DOMICILIO AS vd
+                INNER JOIN si_solm.dbo.PERSONAL AS p
+                    ON RTRIM(p.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(vd.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS
+                LEFT JOIN si_solm.dbo.CARGOS AS c ON c.CODI_CARG = p.CODI_CARG
+                LEFT JOIN si_solm.dbo.ADMI_DEPARTAMENTO AS ad ON ad.DEPA_CODIGO = p.DEPARTAMENTO
+                LEFT JOIN si_solm.dbo.ADMI_PROVINCIA AS ap ON ap.PROVI_CODIGO = p.PROVINCIA
+                LEFT JOIN si_solm.dbo.ADMI_DISTRITO AS ax ON ax.DIST_CODIGO = p.DISTRITO
+                LEFT JOIN si_solm.dbo.ADMI_ESTADO_CIVIL AS ec ON RTRIM(ec.ESCI_CODIGO) = RTRIM(p.ESCI_CODIGO)
+                LEFT JOIN si_solm.dbo.REDO_VERIFICADORES AS veri ON veri.VERI_CODIGO = vd.VERI_CODIGO
+                OUTER APPLY (
+                    SELECT TOP 1 TELEFONO, TELEFONO1
+                    FROM si_solm.dbo.CURRICULO
+                    WHERE RTRIM(CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(vd.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS
+                    ORDER BY fecha_reg DESC, CODI_CURRICULO DESC
+                ) AS cur
+                WHERE RTRIM(vd.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS = RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+                ORDER BY vd.VIDO_FECHA DESC, vd.VIDO_CODIGO DESC",
+                [$codPersonal]
+            );
+
+            if (! $registroVisita) {
+                return response()->json(['message' => 'No se encontró una verificación domiciliaria registrada para este personal.'], 404);
+            }
+
+            $verificadores = DB::select(
+                "WITH verificadores AS (
+                    SELECT
+                    v.VERI_CODIGO AS codigo,
+                    v.CODI_PERS AS cod_personal,
+                    v.CODI_CARGO AS cod_cargo,
+                    (SELECT TOP 1 c.DESC_CARGO
+                     FROM si_solm.dbo.CARGOS AS c WITH (NOLOCK)
+                     WHERE c.CODI_CARG = v.CODI_CARGO
+                     ORDER BY c.DESC_CARGO) AS cargo,
+                    v.SUCU_CODIGO AS cod_sucursal,
+                    v.VERI_APEL1 AS apellido_1,
+                    v.VERI_APEL2 AS apellido_2,
+                    v.VERI_NOMB1 AS nombre_1,
+                    v.VERI_NOMB2 AS nombre_2,
+                    v.VERI_DNI AS dni,
+                    v.VERI_TIPO AS tipo,
+                    v.VERI_VIGENCIA AS vigencia,
+                    v.VERI_INSTRUCTOR AS instructor,
+                    LTRIM(RTRIM(COALESCE(v.VERI_NOMB1, '') + ' ' + COALESCE(v.VERI_NOMB2, '') + ' ' + COALESCE(v.VERI_APEL1, '') + ' ' + COALESCE(v.VERI_APEL2, ''))) AS nombre,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY CASE
+                            WHEN NULLIF(LTRIM(RTRIM(v.CODI_PERS)), '') IS NOT NULL
+                                THEN 'P:' + LTRIM(RTRIM(v.CODI_PERS))
+                            ELSE 'V:' + CONVERT(VARCHAR(40), v.VERI_CODIGO)
+                        END
+                        ORDER BY CASE
+                            WHEN v.VERI_CODIGO = ? THEN 0
+                            WHEN UPPER(LTRIM(RTRIM(v.VERI_VIGENCIA))) = 'SI' THEN 1
+                            ELSE 2
+                        END, v.VERI_CODIGO
+                    ) AS numero_fila
+                    FROM si_solm.dbo.REDO_VERIFICADORES AS v WITH (NOLOCK)
+                    WHERE v.VERI_INSTRUCTOR = '0' OR v.VERI_CODIGO = ?
+                )
+                SELECT codigo, cod_personal, cod_cargo, cargo, cod_sucursal,
+                    apellido_1, apellido_2, nombre_1, nombre_2, dni, tipo, vigencia, instructor, nombre
+                FROM verificadores
+                WHERE numero_fila = 1
+                ORDER BY apellido_1, apellido_2, nombre_1, nombre_2",
+                [$registroVisita->verificador_codigo, $registroVisita->verificador_codigo]
+            );
+
+            return response()->json(array_merge((array) $registroVisita, [
+                'cod_folio' => $folio->codigo,
+                'folio_nombre' => $folio->nombre,
+                'tipo_codigo' => $folio->tipo_codigo,
+                'tipo_descripcion' => $folio->tipo_descripcion,
+                'verificadores' => $verificadores,
+            ]));
+        }
+
+        $registro = DB::selectOne(
+            "SELECT TOP 1
+                rc.CERT_CODIGO AS codigo_registro,
+                rc.CODI_PERS AS cod_personal,
+                rc.REQU_CODIGO AS cod_requisito,
+                rc.INST_CODIGO AS cod_institucion,
+                ri.INST_DESCRIPCION AS entidad,
+                rc.CERT_FECHA_EMISION AS fecha_emision,
+                rc.CERT_FECHA_CADUCA AS fecha_caducidad,
+                rc.FECHA_PRIMERA_DOSIS AS dosis_1,
+                rc.FECHA_SEGUNDA_DOSIS AS dosis_2,
+                rc.FECHA_TERCERA_DOSIS AS dosis_3,
+                rc.FECHA_CUARTA_DOSIS AS dosis_4,
+                rc.CERT_POSITIVO AS positivo,
+                rc.CERT_NOTA AS nota,
+                rc.CERT_OBSERVACION AS observacion,
+                rc.CERT_VIGENCIA AS vigencia,
+                rc.USUA_REG AS usuario_registro,
+                rc.FEC_REG AS fecha_registro,
+                rc.USUA_MOD AS usuario_modificacion,
+                rc.FEC_MOD AS fecha_modificacion,
+                rc.CERT_TIPO AS tipo_certificado
+            FROM si_solm.dbo.REDO_CERTIFICADO AS rc
+            LEFT JOIN si_solm.dbo.REDO_INSTITUCION AS ri
+                ON ri.INST_CODIGO = rc.INST_CODIGO
+            WHERE RTRIM(rc.CODI_PERS) COLLATE SQL_Latin1_General_CP1_CI_AS =
+                  RTRIM(?) COLLATE SQL_Latin1_General_CP1_CI_AS
+              AND rc.REQU_CODIGO = ?
+            ORDER BY rc.CERT_CODIGO DESC",
+            [$codPersonal, $codRequisito]
+        );
+
+        if (! $registro) {
+            return response()->json(['message' => 'No se encontró un registro guardado para este folio y personal.'], 404);
+        }
+
+        return response()->json(array_merge((array) $registro, [
+            'cod_folio' => $folio->codigo,
+            'folio_nombre' => $folio->nombre,
+            'tipo_codigo' => $folio->tipo_codigo,
+            'tipo_descripcion' => $folio->tipo_descripcion,
+        ]));
+    }
+
+    public function getVerificadoresDomiciliarios()
+    {
+        $verificadores = DB::select(
+            "WITH verificadores AS (
+                SELECT
+                v.VERI_CODIGO AS codigo,
+                v.CODI_PERS AS cod_personal,
+                v.CODI_CARGO AS cod_cargo,
+                (SELECT TOP 1 c.DESC_CARGO
+                 FROM si_solm.dbo.CARGOS AS c WITH (NOLOCK)
+                 WHERE c.CODI_CARG = v.CODI_CARGO
+                 ORDER BY c.DESC_CARGO) AS cargo,
+                v.SUCU_CODIGO AS cod_sucursal,
+                v.VERI_APEL1 AS apellido_1,
+                v.VERI_APEL2 AS apellido_2,
+                v.VERI_NOMB1 AS nombre_1,
+                v.VERI_NOMB2 AS nombre_2,
+                v.VERI_DNI AS dni,
+                v.VERI_TIPO AS tipo,
+                v.VERI_VIGENCIA AS vigencia,
+                v.VERI_INSTRUCTOR AS instructor,
+                LTRIM(RTRIM(COALESCE(v.VERI_NOMB1, '') + ' ' + COALESCE(v.VERI_NOMB2, '') + ' ' + COALESCE(v.VERI_APEL1, '') + ' ' + COALESCE(v.VERI_APEL2, ''))) AS nombre,
+                ROW_NUMBER() OVER (
+                    PARTITION BY CASE
+                        WHEN NULLIF(LTRIM(RTRIM(v.CODI_PERS)), '') IS NOT NULL
+                            THEN 'P:' + LTRIM(RTRIM(v.CODI_PERS))
+                        ELSE 'V:' + CONVERT(VARCHAR(40), v.VERI_CODIGO)
+                    END
+                    ORDER BY CASE
+                        WHEN UPPER(LTRIM(RTRIM(v.VERI_VIGENCIA))) = 'SI' THEN 0
+                        ELSE 1
+                    END, v.VERI_CODIGO
+                ) AS numero_fila
+                FROM si_solm.dbo.REDO_VERIFICADORES AS v WITH (NOLOCK)
+                WHERE v.VERI_INSTRUCTOR = '0'
+            )
+            SELECT codigo, cod_personal, cod_cargo, cargo, cod_sucursal,
+                apellido_1, apellido_2, nombre_1, nombre_2, dni, tipo, vigencia, instructor, nombre
+            FROM verificadores
+            WHERE numero_fila = 1
+            ORDER BY apellido_1, apellido_2, nombre_1, nombre_2"
+        );
+
+        return response()->json($verificadores);
     }
 
     public function getFoliosXPersonas(Request $request)
@@ -1266,7 +1914,7 @@ class FileController extends Controller
 
     public function getFolios()
     {
-        $folios = DB::select('EXEC SW_LISTAR_FOLIOS');
+        $folios = DB::select('EXEC SW_LISTAR_FOLIOS_JHORDAN');
 
         $ids = array_column($folios, 'codigo');
         
@@ -1299,6 +1947,17 @@ class FileController extends Controller
     {
         $folios = DB::table('sw_folios')
             ->where('cod_categoria', $codCategoria)
+            ->where('habilitado', 1)
+            ->orderBy('nombre')
+            ->get(['codigo', 'nombre']);
+
+        return response()->json($folios);
+    }
+
+    public function getFoliosPorTipo($codTipo)
+    {
+        $folios = DB::table('sw_folios')
+            ->where('tipo', $codTipo)
             ->where('habilitado', 1)
             ->orderBy('nombre')
             ->get(['codigo', 'nombre']);
@@ -1443,17 +2102,21 @@ class FileController extends Controller
     //GUARDAR DATOS
     public function saveFolioPersona(Request $request)
     {
+        $codFolio = (int) $request->input('codFolio');
+        $reglaImagenes = $codFolio === 65
+            ? 'required|file|mimes:jpg,jpeg,png,pdf|max:1228'
+            : 'required|file|mimes:jpg,jpeg|max:1228';
+
         // Validar los datos del formulario
         $validated = $request->validate([
             'fecha_emision' => 'required|date',
             'fecha_caducidad' => 'nullable|date',
-            'imagenes.*' => 'required|file|mimes:jpg,jpeg|max:1228', // 1.2 MB
+            'imagenes.*' => $reglaImagenes, // 1.2 MB
             'codPersonal' => 'required|string',
             'codFolio' => 'required|string',
         ]);
 
         $codPersonal = $request->input('codPersonal');
-        $codFolio = $request->input('codFolio');
         $rutas = FileControl::getRutaFolio($codFolio); // siempre array
         $archivos = $request->file('imagenes');
 
@@ -1473,15 +2136,19 @@ class FileController extends Controller
 
         // Recorrer y enviar cada archivo al microservicio
         foreach ($archivos as $index => $archivo) {
+            $extension = $codFolio === 65
+                ? strtolower($archivo->getClientOriginalExtension())
+                : 'jpg';
+
             if ($totalRutas === $totalArchivos) {
                 // Un archivo por ruta → sin sufijo
-                $nameFile = $codPersonal.'.jpg';
+                $nameFile = $codPersonal.'.'.$extension;
                 $rutaArchivo = $rutas[$index];
             } else {
                 // Múltiples archivos para una sola ruta → con sufijo
                 $nameFile = $totalArchivos === 1
-                    ? $codPersonal.'.jpg'
-                    : $codPersonal.'_'.($index + 1).'.jpg';
+                    ? $codPersonal.'.'.$extension
+                    : $codPersonal.'_'.($index + 1).'.'.$extension;
                 $rutaArchivo = $rutas[0];
             }
 
@@ -1548,8 +2215,191 @@ class FileController extends Controller
     //     ]);
     // }
 
+    public function getCertificadosCvPreview(string $codPersonal)
+    {
+        $codigoPersonal = trim($codPersonal);
+        if ($codigoPersonal === '') {
+            return response()->json(['message' => 'El código del personal es obligatorio.'], 422);
+        }
+
+        return response()->json([
+            'certificados_estudios' => $this->buscarArchivosCvEnCarpeta($codigoPersonal, 'CER_ESTUDIOS'),
+            'certificados_laborales' => $this->buscarArchivosCvEnCarpeta($codigoPersonal, 'CER_LABORALES'),
+        ]);
+    }
+
+    /** Sirve los recursos del CV desde el mismo origen para poder incorporarlos al PDF. */
+    public function getCvMedia(string $tipo, string $codPersonal, ?string $archivo = null)
+    {
+        $codigo = trim($codPersonal);
+        if (! preg_match('/^[A-Za-z0-9_-]+$/', $codigo)) {
+            return response()->json(['message' => 'Código de personal inválido.'], 422);
+        }
+
+        if ($tipo === 'foto') {
+            if ($archivo !== null && $archivo !== '') {
+                return response()->json(['message' => 'Recurso inválido.'], 422);
+            }
+            $ruta = 'Fotos/' . rawurlencode($codigo) . '.jpg';
+        } elseif ($tipo === 'firma') {
+            if ($archivo !== null && $archivo !== '') {
+                return response()->json(['message' => 'Recurso inválido.'], 422);
+            }
+            $ruta = 'FIRMAS/PERSONAL/' . rawurlencode($codigo) . '.jpg';
+        } else {
+            $carpeta = match ($tipo) {
+                'estudios' => 'CER_ESTUDIOS',
+                'laborales' => 'CER_LABORALES',
+                default => null,
+            };
+            $nombre = basename((string) $archivo);
+            if ($carpeta === null || ! preg_match('/^' . preg_quote($codigo, '/') . '(?:_\d+)?\.(?:jpg|jpeg|png|pdf)$/i', $nombre)) {
+                return response()->json(['message' => 'Recurso inválido.'], 422);
+            }
+            $ruta = 'CERTIFICADOS/' . $carpeta . '/' . rawurlencode($nombre);
+        }
+
+        try {
+            $respuesta = Http::timeout(20)->get('http://190.116.178.163/Biblioteca_Grafica/' . $ruta);
+            if (! $respuesta->successful()) {
+                return response()->json(['message' => 'No se encontró el recurso solicitado.'], 404);
+            }
+
+            $mime = $respuesta->header('Content-Type', 'application/octet-stream');
+            return response($respuesta->body(), 200, [
+                'Content-Type' => explode(';', $mime)[0],
+                'Cache-Control' => 'private, max-age=300',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        } catch (\Throwable $error) {
+            Log::warning('No se pudo obtener un recurso de Biblioteca Gráfica', ['tipo' => $tipo, 'codigo' => $codigo, 'error' => $error->getMessage()]);
+            return response()->json(['message' => 'No se pudo cargar el recurso solicitado.'], 502);
+        }
+    }
+
+    /**
+     * Encuentra el archivo base y las páginas numeradas en Biblioteca_Grafica.
+     * La IP pública sirve la biblioteca compartida de 10.2; no usa el volumen DJ de 10.5.
+     */
+    private function buscarArchivosCvEnCarpeta(string $codPersonal, string $carpeta): array
+    {
+        $tipoMedia = $carpeta === 'CER_ESTUDIOS' ? 'estudios' : 'laborales';
+        $extensiones = ['jpg', 'jpeg', 'png', 'pdf'];
+        $archivos = [];
+
+        $buscarArchivo = function (string $nombreBase) use ($extensiones, $tipoMedia, $codPersonal): ?array {
+            foreach ($extensiones as $extension) {
+                $nombre = $nombreBase . '.' . $extension;
+                $urlOrigen = 'http://190.116.178.163/Biblioteca_Grafica/CERTIFICADOS/'
+                    . ($tipoMedia === 'estudios' ? 'CER_ESTUDIOS' : 'CER_LABORALES') . '/' . rawurlencode($nombre);
+                if (self::urlExiste($urlOrigen)) {
+                    $url = '/api/cv-media/' . rawurlencode($tipoMedia) . '/' . rawurlencode($codPersonal) . '/' . rawurlencode($nombre);
+                    return ['url' => $url, 'tipo' => $extension];
+                }
+            }
+            return null;
+        };
+
+        $archivoBase = $buscarArchivo($codPersonal);
+        if ($archivoBase) $archivos[] = $archivoBase;
+
+        for ($pagina = 1; $pagina <= 100; $pagina++) {
+            $archivoPagina = $buscarArchivo($codPersonal . '_' . $pagina);
+            if (! $archivoPagina) break;
+            $archivos[] = $archivoPagina;
+        }
+
+        return $archivos;
+    }
+
     public function getViewDocumentsPer($codPersonal, $codFolio)
     {
+        // El CV usa su carpeta exclusiva y sus páginas pueden variar por persona.
+        // No se debe consultar la ruta antigua de certificados ni el volumen 10.5.
+        if ((int) $codFolio === 65) {
+            $rutaBaseCv = 'http://190.116.178.163/Biblioteca_Grafica/CERTIFICADOS/CURRICULUM_VITAE/'
+                . rawurlencode(trim((string) $codPersonal));
+
+            $extensiones = ['jpg', 'jpeg', 'png', 'pdf'];
+            $rutasCv = [];
+
+            // Un solo archivo se guarda sin sufijo; varias páginas usan _1, _2...
+            foreach ($extensiones as $extension) {
+                $rutaDirecta = $rutaBaseCv . '.' . $extension;
+                if (self::urlExiste($rutaDirecta)) {
+                    $rutasCv[] = $rutaDirecta;
+                    break;
+                }
+            }
+
+            for ($pagina = 1; $pagina <= 100; $pagina++) {
+                $paginaEncontrada = false;
+                foreach ($extensiones as $extension) {
+                    $rutaPagina = $rutaBaseCv . '_' . $pagina . '.' . $extension;
+                    if (self::urlExiste($rutaPagina)) {
+                        $rutasCv[] = $rutaPagina;
+                        $paginaEncontrada = true;
+                        break;
+                    }
+                }
+
+                if (! $paginaEncontrada) {
+                    break;
+                }
+            }
+
+            if (empty($rutasCv)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se encontraron archivos accesibles para este CV.'
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'rutas' => $rutasCv
+            ]);
+        }
+
+        // El carnet COVID usa la carpeta configurada en SISO_PARAMETRO (LEG90),
+        // y SW_DOCS_PER_VIEW todavía no devuelve sus rutas.
+        if ((int) $codFolio === 81) {
+            $rutaCompartida = DB::table('si_solm.dbo.SISO_PARAMETRO')
+                ->where('PARA_LEGAJO', 'LEG90')
+                ->where('PARA_VIGENCIA', 'S')
+                ->value('PARA_VALOR');
+            $rutaWeb = $rutaCompartida ? self::rutaBibliotecaAUrl($rutaCompartida) : null;
+
+            if ($rutaWeb) {
+                $codigo = rawurlencode(trim((string) $codPersonal));
+                $rutasVacuna = [];
+                $extensiones = ['jpg', 'jpeg', 'png', 'pdf'];
+
+                for ($pagina = 0; $pagina <= 100; $pagina++) {
+                    $sufijo = $pagina === 0 ? '' : '_' . $pagina;
+                    $encontrada = false;
+                    foreach ($extensiones as $extension) {
+                        $url = $rutaWeb . '/' . $codigo . $sufijo . '.' . $extension;
+                        if (self::urlExiste($url)) {
+                            $rutasVacuna[] = $url;
+                            $encontrada = true;
+                            break;
+                        }
+                    }
+                    if (! $encontrada) break;
+                }
+
+                if ($rutasVacuna) {
+                    return response()->json(['success' => true, 'rutas' => $rutasVacuna]);
+                }
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontraron archivos accesibles para este carnet de vacunación.',
+            ]);
+        }
+
         $result = FileControl::getViewPerDocs($codPersonal, $codFolio);
 
         if (empty($result)) {
@@ -1564,7 +2414,7 @@ class FileController extends Controller
 
             // Probar primero con ruta_aux
             if (isset($item->ruta_aux)) {
-                $rutaBase = str_replace('//', 'http://', $item->ruta_aux);
+                $rutaBase = self::normalizarUrlDocumento($item->ruta_aux);
 
                 foreach ($extensiones as $ext) {
                     $rutaConExt = $rutaBase . '.' . $ext;
@@ -1579,7 +2429,7 @@ class FileController extends Controller
 
             // Si no se encontró nada en ruta_aux, probar con ruta
             if (!$rutaEncontrada && isset($item->ruta)) {
-                $rutaBase = str_replace('//', 'http://', $item->ruta);
+                $rutaBase = self::normalizarUrlDocumento($item->ruta);
 
                 foreach ($extensiones as $ext) {
                     $rutaConExt = $rutaBase . '.' . $ext;
@@ -2046,6 +2896,29 @@ class FileController extends Controller
         curl_close($ch);
 
         return $statusCode === 200;
+    }
+
+    private static function normalizarUrlDocumento(string $ruta): string
+    {
+        $ruta = trim($ruta);
+        if (preg_match('~^https?://~i', $ruta)) {
+            return $ruta;
+        }
+
+        return 'http://' . ltrim($ruta, '/');
+    }
+
+    private static function rutaBibliotecaAUrl(string $rutaCompartida): ?string
+    {
+        $ruta = rtrim(str_replace('\\', '/', trim($rutaCompartida)), '/');
+        $prefijoBiblioteca = '//192.168.10.2/Biblioteca_Grafica';
+
+        if (stripos($ruta, $prefijoBiblioteca) !== 0) {
+            return null;
+        }
+
+        $rutaRelativa = ltrim(substr($ruta, strlen($prefijoBiblioteca)), '/');
+        return 'http://190.116.178.163/Biblioteca_Grafica/' . str_replace(' ', '%20', $rutaRelativa);
     }
 
 

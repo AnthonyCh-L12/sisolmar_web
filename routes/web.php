@@ -99,6 +99,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/get-cargos-erp', [FileController::class, 'getCargosErp']);
         Route::get('/get-coincidencias', [FileController::class, 'getCoincidencias']);
         Route::get('/get-documentos/{personalId}', [FileController::class, 'getDocumentosXPersonal']);
+        Route::get('/cv-personal/{codPersonal}', [FileController::class, 'getDatosCVPersonal']);
+        Route::get('/cv-certificados/{codPersonal}', [FileController::class, 'getCertificadosCvPreview']);
+        Route::get('/cv-media/{tipo}/{codPersonal}/{archivo?}', [FileController::class, 'getCvMedia'])->where('archivo', '.*');
+        Route::get('/get-folio-registrado/{codPersonal}/{codFolio}/{codRequisito}', [FileController::class, 'getFolioRegistradoPersona']);
+        Route::get('/evaluacion-postulante/personal/{codPersonal}', [FileController::class, 'getDatosEvaluacionPostulante']);
+        Route::get('/get-verificadores-domiciliarios', [FileController::class, 'getVerificadoresDomiciliarios']);
         Route::get('/get-legajos', [FileController::class, 'getLegajos']);
         Route::get('/get-clientes', [FileController::class, 'getClientes']);
         Route::get('/get-clientes-legajos', [FileController::class, 'getClientesLegajos']);
@@ -111,6 +117,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/get-folios-cliente-cargo', [FileController::class, 'getFoliosClienteCargo']);
         Route::get('/get-folios', [FileController::class, 'getFolios']);
         Route::get('/get-folios-categoria/{codCategoria}', [FileController::class, 'getFoliosPorCategoria']);
+        Route::get('/get-folios-tipo/{codTipo}', [FileController::class, 'getFoliosPorTipo']);
         Route::get('/get-folios-vigentes', [ConsultaController::class, 'getFoliosVigentes']);
         Route::get('/get-folios-pendientes', [ConsultaController::class, 'getFoliosPendientes']);
         Route::get('/folios/proximos-vencer', [ConsultaController::class, 'getFoliosProximosVencer']);
