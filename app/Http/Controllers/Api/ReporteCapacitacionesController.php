@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\TipoTrabajadorHelper;
 use App\Http\Controllers\Api\Concerns\ReporteFormatoHelpers;
 use App\Http\Controllers\Controller;
 use App\Models\Consulta;

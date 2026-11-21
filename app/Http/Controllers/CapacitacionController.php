@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\TipoTrabajadorHelper;
 use App\Jobs\MatriculaMasivaJob;
 use App\Mail\MemoMail;
 use App\Models\CapacitacionAreas;
@@ -3035,7 +3036,7 @@ class CapacitacionController extends Controller
                     'dni'             => trim($p->NRO_DOC ?? ''),
                     'nombre_completo' => trim($p->NOMBRE_COMPLETO ?? ''),
                     'cargo'           => trim($p->CARGO ?? ''),
-                    'tipo_trabajador' => trim($p->TIPO_TRABAJADOR ?? ''),
+                    'tipo_trabajador' => TipoTrabajadorHelper::normalizar($p->TIPO_TRABAJADOR ?? ''),
                     'cliente'         => $p->CLIENTE ?? null,
                     'sucursal' => trim($p->SUCURSAL ?? ''),
                     'codigo' => trim($p->CODIGO_PERSONAL ?? ''),
@@ -3202,7 +3203,7 @@ class CapacitacionController extends Controller
                     'dni'             => trim($p->NRO_DOC ?? ''),
                     'nombre_completo' => trim($p->NOMBRE_COMPLETO ?? ''),
                     'cargo'           => trim($p->CARGO ?? ''),
-                    'tipo_trabajador' => trim($p->TIPO_TRABAJADOR ?? ''),
+                    'tipo_trabajador' => TipoTrabajadorHelper::normalizar($p->TIPO_TRABAJADOR ?? ''),
                     'cliente'         => $p->CLIENTE ?? null,
                     'sucursal'        => trim($p->SUCURSAL ?? ''),
                     'codigo'          => trim($p->CODIGO_PERSONAL ?? ''),
@@ -3263,7 +3264,7 @@ class CapacitacionController extends Controller
                     'dni' => trim($p->NRO_DOC ?? ''),
                     'nombre_completo' => trim($p->NOMBRE_COMPLETO ?? ''),
                     'cargo' => trim($p->CARGO ?? ''),
-                    'tipo_trabajador' => trim($p->TIPO_TRABAJADOR ?? ''),
+                    'tipo_trabajador' => TipoTrabajadorHelper::normalizar($p->TIPO_TRABAJADOR ?? ''),
                     'empresa' => $empresa,
                     'empresa_codigo' => trim(
                         $p->COD_EMPRESA
@@ -4766,7 +4767,7 @@ class CapacitacionController extends Controller
                     'correo'         => $row->email ?? null,
                     'nota_final'     => $row->final_grade !== null ? (float) $row->final_grade : null,
                     'ultimo_acceso'  => $row->last_access_date ?? null,
-                    'tipo_trabajador' => $local->TIPO_TRABAJADOR ?? null,
+                    'tipo_trabajador' => TipoTrabajadorHelper::normalizar($local->TIPO_TRABAJADOR ?? ''),
                     'cargo'          => $local->CARGO     ?? null,
                     'sucursal'       => $local->SUCURSAL  ?? null,
                     'cliente'        => $local->CLIENTE   ?? 'Sin cliente',
@@ -4915,7 +4916,7 @@ class CapacitacionController extends Controller
                         'NombreCompleto' => $persona->NOMBRE_COMPLETO ?? null,
                         'NroDoc'         => $persona->NRO_DOC         ?? null,
                         'Sucursal'       => $persona->SUCURSAL        ?? null,
-                        'TipoTrabajador' => $persona->TIPO_TRABAJADOR ?? null,
+                        'TipoTrabajador' => TipoTrabajadorHelper::normalizar($persona->TIPO_TRABAJADOR ?? ''),
                         'Correo'         => $persona->CORREO          ?? null,
                         'Cargo'          => $persona->CARGO           ?? null,
                         'Cliente'        => $persona->CLIENTE         ?? "Sin cliente",
@@ -5032,7 +5033,7 @@ class CapacitacionController extends Controller
                     'NombreCompleto' => $persona->NOMBRE_COMPLETO,
                     'DNI'            => $persona->NRO_DOC,
                     'Cargo'          => $persona->CARGO          ?? 'Sin asignar',
-                    'TipoTrabajador' => $persona->TIPO_TRABAJADOR,
+                    'TipoTrabajador' => TipoTrabajadorHelper::normalizar($persona->TIPO_TRABAJADOR ?? ''),
                     'Nota_Final'     => $desdeJson ? null : ($moodle->final_grade ?? null),
                     'Estado'         => strtoupper($moodle->estado ?? ''),
                 ];
@@ -6010,7 +6011,7 @@ class CapacitacionController extends Controller
                         'Sucursal'       => trim($persona->SUCURSAL ?? ''),
                         'Empresa'        => $empresa,
                         'Cargo'          => trim($persona->CARGO ?? ''),
-                        'TipoTrabajador' => trim($persona->TIPO_TRABAJADOR ?? ''),
+                        'TipoTrabajador' => TipoTrabajadorHelper::normalizar($persona->TIPO_TRABAJADOR ?? ''),
                         'Cursos'         => $cursosList,
                     ];
                 })
@@ -6262,7 +6263,11 @@ class CapacitacionController extends Controller
                     'TIPE_DESCRIPCION AS DESCRIPCION'
                 )
                 ->orderBy('TIPE_CODIGO', 'ASC')
-                ->get();
+                ->get()
+                ->map(function ($tipo) {
+                    $tipo->DESCRIPCION = TipoTrabajadorHelper::normalizar($tipo->DESCRIPCION);
+                    return $tipo;
+                });
 
             return response()->json([
                 'success' => true,
@@ -6389,7 +6394,16 @@ class CapacitacionController extends Controller
                 ]
             );
 
-            /* ---------------- 5) Respuesta ---------------- */
+            /* ---------------- 5) Normalizar tipo de trabajador ---------------- */
+            $rows = array_map(function ($row) {
+                if (isset($row->TIPO)) {
+                    $row->TIPO = TipoTrabajadorHelper::normalizar($row->TIPO);
+                }
+
+                return $row;
+            }, $rows);
+
+            /* ---------------- 6) Respuesta ---------------- */
             return response()->json([
                 'success' => true,
                 'total' => count($rows),

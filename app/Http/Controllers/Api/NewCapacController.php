@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\TipoTrabajadorHelper;
 use App\Http\Controllers\Controller;
 use App\Jobs\MatriculaMasivaJob;
 use App\Models\CursoNew;
