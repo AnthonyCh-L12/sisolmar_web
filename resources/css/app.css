@@ -343,6 +343,7 @@ input:where([type='button']),
 input:where([type='reset']),
 input:where([type='submit']) {
   -webkit-appearance: button; /* 1 */
+  appearance: button;
   background-color: transparent; /* 2 */
   background-image: none; /* 2 */
 }
@@ -377,6 +378,7 @@ Correct the cursor style of increment and decrement buttons in Safari.
 */
 [type='search'] {
   -webkit-appearance: textfield; /* 1 */
+  appearance: textfield;
   outline-offset: -2px; /* 2 */
 }
 /*
@@ -495,7 +497,7 @@ iframe,
 embed,
 object {
   display: block; /* 1 */
-  vertical-align: middle; /* 2 */
+  
 }
 /*
 Constrain images and videos to the parent width and preserve their intrinsic aspect ratio. (https://github.com/mozdevs/cssremedy/issues/14)
@@ -6896,7 +6898,7 @@ th.fc-day-header {
   background-color: rgb(51 65 85 / var(--tw-bg-opacity)) !important;
 }
 
-/* Personalización de Paginación de vanilla-datatables */
+/* Personalizaciï¿½n de Paginaciï¿½n de vanilla-datatables */
 .dataTable-pagination li.active a {
     background-color: #10b981; /* emerald-500 equivalent */
     color: white;
@@ -6911,4 +6913,7 @@ th.fc-day-header {
 .dataTable-pagination li a:hover {
     background-color: #f3f4f6; /* gray-100 */
     color: #1f2937; /* gray-800 */
+}
+.fila-sin-saldo td {
+    background-color: #bbbbbb !important;
 }

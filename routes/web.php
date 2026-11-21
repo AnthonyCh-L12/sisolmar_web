@@ -20,6 +20,7 @@ use App\Mail\AlertaCaducidadMail;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
+use App\Http\Controllers\SolicitudVacacionesController;
 
 
 Route::get('/login', [LoginController::class, 'index'])->name('login');
@@ -337,6 +338,17 @@ Route::middleware(['auth'])->group(function () {
     }); // fin prefix('api')
 
     Route::get('/reportes', [FileController::class, 'ViewReportes'])->name('reportes');
+
+    Route::get('/rrhh/Solicitud/personal', [SolicitudVacacionesController::class, 'getPersonalVacaciones'])
+    ->name('rrhh.solicitud.personal');
+
+    Route::get('/rrhh/Solicitud/pdf/{cab}/{det}',[SolicitudVacacionesController::class, 'generarPdf'])->name('rrhh.solicitud.pdf');
+    Route::get('/rrhh/Solicitud/detalle/{codigo}',[SolicitudVacacionesController::class, 'detalle'])->name('rrhh.solicitud.detalle');
+    Route::get('/rrhh/Solicitud/tipos-cargo', [SolicitudVacacionesController::class, 'getTiposCargoVacaciones'])->name('rrhh.solicitud.tiposCargo');
+    Route::post('rrhh/Solicitud/detalle/{codigo}/iniciar',[SolicitudVacacionesController::class, 'iniciarVacaciones'])->name('rrhh.solicitud.vacaciones.iniciar');
+    Route::post('rrhh/Solicitud/detalle/{codigo}/revertir/{cronograma}',[SolicitudVacacionesController::class, 'revertirVacaciones'])->name('rrhh.solicitud.vacaciones.revertir');
+
+
     // ─── RUTAS DE VISTAS (catchall al final) ─────────────────────────────────
     Route::group(['prefix' => '/', 'where' => ['first' => '^(?!api|\.well-known).*']], function () {
         Route::get('', [RoutingController::class, 'index'])->name('root');
