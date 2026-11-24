@@ -561,6 +561,9 @@ class ReporteCapacitacionesController extends Controller
 
             $estadoFiltro = mb_strtoupper(trim((string) $estado));
             $esNoMatriculado = $estadoFiltro === 'NO MATRICULADO';
+            // Las filas "NO MATRICULADO" solo se agregan cuando no se filtró por
+            // un estado concreto (o cuando el estado pedido es justamente ese).
+            $incluirNoMatriculado = $estadoFiltro === '' || $esNoMatriculado;
 
             $usernamesStr = !empty($usernames) ? implode(',', $usernames) : null;
             $courseIdsStr = !empty($courseIds) ? implode(',', $courseIds) : null;
@@ -668,46 +671,50 @@ class ReporteCapacitacionesController extends Controller
                     $courseIds,
                     $inscritosPorUsuario,
                     $inscritosPorUsuarioNombre,
-                    $nombresCursos
+                    $nombresCursos,
+                    $incluirNoMatriculado
                 ) {
                     $persona = $personal->get($username);
                     if (!$persona) return null;
 
                     $cursosList = $cursosPorUsuario[$username] ?? [];
-                    $idsEnLista = collect($cursosList)
-                        ->pluck('CourseId')
-                        ->filter()
-                        ->map(fn($id) => (string) $id)
-                        ->all();
-                    $nombresEnLista = collect($cursosList)
-                        ->pluck('Nombre')
-                        ->map(fn($nombre) => mb_strtoupper(trim((string) $nombre)))
-                        ->all();
 
-                    foreach ((array) $courseIds as $courseId) {
-                        $key = (string) $courseId;
+                    if ($incluirNoMatriculado) {
+                        $idsEnLista = collect($cursosList)
+                            ->pluck('CourseId')
+                            ->filter()
+                            ->map(fn($id) => (string) $id)
+                            ->all();
+                        $nombresEnLista = collect($cursosList)
+                            ->pluck('Nombre')
+                            ->map(fn($nombre) => mb_strtoupper(trim((string) $nombre)))
+                            ->all();
 
-                        if (in_array($key, $idsEnLista, true)) continue;
+                        foreach ((array) $courseIds as $courseId) {
+                            $key = (string) $courseId;
 
-                        $nombreCurso = $nombresCursos[$key]
-                            ?? $this->nombreCursoLocal($courseId);
-                        $nombreKey = mb_strtoupper(trim($nombreCurso));
+                            if (in_array($key, $idsEnLista, true)) continue;
 
-                        if (!empty($inscritosPorUsuario[$username][$key])) continue;
-                        if (!empty($inscritosPorUsuarioNombre[$username][$nombreKey])) continue;
-                        if (in_array($nombreKey, $nombresEnLista, true)) continue;
+                            $nombreCurso = $nombresCursos[$key]
+                                ?? $this->nombreCursoLocal($courseId);
+                            $nombreKey = mb_strtoupper(trim($nombreCurso));
 
-                        $cursosList[] = [
-                            'CourseId' => $courseId,
-                            'Nombre' => $nombreCurso,
-                            'Estado' => 'NO MATRICULADO',
-                            'Nota_Final' => null,
-                            'Fecha_Nota' => null,
-                            'Fecha_Ultimo_Acceso' => null,
-                        ];
+                            if (!empty($inscritosPorUsuario[$username][$key])) continue;
+                            if (!empty($inscritosPorUsuarioNombre[$username][$nombreKey])) continue;
+                            if (in_array($nombreKey, $nombresEnLista, true)) continue;
 
-                        $idsEnLista[] = $key;
-                        $nombresEnLista[] = $nombreKey;
+                            $cursosList[] = [
+                                'CourseId' => $courseId,
+                                'Nombre' => $nombreCurso,
+                                'Estado' => 'NO MATRICULADO',
+                                'Nota_Final' => null,
+                                'Fecha_Nota' => null,
+                                'Fecha_Ultimo_Acceso' => null,
+                            ];
+
+                            $idsEnLista[] = $key;
+                            $nombresEnLista[] = $nombreKey;
+                        }
                     }
 
                     $empresa = trim(
@@ -758,6 +765,12 @@ class ReporteCapacitacionesController extends Controller
                     })->values();
                 }
             }
+
+            // Excluir personal sin cursos dentro del alcance del reporte:
+            // no aportan filas reales y generaban registros vacíos en el PDF.
+            $personales = $personales
+                ->filter(fn($p) => count($p['Cursos'] ?? []) > 0)
+                ->values();
 
             return response()->json([
                 'success' => true,
