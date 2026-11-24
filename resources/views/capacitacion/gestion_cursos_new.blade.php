@@ -413,12 +413,7 @@
     {{-- Catálogo "Dirigido a" para el wizard (el resto de combos llega por API al abrir el modal) --}}
     @isset($dirigidos)
     <script>
-        window.dirigidosNew = {
-            {
-                Js::from($dirigidos - > map(fn($d) => ['codigo' => $d - > codigo, 'texto' => $d - > texto]) - >
-                    values() - > toArray())
-            }
-        };
+        window.dirigidosNew = {{ Js::from($dirigidos->map(fn($d) => ['codigo' => $d->codigo, 'texto' => $d->texto])->values()->toArray()) }};
     </script>
     @endisset
 

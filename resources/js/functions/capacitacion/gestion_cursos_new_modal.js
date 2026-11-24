@@ -1209,9 +1209,23 @@ window.formCursoEditNew = function () {
                 ops = [...ops, { codigo: "0", texto: "Otros" }];
             }
 
-            // Preservar valor actual legado para no dejar el campo vacío en cursos antiguos.
+            // Preservar valor actual legado para no dejar el campo vacío en cursos antiguos,
+            // usando una etiqueta legible en lugar del código crudo.
             if (this.dirigido && !ops.some((o) => String(o.codigo) === String(this.dirigido))) {
-                ops = [...ops, { codigo: String(this.dirigido), texto: `Código ${this.dirigido} (actual)` }];
+                const etiquetas = {
+                    "0": "Otros",
+                    "1": "Todos",
+                    "2": "Personal Administrativo",
+                    "3": "Personal Operativo",
+                    "7": "Personal Administrativo (Todos)",
+                    "8": "Personal Administrativo (4°)",
+                    "9": "Personal Administrativo (5°)",
+                    "10": "Personal Operativo (Todos)",
+                    "11": "Personal Operativo (4°)",
+                    "12": "Personal Operativo (5°)",
+                };
+                const texto = etiquetas[String(this.dirigido)] || `Dirigido actual (${this.dirigido})`;
+                ops = [...ops, { codigo: String(this.dirigido), texto }];
             }
             return ops;
         },
@@ -1241,16 +1255,9 @@ window.formCursoEditNew = function () {
             );
         },
         get formularioCompleto() {
-            if (!this.nombre.trim() || !this.categoria || !this.codResponsable || !this.areaResponsable) return false;
-            if (this.esPCU) {
-                if (!this.tipoCursoCodigo) return false;
-            } else if (!this.areaConocimiento) {
-                return false;
-            }
-            if (this.esPeriodico && !this.frecuencia) return false;
-            if (this.dirigido === "" || this.sucursal === "") return false;
-            if (this.esPCU && !this.clienteSeleccionado) return false;
-            return true;
+            // En edición solo el nombre es obligatorio; el resto de campos se
+            // puede dejar como esté para no bloquear cambios puntuales.
+            return this.nombre.trim() !== "";
         },
         get hayCambios() {
             const o = this._original || {};
@@ -1258,7 +1265,7 @@ window.formCursoEditNew = function () {
                 .some((k) => String(this[k] ?? "") !== String(o[k] ?? ""));
         },
         get tituloBoton() {
-            if (!this.formularioCompleto) return "Completa los campos obligatorios (*)";
+            if (!this.formularioCompleto) return "El nombre del curso es obligatorio";
             if (!this.hayCambios) return "Sin cambios por guardar";
             return "";
         },
@@ -1499,18 +1506,20 @@ window.formCursoEditNew = function () {
                 const n = parseInt(String(v ?? "").replace(/[^\d-]/g, ""), 10);
                 return Number.isFinite(n) ? n : 0;
             };
+            // Los campos opcionales vacíos se omiten para no persistir 0 por error.
+            const hasVal = (v) => String(v ?? "").trim() !== "";
 
             if (changed("nombre"))         fd.append("SW_CURS_NOMBRE", this.nombre);
             if (changed("descripcion"))    fd.append("SW_CURS_DESCRIPCION", this.descripcion || "");
-            if (changed("categoria"))      fd.append("SW_CURS_TIPO_COD", String(this.categoria));
-            if (changed("codResponsable")) fd.append("SW_CURS_RESP_COD", String(this.codResponsable));
-            if (changed("areaConocimiento") && !this.esPCU) fd.append("SW_CURS_SIST_GESTION_COD", String(this.areaConocimiento));
-            if (changed("areaResponsable")) fd.append("SW_CURS_AREA_COD", String(this.areaResponsable));
+            if (changed("categoria") && hasVal(this.categoria)) fd.append("SW_CURS_TIPO_COD", String(this.categoria));
+            if (changed("codResponsable") && hasVal(this.codResponsable)) fd.append("SW_CURS_RESP_COD", String(this.codResponsable));
+            if (changed("areaConocimiento") && !this.esPCU && hasVal(this.areaConocimiento)) fd.append("SW_CURS_SIST_GESTION_COD", String(this.areaConocimiento));
+            if (changed("areaResponsable") && hasVal(this.areaResponsable)) fd.append("SW_CURS_AREA_COD", String(this.areaResponsable));
             if (changed("codMoodleArea") && this.codMoodleArea) fd.append("cod_moodle_area", this.codMoodleArea);
-            if (changed("dirigido"))       fd.append("SW_CURS_DIRIGIDO_COD", String(toInt(this.dirigido)));
-            if (changed("sucursal"))       fd.append("SW_CURS_SUCURSAL_COD", String(toInt(this.sucursal)));
+            if (changed("dirigido") && hasVal(this.dirigido)) fd.append("SW_CURS_DIRIGIDO_COD", String(toInt(this.dirigido)));
+            if (changed("sucursal") && hasVal(this.sucursal)) fd.append("SW_CURS_SUCURSAL_COD", String(toInt(this.sucursal)));
             if (changed("esPeriodico")) fd.append("SW_CURS_PERIODICIDAD", this.esPeriodico ? 1 : 0);
-            if (changed("frecuencia")) fd.append("SW_CURS_CANT_PERIOD", toInt(this.frecuencia));
+            if (changed("frecuencia") && hasVal(this.frecuencia) && toInt(this.frecuencia) > 0) fd.append("SW_CURS_CANT_PERIOD", toInt(this.frecuencia));
             if (changed("tipoCursoCodigo")) fd.append("SW_CURS_PLAN_CAPAC_COD", String(this.tipoCursoCodigo));
             if (changed("cliente")) fd.append("SW_CURS_CLIENTE_COD", String(this.clienteSeleccionado || ""));
             

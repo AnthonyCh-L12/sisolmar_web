@@ -64,7 +64,7 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label for="nediCategoria" class="text-sm font-medium text-gray-800 inline-block mb-1">Tipo del curso <span class="text-red-500">*</span></label>
+                                <label for="nediCategoria" class="text-sm font-medium text-gray-800 inline-block mb-1">Tipo del curso</label>
                                 <select id="nediCategoria" x-model="categoria"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione…</option>
@@ -76,7 +76,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label for="nediResponsable" class="text-sm font-medium text-gray-800 inline-block mb-1">Responsable <span class="text-red-500">*</span></label>
+                                <label for="nediResponsable" class="text-sm font-medium text-gray-800 inline-block mb-1">Responsable</label>
                                 <select id="nediResponsable" x-model="codResponsable"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione responsable…</option>
@@ -95,7 +95,7 @@
                             <input id="nediPeriodico" type="checkbox" x-model="esPeriodico" @click.stop class="form-switch scale-110 cursor-pointer">
                         </div>
                         <div x-show="esPeriodico" x-transition>
-                            <label for="nediFrecuencia" class="text-sm font-medium text-gray-800 inline-block mb-1">Frecuencia <span class="text-red-500">*</span></label>
+                            <label for="nediFrecuencia" class="text-sm font-medium text-gray-800 inline-block mb-1">Frecuencia</label>
                             <select id="nediFrecuencia" x-model="frecuencia"
                                 class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                 <option value="0">Seleccione la frecuencia…</option>
@@ -109,7 +109,7 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div x-show="!esPCU">
-                                <label for="nediSistema" class="text-sm font-medium text-gray-800 inline-block mb-1">Sistema de gestión <span class="text-red-500">*</span></label>
+                                <label for="nediSistema" class="text-sm font-medium text-gray-800 inline-block mb-1">Sistema de gestión</label>
                                 <select id="nediSistema" x-model="areaConocimiento"
                                     @change="cargarAreasResponsables(areaConocimiento)"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
@@ -120,7 +120,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label for="nediAreaResp" class="text-sm font-medium text-gray-800 inline-block mb-1">Área responsable <span class="text-red-500">*</span></label>
+                                <label for="nediAreaResp" class="text-sm font-medium text-gray-800 inline-block mb-1">Área responsable</label>
                                 <select id="nediAreaResp" x-model="areaResponsable" :disabled="areaBloqueada"
                                     :class="areaBloqueada ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'bg-white'"
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
@@ -134,7 +134,7 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label for="nediSucursal" class="text-sm font-medium text-gray-800 inline-block mb-1">Sucursal <span class="text-red-500">*</span></label>
+                                <label for="nediSucursal" class="text-sm font-medium text-gray-800 inline-block mb-1">Sucursal</label>
                                 <select id="nediSucursal" x-model="sucursal"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione sucursal…</option>
@@ -145,7 +145,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label for="nediDirigido" class="text-sm font-medium text-gray-800 inline-block mb-1">Dirigido a <span class="text-red-500">*</span></label>
+                                <label for="nediDirigido" class="text-sm font-medium text-gray-800 inline-block mb-1">Dirigido a</label>
                                 <select id="nediDirigido" x-model="dirigido"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione a quién va dirigido…</option>
@@ -157,7 +157,7 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <p class="text-sm font-medium text-gray-800 mb-1">Plan de capacitación <span class="text-red-500">*</span></p>
+                                <p class="text-sm font-medium text-gray-800 mb-1">Plan de capacitación</p>
                                 <div class="flex flex-wrap gap-2">
                                     <template x-for="o in planes" :key="o.codigo">
                                         <label class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm cursor-pointer transition-all"
@@ -171,7 +171,7 @@
                                 </div>
                             </div>
                             <div x-show="esPCU">
-                                <p class="text-sm font-bold text-blue-800 mb-1">Clientes <span class="text-red-500">*</span></p>
+                                <p class="text-sm font-bold text-blue-800 mb-1">Clientes</p>
                                 <p class="text-xs text-blue-500 mb-2">Se matriculará al personal asignado a este cliente.</p>
                                 <input type="text" x-model="busquedaCliente" placeholder="Buscar cliente…" class="w-full border border-blue-200 rounded-md px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-200">
                                 <div class="border border-blue-100 rounded-md p-2 overflow-y-auto bg-white custom-scrollbar" style="max-height: 150px;">
