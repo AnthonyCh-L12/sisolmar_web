@@ -3752,17 +3752,17 @@
                                     </div>
                                 </div>
                                 {{-- Firma responsable --}}
-                                <div class="flex items-center gap-3">
-                                    <div x-show="!reporteData.Firma_Responsable" class="w-10 h-10 shrink-0 rounded-xl bg-default-100 flex items-center justify-center">
+                                <div class="flex items-center gap-3" x-data="{ fallo: false }">
+                                    <div x-show="!reporteData.Firma_Responsable || fallo" class="w-10 h-10 shrink-0 rounded-xl bg-default-100 flex items-center justify-center">
                                         <i class="ti ti-signature text-default-500 text-lg"></i>
                                     </div>
                                     <div class="min-w-0">
                                         <p class="text-[10px] font-bold uppercase tracking-wider text-default-400">Firma responsable</p>
-                                        <template x-if="reporteData.Firma_Responsable">
+                                        <template x-if="reporteData.Firma_Responsable && !fallo">
                                             <img :src="reporteData.Firma_Responsable" alt="Firma" class="h-10 object-contain"
-                                                x-on:error="$el.style.display = 'none'">
+                                                x-on:error="fallo = true">
                                         </template>
-                                        <p x-show="!reporteData.Firma_Responsable" class="text-xs text-default-400">Sin firma</p>
+                                        <p x-show="!reporteData.Firma_Responsable || fallo" class="text-xs text-default-400">SIN FIRMA</p>
                                     </div>
                                 </div>
                                 {{-- Total personal --}}
@@ -3814,18 +3814,18 @@
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white">
-                                            <template x-for="(persona, pi) in personalOrdenado" :key="pi">
+                                            <template x-for="(persona, pi) in personalOrdenado" :key="persona.DNI_Personal || pi">
                                                 <tr class="border-b border-default-100 last:border-b-0" :class="pi % 2 === 1 ? 'bg-default-50/40' : ''">
                                                     <td class="px-5 py-2.5 text-center text-default-400 text-xs font-mono" x-text="pi + 1"></td>
                                                     <td class="px-5 py-2.5 text-default-800 font-medium whitespace-nowrap" x-text="persona.Nombre_Personal"></td>
                                                     <td class="px-5 py-2.5 text-default-500 font-mono whitespace-nowrap" x-text="persona.DNI_Personal"></td>
                                                     <td class="px-5 py-2.5 text-default-600" x-text="persona.Cargo_Personal || '—'"></td>
-                                                    <td class="px-5 py-2.5 text-center">
-                                                        <template x-if="persona.Firma_Personal">
+                                                    <td class="px-5 py-2.5 text-center" x-data="{ fallo: false }">
+                                                        <template x-if="persona.Firma_Personal && !fallo">
                                                             <img :src="persona.Firma_Personal" alt="Firma" class="h-8 object-contain mx-auto"
-                                                                x-on:error="$el.style.display = 'none'">
+                                                                x-on:error="fallo = true">
                                                         </template>
-                                                        <span x-show="!persona.Firma_Personal" class="text-xs text-default-400">—</span>
+                                                        <span x-show="!persona.Firma_Personal || fallo" class="text-xs text-default-400">SIN FIRMA</span>
                                                     </td>
                                                 </tr>
                                             </template>

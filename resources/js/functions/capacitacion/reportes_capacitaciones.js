@@ -6436,6 +6436,25 @@ export default document.addEventListener("alpine:init", () => {
                         cell.width <= 0 ||
                         cell.height <= 0
                     ) {
+                        if (
+                            isFinite(cell.x) &&
+                            isFinite(cell.y) &&
+                            isFinite(cell.width) &&
+                            isFinite(cell.height) &&
+                            cell.width > 0 &&
+                            cell.height > 0
+                        ) {
+                            doc.setFont(undefined, "normal");
+                            doc.setFontSize(opts.textoFontSize ?? 7);
+                            doc.setTextColor(120, 120, 120);
+                            doc.text(
+                                "SIN FIRMA",
+                                cell.x + cell.width / 2,
+                                cell.y + cell.height / 2 + 1,
+                                { align: "center" },
+                            );
+                            doc.setTextColor(0, 0, 0);
+                        }
                         return;
                     }
                     const pad = opts.pad ?? 1;
