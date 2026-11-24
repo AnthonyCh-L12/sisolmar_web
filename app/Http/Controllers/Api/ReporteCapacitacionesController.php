@@ -316,9 +316,7 @@ class ReporteCapacitacionesController extends Controller
                 $courseId = (string) $courseId;
 
                 $personales = $personalPorDni
-                    ->reject(fn($p) => !empty(
-                        $inscritosPorCurso[$courseId][trim((string) ($p->NRO_DOC ?? ''))]
-                    ))
+                    ->reject(fn($p) => !empty($inscritosPorCurso[$courseId][trim((string) ($p->NRO_DOC ?? ''))]))
                     ->map(fn($p) => [
                         'CodigoPers' => $p->CODI_PERS,
                         'SucursalCodigo' => $p->SUCU_CODIGO,
@@ -347,13 +345,17 @@ class ReporteCapacitacionesController extends Controller
         try {
             $usernames = $request->usernames ?? [];
             $courseIds = $request->courseIds ?? [];
-            $estadoId = $request->estadoId ?? 0;
-            $desde = $request->desde ?? null;
-            $hasta = $request->hasta ?? null;
+            $estadoId  = (int) ($request->estadoId ?? 0);
+            $desde     = $request->desde ?? null;
+            $hasta     = $request->hasta ?? null;
 
-            $estadoFiltro = (int) $estadoId;
-            $esNoMatriculado = $estadoFiltro === self::ESTADO_NO_MATRICULADO;
-            $estadoConsulta = $esNoMatriculado ? 0 : $estadoFiltro;
+            $esNoMatriculado  = $estadoId === self::ESTADO_NO_MATRICULADO;
+            $estadoConsulta   = $esNoMatriculado ? 0 : $estadoId;
+
+            // Mismo criterio que general(): estados válidos y si corresponde
+            // agregar filas NO MATRICULADO.
+            $estadosPermitidos   = $this->estadosFiltro($estadoId);
+            $incluirNoMatriculado = $estadoId === 0 || $esNoMatriculado;
 
             $usernamesStr = !empty($usernames) ? implode(',', $usernames) : null;
             $courseIdsStr = !empty($courseIds) ? implode(',', $courseIds) : null;
@@ -393,6 +395,8 @@ class ReporteCapacitacionesController extends Controller
             $inscritosPorUsuarioNombre = [];
             $nombresCursos = [];
 
+            // Inscritos reales (sin filtro de estado) para saber si el usuario
+            // está o no matriculado en cada curso.
             foreach ($cursosMatricula as $curso) {
                 $courseId = (string) ($curso->course_id ?? '');
                 $nombreCurso = $this->nombreCursoLocal(
@@ -426,12 +430,27 @@ class ReporteCapacitacionesController extends Controller
                 );
 
                 foreach ($usuarios as $u) {
-                    $cursosPorUsuario[trim($u['username'])][] = [
-                        'CourseId' => $courseId,
-                        'Nombre' => $nombreCurso,
-                        'Estado' => strtoupper($u['estado']),
-                        'Nota_Final' => $u['final_grade'] ?? 'Sin nota',
-                        'Fecha_Nota' => $u['fecha_nota'] ?? null,
+                    $username = trim((string) ($u['username'] ?? ''));
+
+                    if ($username === '') continue;
+
+                    $estadoUsuario = strtoupper(trim((string) ($u['estado'] ?? '')));
+
+                    // Respetar el estado seleccionado: descartar usuarios cuya
+                    // calificación no coincida con el estado filtrado.
+                    if (
+                        !empty($estadosPermitidos) &&
+                        !in_array($estadoUsuario, $estadosPermitidos, true)
+                    ) {
+                        continue;
+                    }
+
+                    $cursosPorUsuario[$username][] = [
+                        'CourseId'            => $courseId,
+                        'Nombre'              => $nombreCurso,
+                        'Estado'              => $estadoUsuario,
+                        'Nota_Final'          => $u['final_grade'] ?? 'Sin nota',
+                        'Fecha_Nota'          => $u['fecha_nota'] ?? null,
                         'Fecha_Ultimo_Acceso' => $u['ultimo_acceso'] ?? null,
                     ];
                 }
@@ -459,59 +478,65 @@ class ReporteCapacitacionesController extends Controller
                     $courseIds,
                     $inscritosPorUsuario,
                     $inscritosPorUsuarioNombre,
-                    $nombresCursos
+                    $nombresCursos,
+                    $incluirNoMatriculado
                 ) {
                     $persona = $personal->get($username);
 
                     if (!$persona) return null;
 
                     $cursosList = $cursosPorUsuario[$username] ?? [];
-                    $idsEnLista = collect($cursosList)
-                        ->pluck('CourseId')
-                        ->filter()
-                        ->map(fn($id) => (string) $id)
-                        ->all();
-                    $nombresEnLista = collect($cursosList)
-                        ->pluck('Nombre')
-                        ->map(fn($nombre) => mb_strtoupper(trim((string) $nombre)))
-                        ->all();
 
-                    foreach ((array) $courseIds as $courseId) {
-                        $key = (string) $courseId;
+                    // Sólo agregar NO MATRICULADO cuando no hay filtro de estado
+                    // específico (o cuando el filtro es justamente ese estado).
+                    if ($incluirNoMatriculado) {
+                        $idsEnLista = collect($cursosList)
+                            ->pluck('CourseId')
+                            ->filter()
+                            ->map(fn($id) => (string) $id)
+                            ->all();
+                        $nombresEnLista = collect($cursosList)
+                            ->pluck('Nombre')
+                            ->map(fn($nombre) => mb_strtoupper(trim((string) $nombre)))
+                            ->all();
 
-                        if (in_array($key, $idsEnLista, true)) continue;
+                        foreach ((array) $courseIds as $courseId) {
+                            $key = (string) $courseId;
 
-                        $nombreCurso = $nombresCursos[$key]
-                            ?? $this->nombreCursoLocal($courseId);
-                        $nombreKey = mb_strtoupper(trim($nombreCurso));
+                            if (in_array($key, $idsEnLista, true)) continue;
 
-                        if (!empty($inscritosPorUsuario[$username][$key])) continue;
-                        if (!empty($inscritosPorUsuarioNombre[$username][$nombreKey])) continue;
-                        if (in_array($nombreKey, $nombresEnLista, true)) continue;
+                            $nombreCurso = $nombresCursos[$key]
+                                ?? $this->nombreCursoLocal($courseId);
+                            $nombreKey = mb_strtoupper(trim($nombreCurso));
 
-                        $cursosList[] = [
-                            'CourseId' => $courseId,
-                            'Nombre' => $nombreCurso,
-                            'Estado' => 'NO MATRICULADO',
-                            'Nota_Final' => null,
-                            'Fecha_Nota' => null,
-                            'Fecha_Ultimo_Acceso' => null,
-                        ];
+                            if (!empty($inscritosPorUsuario[$username][$key])) continue;
+                            if (!empty($inscritosPorUsuarioNombre[$username][$nombreKey])) continue;
+                            if (in_array($nombreKey, $nombresEnLista, true)) continue;
 
-                        $idsEnLista[] = $key;
-                        $nombresEnLista[] = $nombreKey;
+                            $cursosList[] = [
+                                'CourseId'            => $courseId,
+                                'Nombre'              => $nombreCurso,
+                                'Estado'              => 'NO MATRICULADO',
+                                'Nota_Final'          => null,
+                                'Fecha_Nota'          => null,
+                                'Fecha_Ultimo_Acceso' => null,
+                            ];
+
+                            $idsEnLista[]     = $key;
+                            $nombresEnLista[] = $nombreKey;
+                        }
                     }
 
                     return [
                         'CodigoPersonal' => $persona->CODIGO_PERSONAL ?? null,
                         'NombreCompleto' => $persona->NOMBRE_COMPLETO ?? null,
-                        'NroDoc' => $persona->NRO_DOC ?? null,
-                        'Sucursal' => $persona->SUCURSAL ?? null,
+                        'NroDoc'         => $persona->NRO_DOC ?? null,
+                        'Sucursal'       => $persona->SUCURSAL ?? null,
                         'TipoTrabajador' => TipoTrabajadorHelper::normalizar($persona->TIPO_TRABAJADOR ?? ''),
-                        'Correo' => $persona->CORREO ?? null,
-                        'Cargo' => $persona->CARGO ?? null,
-                        'Cliente' => $persona->CLIENTE ?? 'Sin cliente',
-                        'Cursos' => $cursosList,
+                        'Correo'         => $persona->CORREO ?? null,
+                        'Cargo'          => $persona->CARGO ?? null,
+                        'Cliente'        => $persona->CLIENTE ?? 'Sin cliente',
+                        'Cursos'         => $cursosList,
                     ];
                 })
                 ->filter()
@@ -527,19 +552,24 @@ class ReporteCapacitacionesController extends Controller
 
                         return $personal;
                     })
-                    ->filter(fn($personal) => count($personal['Cursos']) > 0)
                     ->values();
             }
 
+            // Igual que general(): descartar personales sin cursos
+            // (evita registros vacíos cuando el estado filtrado no aplica).
+            $personales = $personales
+                ->filter(fn($p) => count($p['Cursos'] ?? []) > 0)
+                ->values();
+
             return response()->json([
-                'success' => true,
+                'success'    => true,
                 'Personales' => $personales,
             ]);
         } catch (\Exception $e) {
             Log::error('Error en ReporteCapacitacionesController@recordPersonal', [
                 'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
+                'line'  => $e->getLine(),
+                'file'  => $e->getFile(),
             ]);
 
             return response()->json([
