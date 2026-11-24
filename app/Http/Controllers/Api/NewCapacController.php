@@ -214,6 +214,7 @@ class NewCapacController extends Controller
                     'c.SW_CURS_TIPO_COD',
                     'c.SW_CURS_AV_COD',
                     'c.SW_CURS_PLAN_CAPAC_COD',
+                    'c.SW_CURS_CLIENTE_COD',
                     'c.SW_CURS_SIST_GESTION_COD',
                     'c.SW_CURS_AREA_COD',
                     'c.SW_CURS_RESP_COD',
@@ -330,6 +331,7 @@ class NewCapacController extends Controller
                     'CURS_AREA_RESPONSABLE' => $areaCodigo > 0 ? (string) $areaCodigo : null,
                     'CURS_AREA_RESPONSABLE_NOMBRE' => $row->area_responsable_nombre,
                     'CURS_COD_MOODLE_AREA' => $row->area_codigo_moodle !== null ? (string) $row->area_codigo_moodle : null,
+                    'CURS_CLIENTE_COD' => $row->SW_CURS_CLIENTE_COD !== null ? (string) $row->SW_CURS_CLIENTE_COD : null,
                     'CURS_AV_COD' => $row->SW_CURS_AV_COD !== null && (int) $row->SW_CURS_AV_COD > 0
                         ? (string) $row->SW_CURS_AV_COD
                         : null,
@@ -696,12 +698,14 @@ class NewCapacController extends Controller
                 'SW_CURS_DESCRIPCION' => 'nullable|string',
                 'SW_CURS_TIPO_COD' => 'nullable|integer|exists:sw_cursos_tipo,codigo',
                 'SW_CURS_RESP_COD' => 'nullable|string|min:0',
+                'SW_CURS_PLAN_CAPAC_COD' => 'nullable|integer|exists:sw_cursos_plan,codigo',
                 'SW_CURS_PERIODICIDAD' => 'nullable|boolean',
                 'SW_CURS_CANT_PERIOD' => 'nullable|integer|min:1',
                 'SW_CURS_SIST_GESTION_COD' => 'nullable|integer|min:0',
                 'SW_CURS_AREA_COD' => 'nullable|integer|min:0',
-                'SW_CURS_DIRIGIDO_COD' => 'nullable|integer|min:0',
+                'SW_CURS_DIRIGIDO_COD' => 'nullable|integer|in:0,9,12',
                 'SW_CURS_SUCURSAL_COD' => 'nullable|integer|min:0',
+                'SW_CURS_CLIENTE_COD' => 'nullable|string|max:20',
             ]);
 
             $curso = CursoNew::where('SW_CURS_COD', $request->input('SW_CURS_COD'))->first();
@@ -764,6 +768,21 @@ class NewCapacController extends Controller
 
             if ($request->has('SW_CURS_SUCURSAL_COD')) {
                 $data['SW_CURS_SUCURSAL_COD'] = (int) $request->input('SW_CURS_SUCURSAL_COD');
+            }
+
+            // Plan de capacitación y cliente (PCA): permiten corregir cualquier
+            // dato del curso antes de subirlo al Aula Virtual. Se usa `has` para
+            // poder limpiar el cliente cuando el curso deja de ser PCA.
+            if ($request->has('SW_CURS_PLAN_CAPAC_COD')) {
+                $planCodigoReq = $request->input('SW_CURS_PLAN_CAPAC_COD');
+                $data['SW_CURS_PLAN_CAPAC_COD'] = ($planCodigoReq !== null && $planCodigoReq !== '')
+                    ? (int) $planCodigoReq
+                    : null;
+            }
+
+            if ($request->has('SW_CURS_CLIENTE_COD')) {
+                $clienteCodReq = trim((string) $request->input('SW_CURS_CLIENTE_COD'));
+                $data['SW_CURS_CLIENTE_COD'] = $clienteCodReq !== '' ? $clienteCodReq : null;
             }
 
             $data['modificado_por'] = $usuario;
@@ -857,6 +876,68 @@ class NewCapacController extends Controller
     }
 
     /**
+     * Elimina (inhabilita) un curso del módulo y lo oculta en el Aula Virtual.
+     *
+     * - sw_cursos_new: se marca `habilitado = 0` (baja lógica del módulo).
+     * - Moodle: el curso se oculta (`visible = 0`) para que no quede activo.
+     */
+    public function eliminarCursoNew(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'codigo_curso' => 'required|string|max:40',
+            ]);
+
+            $curso = CursoNew::query()->where('SW_CURS_COD', $request->input('codigo_curso'))->first();
+
+            if (! $curso) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "El curso {$request->input('codigo_curso')} no existe.",
+                ], 404);
+            }
+
+            $moodleCourseId = (int) $curso->SW_CURS_AV_COD;
+            $warnings = [];
+
+            if ($moodleCourseId > 0) {
+                $oculto = app(MoodleCursoService::class)->ocultarCurso($moodleCourseId);
+
+                if (! $oculto) {
+                    $warnings[] = 'El curso se inhabilitó en el módulo, pero no se pudo ocultar en el Aula Virtual.';
+                }
+            }
+
+            $curso->update([
+                'habilitado' => 0,
+                'modificado_por' => auth()->user()?->usuario ?? 'SISTEMA',
+                'fecha_modificacion' => Carbon::now()->format('Y-m-d H:i:s'),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Curso eliminado correctamente.',
+                'warnings' => $warnings,
+                'codigo' => $curso->CODIGO,
+                'codigo_curso' => $curso->SW_CURS_COD,
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Errores de validación.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Error en NewCapacController@eliminarCursoNew', [
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+            ]);
+
+            return response()->json(['success' => false, 'message' => 'Error al eliminar el curso.'], 500);
+        }
+    }
+
+    /**
      * Envoltorio común para los catálogos: conserva el contrato {success, total, data}.
      */
     private function listarCatalogo(string $metodo, callable $consulta, string $mensajeError): JsonResponse
@@ -900,7 +981,7 @@ class NewCapacController extends Controller
                 'SW_CURS_SIST_GESTION_COD' => 'required|integer|min:0',
                 'SW_CURS_AREA_COD' => 'required|integer|min:0',
                 'SW_CURS_RESP_COD' => 'required|integer|min:0',
-                'SW_CURS_DIRIGIDO_COD' => 'required|integer|min:0',
+                'SW_CURS_DIRIGIDO_COD' => 'required|integer|in:0,9,12',
                 'SW_CURS_SUCURSAL_COD' => 'required|integer|min:0',
                 'SW_CURS_CANT_PERIOD' => 'required|integer|min:0',
                 'SW_CURS_AV_COD' => 'required|integer|min:0',

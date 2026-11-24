@@ -197,7 +197,7 @@
                     </li>
                     <li class="flex items-start gap-2">
                         <i class="ti ti-check mt-0.5 shrink-0 text-xs text-primary"></i>
-                        <span class="text-xs leading-relaxed text-default-600">Estado: Pendiente, Aprobado o Desaprobado</span>
+                        <span class="text-xs leading-relaxed text-default-600">Estado: Aprobado, Desaprobado, Sin acceder, En curso o No matriculado</span>
                     </li>
                     <li class="flex items-start gap-2">
                         <i class="ti ti-check mt-0.5 shrink-0 text-xs text-primary"></i>
@@ -477,6 +477,20 @@
                     </select>
                 </div>
 
+                {{-- Selector de plan --}}
+                <div>
+                    <label class="text-xs font-medium text-default-700 mb-1.5 block">
+                        Plan de capacitación <span class="text-default-400 font-normal">(PCA / PCE)</span>
+                    </label>
+                    <select x-model="selectedPlan" @change="filtrarCursosPorFecha()"
+                        class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                        <option value="">Todos los planes</option>
+                        <template x-for="plan in planesDisponibles" :key="plan">
+                            <option :value="plan" x-text="plan"></option>
+                        </template>
+                    </select>
+                </div>
+
                 {{-- Rango de fechas --}}
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -507,6 +521,7 @@
                         <option value="2">Desaprobados</option>
                         <option value="3">Sin acceder</option>
                         <option value="4">En curso</option>
+                        <option value="5">No matriculado</option>
                     </select>
                 </div>
 
@@ -820,21 +835,24 @@
                                                                         'bg-green-50 text-green-700 border-green-200': persona.Estado === 'APROBADO',
                                                                         'bg-red-50 text-red-700 border-red-200': persona.Estado === 'DESAPROBADO',
                                                                         'bg-gray-50 text-gray-600 border-gray-200': persona.Estado === 'SIN ACCEDER',
-                                                                        'bg-blue-50 text-blue-700 border-blue-200': persona.Estado === 'EN CURSO'
+                                                                        'bg-blue-50 text-blue-700 border-blue-200': persona.Estado === 'EN CURSO',
+                                                                        'bg-slate-100 text-slate-600 border-slate-300': persona.Estado === 'NO MATRICULADO'
                                                                     }">
                                                                 <span class="badge-dot" :class="{
                                                                             'bg-amber-500': persona.Estado === 'PENDIENTE',
                                                                             'bg-green-500': persona.Estado === 'APROBADO',
                                                                             'bg-red-500': persona.Estado === 'DESAPROBADO',
                                                                             'bg-gray-400': persona.Estado === 'SIN ACCEDER',
-                                                                            'bg-blue-500': persona.Estado === 'EN CURSO'
+                                                                            'bg-blue-500': persona.Estado === 'EN CURSO',
+                                                                            'bg-slate-400': persona.Estado === 'NO MATRICULADO'
                                                                         }"></span>
                                                                 <i class="ti text-[11px]" :class="{
                                                                             'ti-clock': persona.Estado === 'PENDIENTE',
                                                                             'ti-circle-check': persona.Estado === 'APROBADO',
                                                                             'ti-circle-x': persona.Estado === 'DESAPROBADO',
                                                                             'ti-player-off': persona.Estado === 'SIN ACCEDER',
-                                                                            'ti-player-play': persona.Estado === 'EN CURSO'
+                                                                            'ti-player-play': persona.Estado === 'EN CURSO',
+                                                                            'ti-user-off': persona.Estado === 'NO MATRICULADO'
                                                                         }"></i>
                                                                 <span x-text="persona.Estado"></span>
                                                             </span>
@@ -1647,6 +1665,19 @@
                             </div>
                         </div>
 
+                        <div>
+                            <label class="text-xs font-medium text-default-700 mb-1 block">
+                                Plan de capacitación <span class="text-default-400 font-normal">(PCA / PCE)</span>
+                            </label>
+                            <select x-model="selectedPlan" @change="filtrarCursos()"
+                                class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                <option value="">Todos los planes</option>
+                                <template x-for="plan in planesDisponibles" :key="plan">
+                                    <option :value="plan" x-text="plan"></option>
+                                </template>
+                            </select>
+                        </div>
+
                         <div class="grid grid-cols-3 gap-3">
                             <div>
                                 <label class="text-xs font-medium text-default-700 mb-1 block">
@@ -2425,6 +2456,19 @@
                                 <input type="date" x-model="selectedFechaHasta" @change="filtrarCursos()"
                                     class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all">
                             </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-medium text-default-700 mb-1 block">
+                                Plan de capacitación <span class="text-default-400 font-normal">(PCA / PCE)</span>
+                            </label>
+                            <select x-model="selectedPlan" @change="filtrarCursos()"
+                                class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                <option value="">Todos los planes</option>
+                                <template x-for="plan in planesDisponibles" :key="plan">
+                                    <option :value="plan" x-text="plan"></option>
+                                </template>
+                            </select>
                         </div>
 
                         <div>
@@ -3240,6 +3284,19 @@
                         </div>
 
                         <div>
+                            <label class="text-xs font-medium text-default-700 mb-1 block">
+                                Plan de capacitación <span class="text-default-400 font-normal">(PCA / PCE)</span>
+                            </label>
+                            <select x-model="selectedPlan" @change="filtrarCursos()"
+                                class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                <option value="">Todos los planes</option>
+                                <template x-for="plan in planesDisponibles" :key="plan">
+                                    <option :value="plan" x-text="plan"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div>
                             <div class="relative">
                                 <input type="text" x-model="searchCurso" @input="filtrarCursos()"
                                     placeholder="Buscar capacitación por nombre..."
@@ -3695,17 +3752,17 @@
                                     </div>
                                 </div>
                                 {{-- Firma responsable --}}
-                                <div class="flex items-center gap-3">
-                                    <div x-show="!reporteData.Firma_Responsable" class="w-10 h-10 shrink-0 rounded-xl bg-default-100 flex items-center justify-center">
+                                <div class="flex items-center gap-3" x-data="{ fallo: false }">
+                                    <div x-show="!reporteData.Firma_Responsable || fallo" class="w-10 h-10 shrink-0 rounded-xl bg-default-100 flex items-center justify-center">
                                         <i class="ti ti-signature text-default-500 text-lg"></i>
                                     </div>
                                     <div class="min-w-0">
                                         <p class="text-[10px] font-bold uppercase tracking-wider text-default-400">Firma responsable</p>
-                                        <template x-if="reporteData.Firma_Responsable">
+                                        <template x-if="reporteData.Firma_Responsable && !fallo">
                                             <img :src="reporteData.Firma_Responsable" alt="Firma" class="h-10 object-contain"
-                                                x-on:error="$el.style.display = 'none'">
+                                                x-on:error="fallo = true">
                                         </template>
-                                        <p x-show="!reporteData.Firma_Responsable" class="text-xs text-default-400">Sin firma</p>
+                                        <p x-show="!reporteData.Firma_Responsable || fallo" class="text-xs text-default-400">SIN FIRMA</p>
                                     </div>
                                 </div>
                                 {{-- Total personal --}}
@@ -3757,18 +3814,18 @@
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white">
-                                            <template x-for="(persona, pi) in personalOrdenado" :key="pi">
+                                            <template x-for="(persona, pi) in personalOrdenado" :key="persona.DNI_Personal || pi">
                                                 <tr class="border-b border-default-100 last:border-b-0" :class="pi % 2 === 1 ? 'bg-default-50/40' : ''">
                                                     <td class="px-5 py-2.5 text-center text-default-400 text-xs font-mono" x-text="pi + 1"></td>
                                                     <td class="px-5 py-2.5 text-default-800 font-medium whitespace-nowrap" x-text="persona.Nombre_Personal"></td>
                                                     <td class="px-5 py-2.5 text-default-500 font-mono whitespace-nowrap" x-text="persona.DNI_Personal"></td>
                                                     <td class="px-5 py-2.5 text-default-600" x-text="persona.Cargo_Personal || '—'"></td>
-                                                    <td class="px-5 py-2.5 text-center">
-                                                        <template x-if="persona.Firma_Personal">
+                                                    <td class="px-5 py-2.5 text-center" x-data="{ fallo: false }">
+                                                        <template x-if="persona.Firma_Personal && !fallo">
                                                             <img :src="persona.Firma_Personal" alt="Firma" class="h-8 object-contain mx-auto"
-                                                                x-on:error="$el.style.display = 'none'">
+                                                                x-on:error="fallo = true">
                                                         </template>
-                                                        <span x-show="!persona.Firma_Personal" class="text-xs text-default-400">—</span>
+                                                        <span x-show="!persona.Firma_Personal || fallo" class="text-xs text-default-400">SIN FIRMA</span>
                                                     </td>
                                                 </tr>
                                             </template>

@@ -107,14 +107,22 @@ document.addEventListener("DOMContentLoaded", () => {
         window.dispatchEvent(new CustomEvent("subir-curso-av", { detail: { codigo: String(cod) } }));
     };
 
+    // NUEVO: Dispatcher para Eliminar curso (inhabilitar + ocultar en AV)
+    window.solicitarEliminarCursoNew = (cod) => {
+        if (!cod) return;
+        window.__pendingEliminarNew = String(cod);
+        window.dispatchEvent(new CustomEvent("open-modal-eliminar-new", { detail: { codigo: String(cod) } }));
+    };
+
     // ── BOTONES DE ACCIÓN ──
     function botonesAccionVisual(cod, tieneVigente, subidoAV) {
         const safeCod = String(cod ?? "").replace(/'/g, "\\'");
         const bloqueado = "btn btn-sm rounded bg-gray-100/50 text-gray-400 cursor-not-allowed";
         
-        // 1. Editar
-        const btnEditar = tieneVigente
-            ? `<button type="button" disabled title="No se puede editar: tiene un periodo VIGENTE activo"
+        // 1. Editar: solo antes de subir al AV. Los cursos ya subidos al AV
+        // no deben editarse desde este módulo.
+        const btnEditar = subidoAV
+            ? `<button type="button" disabled title="No se puede editar: el curso ya está subido al AV"
                 class="${bloqueado}">
                 <i class="bx bxs-edit text-base pointer-events-none"></i>
             </button>`
@@ -166,16 +174,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 <i class="bx bx-cloud-upload text-base pointer-events-none"></i>
             </button>`;
 
-        // 5. Deshabilitar
-        const btnEliminar = tieneVigente
-            ? `<button type="button" disabled title="No se puede deshabilitar: tiene un periodo VIGENTE activo"
-                class="${bloqueado}">
-                <i class="bx bx-trash text-base pointer-events-none"></i>
-            </button>`
-            : `<button type="button" title="Deshabilitar curso (próximamente)"
-                class="btn btn-sm rounded bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors">
-                <i class="bx bx-trash text-base pointer-events-none"></i>
-            </button>`;
+        // 5. Eliminar (inhabilitar en módulo + ocultar en AV)
+        const btnEliminar = `<button type="button" title="Eliminar curso" onclick="window.solicitarEliminarCursoNew('${safeCod}')"
+            class="btn btn-sm rounded bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors">
+            <i class="bx bx-trash text-base pointer-events-none"></i>
+        </button>`;
             
         return `
         <div class="flex items-center justify-center gap-1.5">
@@ -207,17 +210,27 @@ document.addEventListener("DOMContentLoaded", () => {
         langs: { "es-es": esLocale },
         initialSort: [{ column: "CURS_CREADO_FECHA", dir: "desc" }],
         rowFormatter(row) {
+            const d = row.getData() || {};
             const el = row.getElement();
-            el.style.cursor = "pointer";
-            el.setAttribute("title", "Clic para editar el curso");
-            if (row.getData()?.CURS_HABILITADO === false) {
+            const subidoAV = d.CURS_SUBIDO_AV === true;
+            el.style.cursor = subidoAV ? "default" : "pointer";
+            el.setAttribute(
+                "title",
+                subidoAV
+                    ? "Curso ya subido al AV: edición deshabilitada"
+                    : "Clic para editar el curso"
+            );
+            if (d.CURS_HABILITADO === false) {
                 el.classList.add("tabulator-row-disabled");
             }
         },
         rowClick(e, row) {
-            // Los botones de acción tienen su propio onclick; el clic en fila también abre edición
+            // Los botones de acción tienen su propio onclick; el clic en fila también abre edición.
+            // Cursos ya subidos al AV no deben editarse desde este módulo.
             if (e?.target?.closest?.("button")) return;
-            window.solicitarEdicionCursoNew(row.getData()?.CURS_COD);
+            const d = row.getData() || {};
+            if (d.CURS_SUBIDO_AV === true) return;
+            window.solicitarEdicionCursoNew(d.CURS_COD);
         },
         columns: [
             {

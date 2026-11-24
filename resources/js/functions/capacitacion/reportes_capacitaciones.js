@@ -650,6 +650,22 @@ export default document.addEventListener("alpine:init", () => {
         },
     }));
 
+    const _planesDisponibles = (cursos) => {
+        const planes = [
+            ...new Set(
+                (cursos || [])
+                    .map((c) => (c.Plan || "").trim())
+                    .filter(Boolean),
+            ),
+        ];
+        const orden = { PCA: 0, PCE: 1 };
+        return planes.sort(
+            (a, b) =>
+                (orden[a] ?? 2) - (orden[b] ?? 2) ||
+                a.localeCompare(b, "es"),
+        );
+    };
+
     const _rankEstado = (estado) => {
         const orden = {
             APROBADO: 0,
@@ -672,6 +688,7 @@ export default document.addEventListener("alpine:init", () => {
         selectedFechaFin: "",
         selectedEstado: 0,
         selectedSucursal: "",
+        selectedPlan: "",
         personalVigente: "1",
 
         cursos: [],
@@ -837,6 +854,13 @@ export default document.addEventListener("alpine:init", () => {
                     return false;
                 }
 
+                if (
+                    this.selectedPlan &&
+                    (curso.Plan || "").trim() !== this.selectedPlan
+                ) {
+                    return false;
+                }
+
                 return true;
             });
 
@@ -857,6 +881,7 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedFechaFin = "";
             this.selectedEstado = 0;
             this.selectedSucursal = "";
+            this.selectedPlan = "";
             this.personalVigente = "1";
 
             this.cursos = [...this.todosLosCursos];
@@ -884,6 +909,10 @@ export default document.addEventListener("alpine:init", () => {
             this.loadingPersonal = false;
             this.selectedCursoIndex = -1;
             this.selectedSucursalIdx = 0;
+        },
+
+        get planesDisponibles() {
+            return _planesDisponibles(this.todosLosCursos);
         },
 
         get todosCursosSeleccionados() {
@@ -3244,9 +3273,11 @@ export default document.addEventListener("alpine:init", () => {
         selectedFechaDesde: "",
         selectedFechaHasta: "",
         selectedAnio: "",
+        selectedPlan: "",
 
         sistemas: [],
         aniosDisponibles: [],
+        planesDisponibles: [],
         areas: [],
         cursos: [],
         todosLosCursos: [],
@@ -3354,6 +3385,7 @@ export default document.addEventListener("alpine:init", () => {
                     catalogs.cursos.map((c) => c.Anio_Curso).filter(Boolean),
                 ),
             ].sort((a, b) => b - a);
+            this.planesDisponibles = _planesDisponibles(catalogs.cursos);
             this.filtrarCursos();
             this.todosLosPersonales = catalogs.personales;
             const tipos = [
@@ -3552,6 +3584,11 @@ export default document.addEventListener("alpine:init", () => {
                     this.selectedAnio &&
                     c.Anio_Curso &&
                     Number(c.Anio_Curso) !== Number(this.selectedAnio)
+                )
+                    return false;
+                if (
+                    this.selectedPlan &&
+                    (c.Plan || "").trim() !== this.selectedPlan
                 )
                     return false;
                 if (this.searchCurso) {
@@ -3876,6 +3913,7 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedFechaDesde = "";
             this.selectedFechaHasta = "";
             this.selectedAnio = "";
+            this.selectedPlan = "";
             this.selectedCourseIds = [];
             this.selectedUsernames = [];
             this.importados = [];
@@ -4617,7 +4655,9 @@ export default document.addEventListener("alpine:init", () => {
         selectedFechaHasta: "",
         selectedEstado: "",
         searchCurso: "",
+        selectedPlan: "",
 
+        planesDisponibles: [],
         clientes: [],
         empresas: [],
         sucursales: [],
@@ -4682,6 +4722,7 @@ export default document.addEventListener("alpine:init", () => {
                 this.empresas = catalogs.empresas;
                 this.sucursales = catalogs.sucursales;
                 this.todosLosCursos = catalogs.cursos;
+                this.planesDisponibles = _planesDisponibles(catalogs.cursos);
                 this.filtrarCursos();
 
                 const personales = catalogs.personalesTodasEmpresas;
@@ -4842,6 +4883,11 @@ export default document.addEventListener("alpine:init", () => {
                         ).getTime() / 1000;
                     if (c.Fecha_Creacion > hastaTs) return false;
                 }
+                if (
+                    this.selectedPlan &&
+                    (c.Plan || "").trim() !== this.selectedPlan
+                )
+                    return false;
                 if (this.searchCurso) {
                     const term = this.searchCurso.toLowerCase();
                     if (!(c.Nombre || "").toLowerCase().includes(term))
@@ -5580,6 +5626,7 @@ export default document.addEventListener("alpine:init", () => {
             this.selectedFechaHasta = "";
             this.selectedEstado = "";
             this.searchCurso = "";
+            this.selectedPlan = "";
             this.selectedUsernames = [];
             this.selectedCourseIds = [];
             this.selectAllPersonal = false;
@@ -5603,6 +5650,7 @@ export default document.addEventListener("alpine:init", () => {
         fechaCreacionDesde: "",
         fechaCreacionHasta: "",
         selectedAnio: "",
+        selectedPlan: "",
         searchCurso: "",
 
         selectedSucursal: "",
@@ -5616,6 +5664,7 @@ export default document.addEventListener("alpine:init", () => {
         todosLosCursos: [],
         cursos: [],
         aniosDisponibles: [],
+        planesDisponibles: [],
         todosLosPersonales: [],
         personales: [],
         sucursales: [],
@@ -5650,6 +5699,9 @@ export default document.addEventListener("alpine:init", () => {
                         .filter(Boolean),
                 ),
             ].sort((a, b) => b - a);
+            this.planesDisponibles = _planesDisponibles(
+                this.todosLosCursos,
+            );
             this.selectedAnio = this.aniosDisponibles[0] || "";
             this.filtrarCursos();
 
@@ -5720,6 +5772,12 @@ export default document.addEventListener("alpine:init", () => {
                     this.selectedAnio &&
                     c.Anio_Curso &&
                     Number(c.Anio_Curso) !== Number(this.selectedAnio)
+                ) {
+                    return false;
+                }
+                if (
+                    this.selectedPlan &&
+                    (c.Plan || "").trim() !== this.selectedPlan
                 ) {
                     return false;
                 }
@@ -6378,6 +6436,25 @@ export default document.addEventListener("alpine:init", () => {
                         cell.width <= 0 ||
                         cell.height <= 0
                     ) {
+                        if (
+                            isFinite(cell.x) &&
+                            isFinite(cell.y) &&
+                            isFinite(cell.width) &&
+                            isFinite(cell.height) &&
+                            cell.width > 0 &&
+                            cell.height > 0
+                        ) {
+                            doc.setFont(undefined, "normal");
+                            doc.setFontSize(opts.textoFontSize ?? 7);
+                            doc.setTextColor(120, 120, 120);
+                            doc.text(
+                                "SIN FIRMA",
+                                cell.x + cell.width / 2,
+                                cell.y + cell.height / 2 + 1,
+                                { align: "center" },
+                            );
+                            doc.setTextColor(0, 0, 0);
+                        }
                         return;
                     }
                     const pad = opts.pad ?? 1;
@@ -6460,9 +6537,10 @@ export default document.addEventListener("alpine:init", () => {
                             ? `${label} (X)`
                             : `${label} (  )`;
 
+                    const dibujarBloque = (startY) => {
                     // Datos del empleador
                     doc.autoTable({
-                        startY: 49,
+                        startY: startY,
                         margin: margenContenido,
                         theme: "grid",
                         styles: {
@@ -6657,11 +6735,21 @@ export default document.addEventListener("alpine:init", () => {
                         },
                     });
 
+                    return doc.lastAutoTable.finalY;
+                    };
+
+                    const blockEndY = dibujarBloque(49);
+
                     // Listado de personal capacitado
                     doc.autoTable({
-                        startY: doc.lastAutoTable.finalY,
-                        margin: margenContenido,
+                        startY: blockEndY,
+                        margin: { ...margenContenido, top: blockEndY },
                         theme: "grid",
+                        willDrawPage: (pageData) => {
+                            if (pageData.pageNumber > 1) {
+                                dibujarBloque(49);
+                            }
+                        },
                         didDrawCell: (cellData) => {
                             if (
                                 cellData.section === "body" &&
@@ -6845,6 +6933,7 @@ export default document.addEventListener("alpine:init", () => {
             this.fechaCreacionDesde = "";
             this.fechaCreacionHasta = "";
             this.selectedAnio = "";
+            this.selectedPlan = "";
             this.searchCurso = "";
             this.selectedSucursal = "";
             this.selectedVigencia = "1";

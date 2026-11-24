@@ -45,6 +45,12 @@
                 <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
                     <div x-show="error" class="mb-4 text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-3" x-text="error"></div>
 
+                    <div x-show="informativoVigente" x-cloak
+                        class="mb-4 flex items-start gap-2.5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <i class="ti ti-info-circle text-amber-500 text-lg shrink-0 mt-0.5"></i>
+                        <p class="text-[12px] text-amber-800 font-medium" x-text="informativoVigente"></p>
+                    </div>
+
                     <div class="flex flex-col gap-4">
                         <div>
                             <label for="nediNombre" class="text-sm font-medium text-gray-800 inline-block mb-1">Nombre del curso <span class="text-red-500">*</span></label>
@@ -58,7 +64,7 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label for="nediCategoria" class="text-sm font-medium text-gray-800 inline-block mb-1">Tipo del curso <span class="text-red-500">*</span></label>
+                                <label for="nediCategoria" class="text-sm font-medium text-gray-800 inline-block mb-1">Tipo del curso</label>
                                 <select id="nediCategoria" x-model="categoria"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione…</option>
@@ -70,7 +76,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label for="nediResponsable" class="text-sm font-medium text-gray-800 inline-block mb-1">Responsable <span class="text-red-500">*</span></label>
+                                <label for="nediResponsable" class="text-sm font-medium text-gray-800 inline-block mb-1">Responsable</label>
                                 <select id="nediResponsable" x-model="codResponsable"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione responsable…</option>
@@ -89,7 +95,7 @@
                             <input id="nediPeriodico" type="checkbox" x-model="esPeriodico" @click.stop class="form-switch scale-110 cursor-pointer">
                         </div>
                         <div x-show="esPeriodico" x-transition>
-                            <label for="nediFrecuencia" class="text-sm font-medium text-gray-800 inline-block mb-1">Frecuencia <span class="text-red-500">*</span></label>
+                            <label for="nediFrecuencia" class="text-sm font-medium text-gray-800 inline-block mb-1">Frecuencia</label>
                             <select id="nediFrecuencia" x-model="frecuencia"
                                 class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                 <option value="0">Seleccione la frecuencia…</option>
@@ -103,8 +109,9 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div x-show="!esPCU">
-                                <label for="nediSistema" class="text-sm font-medium text-gray-800 inline-block mb-1">Sistema de gestión <span class="text-red-500">*</span></label>
+                                <label for="nediSistema" class="text-sm font-medium text-gray-800 inline-block mb-1">Sistema de gestión</label>
                                 <select id="nediSistema" x-model="areaConocimiento"
+                                    @change="cargarAreasResponsables(areaConocimiento)"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione sistema…</option>
                                     <template x-for="o in sistemas" :key="o.codigo">
@@ -113,7 +120,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label for="nediAreaResp" class="text-sm font-medium text-gray-800 inline-block mb-1">Área responsable <span class="text-red-500">*</span></label>
+                                <label for="nediAreaResp" class="text-sm font-medium text-gray-800 inline-block mb-1">Área responsable</label>
                                 <select id="nediAreaResp" x-model="areaResponsable" :disabled="areaBloqueada"
                                     :class="areaBloqueada ? 'bg-gray-100 cursor-not-allowed text-gray-400' : 'bg-white'"
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
@@ -127,7 +134,7 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label for="nediSucursal" class="text-sm font-medium text-gray-800 inline-block mb-1">Sucursal <span class="text-red-500">*</span></label>
+                                <label for="nediSucursal" class="text-sm font-medium text-gray-800 inline-block mb-1">Sucursal</label>
                                 <select id="nediSucursal" x-model="sucursal"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione sucursal…</option>
@@ -138,7 +145,7 @@
                                 </select>
                             </div>
                             <div>
-                                <label for="nediDirigido" class="text-sm font-medium text-gray-800 inline-block mb-1">Dirigido a <span class="text-red-500">*</span></label>
+                                <label for="nediDirigido" class="text-sm font-medium text-gray-800 inline-block mb-1">Dirigido a</label>
                                 <select id="nediDirigido" x-model="dirigido"
                                     class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
                                     <option value="">Seleccione a quién va dirigido…</option>
@@ -146,6 +153,36 @@
                                         <option :value="String(o.codigo)" x-text="o.texto"></option>
                                     </template>
                                 </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-sm font-medium text-gray-800 mb-1">Plan de capacitación</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="o in planes" :key="o.codigo">
+                                        <label class="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm cursor-pointer transition-all"
+                                            :class="String(tipoCursoCodigo) === String(o.codigo) ? 'border-primary ring-1 ring-primary/30 bg-primary/5' : 'hover:bg-slate-50'">
+                                            <input type="radio" :value="String(o.codigo)" x-model="tipoCursoCodigo" @change="cambiarPlan()"
+                                                class="w-4 h-4 text-primary focus:ring-primary border-gray-300">
+                                            <span class="text-sm font-medium text-gray-700" x-text="o.descripcion || o.nombre"></span>
+                                        </label>
+                                    </template>
+                                    <p x-show="!planes.length && !cargando" class="text-xs text-default-400 mt-2">Sin planes cargados. Cierra y reabre el modal.</p>
+                                </div>
+                            </div>
+                            <div x-show="esPCU">
+                                <p class="text-sm font-bold text-blue-800 mb-1">Clientes</p>
+                                <p class="text-xs text-blue-500 mb-2">Se matriculará al personal asignado a este cliente.</p>
+                                <input type="text" x-model="busquedaCliente" placeholder="Buscar cliente…" class="w-full border border-blue-200 rounded-md px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-200">
+                                <div class="border border-blue-100 rounded-md p-2 overflow-y-auto bg-white custom-scrollbar" style="max-height: 150px;">
+                                    <template x-for="c in clientesFiltrados" :key="c.codigo">
+                                        <label class="flex items-center gap-2 p-2 rounded-md hover:bg-slate-50 cursor-pointer">
+                                            <input type="radio" :value="String(c.cod_legacy ?? c.codigo)" x-model="clienteSeleccionado" class="w-4 h-4 text-blue-600">
+                                            <span class="text-sm text-gray-700"><span class="text-xs bg-gray-200 px-1.5 py-0.5 rounded mr-1" x-text="c.codigo"></span><span x-text="c.descripcion"></span></span>
+                                        </label>
+                                    </template>
+                                    <p x-show="!clientesDisponibles.length" class="text-xs text-default-400 mt-2">Sin clientes disponibles.</p>
+                                </div>
                             </div>
                         </div>
                         <div x-show="advertenciaAudiencia" x-transition

@@ -332,6 +332,71 @@ class MoodleCursoService
     }
 
     /**
+     * Oculta el curso del Aula Virtual (Moodle) manteniendo la integridad del
+     * registro local: `visible = 0` lo retira del listado de cursos activos.
+     */
+    public function ocultarCurso(int $courseId): bool
+    {
+        if ($courseId <= 0) {
+            return true;
+        }
+
+        try {
+            $http = app()->isProduction()
+                ? Http::asForm()
+                : Http::withoutVerifying()->asForm();
+
+            $response = $http->post(
+                config('services.moodle.url') . '/webservice/rest/server.php',
+                [
+                    'wstoken' => config('services.moodle.ws_token'),
+                    'wsfunction' => 'core_course_update_courses',
+                    'moodlewsrestformat' => 'json',
+                    'courses[0][id]' => $courseId,
+                    'courses[0][visible]' => 0,
+                ]
+            );
+
+            $json = $response->json();
+
+            if (! $response->successful() || (is_array($json) && isset($json['exception']))) {
+                Log::warning('No se pudo ocultar el curso en Moodle', [
+                    'courseId' => $courseId,
+                    'status' => $response->status(),
+                    'response' => $json,
+                ]);
+
+                return false;
+            }
+
+            // Moodle devuelve 200 con `warnings` cuando la operación no se aplicó
+            // (p. ej. curso inexistente). En ese caso no debe reportarse éxito.
+            if (
+                is_array($json)
+                && isset($json['warnings'])
+                && is_array($json['warnings'])
+                && count($json['warnings']) > 0
+            ) {
+                Log::warning('Moodle no aplicó el ocultamiento del curso', [
+                    'courseId' => $courseId,
+                    'response' => $json,
+                ]);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Error al ocultar el curso en Moodle', [
+                'error' => $e->getMessage(),
+                'courseId' => $courseId,
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
      * Devuelve los participantes inscritos en un curso de Moodle.
      *
      * Consulta el estado de las inscripciones directamente en Moodle

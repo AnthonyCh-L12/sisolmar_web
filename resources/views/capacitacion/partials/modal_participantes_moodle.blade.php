@@ -84,7 +84,7 @@
             <!-- Filtros -->
             <div class="border border-default-200/60 rounded-xl bg-default-50/50 px-4 pt-2.5 pb-3 mb-4">
                 <p class="text-[11px] font-semibold text-default-400 uppercase tracking-widest mb-2">Filtros</p>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                     <div class="relative">
                         <input type="text" id="txtBuscarParticipanteMoodle" placeholder="Buscar por nombre o DNI..."
                             class="w-full h-9 pl-8 pr-8 text-xs border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
@@ -92,6 +92,18 @@
                             class="absolute right-2.5 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700 transition cursor-pointer hidden">
                             <i class="ti ti-x text-sm"></i>
                         </button>
+                    </div>
+                    <div>
+                        <select id="slcFiltroSucursalMoodle"
+                            class="w-full h-9 px-2.5 text-xs border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                            <option value="">Todas las sucursales</option>
+                        </select>
+                    </div>
+                    <div x-show="esPCA">
+                        <select id="slcFiltroClienteMoodle"
+                            class="w-full h-9 px-2.5 text-xs border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                            <option value="">Todos los clientes</option>
+                        </select>
                     </div>
                     <div>
                         <select id="slcFiltroCargoMoodle"
@@ -139,6 +151,7 @@
             codigoProgramacion: '',
             programacionTexto: '',
             total: 0,
+            esPCA: false,
 
             abrir(data) {
                 this.open = true;
@@ -153,6 +166,7 @@
                 this.codigoProgramacion = '';
                 this.programacionTexto = '';
                 this.total = 0;
+                this.esPCA = String(data?.Tipo || '').toUpperCase().includes("PCA");
 
                 const buscarEl = document.getElementById('txtBuscarParticipanteMoodle');
                 if (buscarEl) buscarEl.value = '';
@@ -162,6 +176,12 @@
                 if (cargoEl) cargoEl.value = '';
                 const tipoEl = document.getElementById('slcFiltroTipoTrabajadorMoodle');
                 if (tipoEl) tipoEl.value = '';
+                // Los filtros de sucursal/cliente se reinician en cada apertura para
+                // evitar arrastrar selecciones previas (el cliente solo aplica a PCA).
+                const sucursalEl = document.getElementById('slcFiltroSucursalMoodle');
+                if (sucursalEl) sucursalEl.value = '';
+                const clienteEl = document.getElementById('slcFiltroClienteMoodle');
+                if (clienteEl) clienteEl.value = '';
 
                 if (window.cargarParticipantesMoodle) {
                     window.cargarParticipantesMoodle(this);
