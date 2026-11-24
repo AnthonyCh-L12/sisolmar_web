@@ -552,10 +552,16 @@ window.formCursoNew = function () {
             return Array.isArray(raw) ? raw : [];
         },
         get opcionesDirigido() {
-            // Misma regla que el modal original:
-            // tipo 5 -> lista fija / tipo 6 (PCU) -> según cliente / resto -> catálogo completo
+            // Registro de curso: únicamente personal de quinta categoría.
+            const soloQuintaYOtros = (ops) =>
+                (Array.isArray(ops) ? ops : []).filter((o) =>
+                    ["0", "9", "12", "OTROS"].includes(String(o?.codigo))
+                );
+
+            // Misma base por plan que el modal original, pero restringida a 5ta + Otros.
+            let opciones;
             if (this.tipoCurso == "5") {
-                return [
+                opciones = soloQuintaYOtros([
                     { codigo: "1", texto: "Todos" },
                     { codigo: "7", texto: "Personal Administrativo (Todos)" },
                     { codigo: "8", texto: "Personal Administrativo (4°)" },
@@ -564,20 +570,34 @@ window.formCursoNew = function () {
                     { codigo: "11", texto: "Personal Operativo (4°)" },
                     { codigo: "12", texto: "Personal Operativo (5°)" },
                     { codigo: "OTROS", texto: "Otros" },
-                ];
-            }
-            if (this.tipoCurso == "6") {
+                ]);
+            } else if (this.tipoCurso == "6") {
                 const cliente = (this.clientesDisponibles || []).find((c) => String(c.codigo) === String(this.clienteSeleccionado));
                 const desc = String(cliente?.descripcion || "").toLowerCase();
                 if (desc.includes("linea 2") || desc.includes("línea 2")) {
-                    return this.dirigidosBase.filter((o) => ["Todos", "PTSA", "Estaciones"].includes(o.texto));
-                }
-                if (this.clienteSeleccionado) {
+                    opciones = soloQuintaYOtros(this.dirigidosBase.filter((o) => ["Todos", "PTSA", "Estaciones"].includes(o.texto)));
+                } else if (this.clienteSeleccionado) {
                     const base = this.dirigidosBase.filter((o) => o.texto === "Todos");
-                    return [...base, { codigo: "OTROS", texto: "Otros" }];
+                    opciones = soloQuintaYOtros([...base, { codigo: "OTROS", texto: "Otros" }]);
+                } else {
+                    opciones = soloQuintaYOtros(this.dirigidosBase);
                 }
+            } else {
+                opciones = soloQuintaYOtros(this.dirigidosBase);
             }
-            return this.dirigidosBase;
+
+            if (!opciones.some((o) => ["0", "OTROS"].includes(String(o?.codigo)))) {
+                opciones = [...opciones, { codigo: "OTROS", texto: "Otros" }];
+            }
+            return opciones;
+        },
+        _normalizarDirigidoQuinta() {
+            const permitidos = new Set(
+                (this.opcionesDirigido || []).map((o) => String(o?.codigo))
+            );
+            if (this.dirigido && !permitidos.has(String(this.dirigido))) {
+                this.dirigido = "";
+            }
         },
         get clientesFiltrados() {
             if (!this.busquedaCliente) return this.clientesDisponibles;
@@ -999,15 +1019,108 @@ window.formCursoNew = function () {
                     this.areaResponsable = "";
                     this.lastSistemaId = null;
                 }
+                this._normalizarDirigidoQuinta();
+            });
+            this.$watch("clienteSeleccionado", () => {
+                this._normalizarDirigidoQuinta();
             });
         },
     };
 };
 
+// ── Eliminar curso (inhabilitar en módulo + ocultar en AV) ──
+window.formEliminarCursoNew = function () {
+    return {
+        showModal: false,
+        cargando: false,
+        guardando: false,
+        error: "",
+        curso: null,
+
+        async abrir(codigo) {
+            this.error = "";
+            this.curso = null;
+            this.showModal = true;
+            window.__pendingEliminarNew = null;
+            document.body.style.overflow = "hidden";
+            this.cargando = true;
+            try {
+                const res = await axios.get(`${VITE_URL_APP}/api/obtener-curso-new/${codigo}`);
+                const curso = res?.data?.data;
+                this.curso = curso ? { ...curso } : { CURS_COD: String(codigo) };
+            } catch (e) {
+                console.error("Error abriendo eliminar curso:", e);
+                this.error = "No se pudo cargar la información del curso.";
+            } finally {
+                this.cargando = false;
+            }
+        },
+
+        cerrar() {
+            this.showModal = false;
+            document.body.style.overflow = "";
+            window.dispatchEvent(new CustomEvent("close-modal-eliminar-new"));
+        },
+
+        async confirmarEliminar() {
+            if (this.guardando || this.cargando) return;
+            const codigoCurso = this.curso?.CURS_COD || this.curso?.Codigo;
+            if (!codigoCurso) return;
+            this.guardando = true;
+            try {
+                const res = await axios.post(`${VITE_URL_APP}/api/cursos/eliminar-curso-new`, {
+                    codigo_curso: codigoCurso,
+                }, {
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(document.querySelector('meta[name="csrf-token"]')?.getAttribute("content")
+                            ? { "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") }
+                            : {}),
+                    },
+                });
+
+                if (res.data?.success) {
+                    this.cerrar();
+                    Swal.fire({
+                        toast: true,
+                        position: "top-end",
+                        showConfirmButton: false,
+                        timer: 3500,
+                        timerProgressBar: true,
+                        icon: "success",
+                        title: res.data.message || "Curso eliminado correctamente.",
+                    });
+                    if (window.tablaCursosNew) {
+                        try {
+                            await window.tablaCursosNew.setData(`${VITE_URL_APP}/api/obtener-cursos-new`);
+                        } catch {}
+                    }
+                } else {
+                    Swal.fire("Error", res.data?.message || "No se pudo eliminar el curso.", "error");
+                }
+            } catch (err) {
+                console.error("Error eliminando curso:", err);
+                Swal.fire("Error", err.response?.data?.message || "Ocurrió un problema al eliminar el curso.", "error");
+            } finally {
+                this.guardando = false;
+            }
+        },
+
+        init() {
+            // El evento normal lo maneja @open-modal-eliminar-new.window en el
+            // blade; aquí solo se cubre el caso de un disparo previo a Alpine.
+            if (window.__pendingEliminarNew && !this.showModal) {
+                const c = window.__pendingEliminarNew;
+                this.abrir(c);
+            }
+        },
+    };
+};
+
 // ── Edición (modal simple, solo cursos inactivos) ──
-// Regla: VIGENTE o PENDIENTE bloquean. Solo editable si no hay programación
-// o todas están CERRADAS. Campos editables: nombre, descripción, tipo,
-// responsable, periódico, frecuencia, sistema (PCE) y área responsable.
+// Regla: se permite editar cualquier campo del curso antes de subirlo al AV.
+// Campos editables: nombre, descripción, tipo, responsable, periódico, frecuencia,
+// plan de capacitación, sucursal, dirigido, cliente (PCA) y área responsable.
 window.abrirModalEdicionNew = (cod) => {
     if (cod) window.__pendingEdicionNew = String(cod);
     const el = document.getElementById("formCursoEditNewRoot");
@@ -1040,6 +1153,7 @@ window.formCursoEditNew = function () {
         planNombre: "—",
         tipoCursoCodigo: "",
         estadoProg: "",
+        informativoVigente: "",
         // editables
         nombre: "",
         descripcion: "",
@@ -1055,16 +1169,21 @@ window.formCursoEditNew = function () {
         codMoodleArea: "",
         dirigido: "",
         sucursal: "",
+        clienteSeleccionado: "",
         sucursalesDisponibles: [],
         tieneProgramaciones: false,
         subidoAV: false,
         lastSistemaId: null,
+        planes: [],
+        clientesDisponibles: [],
+        busquedaCliente: "",
         _original: {},
 
         get esPCU() {
             return String(this.tipoCursoCodigo) === "6";
         },
         get opcionesDirigidoEdit() {
+            const permitidos = new Set(["0", "9", "12", "OTROS"]);
             let ops;
             if (String(this.tipoCursoCodigo) === "5") {
                 ops = [
@@ -1082,9 +1201,17 @@ window.formCursoEditNew = function () {
                 ops = raw.map((o) => ({ codigo: String(o.codigo), texto: o.texto }));
                 if (!ops.some((o) => o.codigo === "0")) ops.push({ codigo: "0", texto: "Otros" });
             }
-            // Garantizar que el valor actual se pueda mostrar aunque no esté en el catálogo
-            if (this.dirigido && !ops.some((o) => o.codigo === String(this.dirigido))) {
-                ops = [...ops, { codigo: String(this.dirigido), texto: `Código ${this.dirigido}` }];
+
+            // Registro/edición: solo quinta categoría + Otros.
+            ops = ops.filter((o) => permitidos.has(String(o?.codigo)));
+
+            if (!ops.some((o) => ["0", "OTROS"].includes(String(o?.codigo)))) {
+                ops = [...ops, { codigo: "0", texto: "Otros" }];
+            }
+
+            // Preservar valor actual legado para no dejar el campo vacío en cursos antiguos.
+            if (this.dirigido && !ops.some((o) => String(o.codigo) === String(this.dirigido))) {
+                ops = [...ops, { codigo: String(this.dirigido), texto: `Código ${this.dirigido} (actual)` }];
             }
             return ops;
         },
@@ -1102,22 +1229,80 @@ window.formCursoEditNew = function () {
         get areaBloqueada() {
             return !this.esPCU && !this.areaConocimiento;
         },
+        get clientesFiltrados() {
+            const list = Array.isArray(this.clientesDisponibles) ? this.clientesDisponibles : [];
+            if (!this.busquedaCliente) return list;
+            const s = this.busquedaCliente.toLowerCase();
+            return list.filter(
+                (c) =>
+                    String(c?.descripcion || "").toLowerCase().includes(s) ||
+                    String(c?.codigo || "").toLowerCase().includes(s) ||
+                    String(c?.cod_legacy || "").toLowerCase().includes(s)
+            );
+        },
         get formularioCompleto() {
             if (!this.nombre.trim() || !this.categoria || !this.codResponsable || !this.areaResponsable) return false;
-            if (!this.esPCU && !this.areaConocimiento) return false;
+            if (this.esPCU) {
+                if (!this.tipoCursoCodigo) return false;
+            } else if (!this.areaConocimiento) {
+                return false;
+            }
             if (this.esPeriodico && !this.frecuencia) return false;
             if (this.dirigido === "" || this.sucursal === "") return false;
+            if (this.esPCU && !this.clienteSeleccionado) return false;
             return true;
         },
         get hayCambios() {
             const o = this._original || {};
-            return ["nombre", "descripcion", "categoria", "codResponsable", "esPeriodico", "frecuencia", "areaConocimiento", "areaResponsable", "dirigido", "sucursal"]
+            return ["nombre", "descripcion", "categoria", "codResponsable", "esPeriodico", "frecuencia", "areaConocimiento", "areaResponsable", "dirigido", "sucursal", "tipoCursoCodigo", "cliente"]
                 .some((k) => String(this[k] ?? "") !== String(o[k] ?? ""));
         },
         get tituloBoton() {
             if (!this.formularioCompleto) return "Completa los campos obligatorios (*)";
             if (!this.hayCambios) return "Sin cambios por guardar";
             return "";
+        },
+
+        async cambiarPlan() {
+            // Al cambiar el plan de capacitación se recarga el catálogo de clientes
+            // (solo aplica para planes PCA) y se recarga el área responsable según
+            // el catálogo del plan elegido, para no guardar un área inválida.
+            this.areaResponsable = "";
+            this.codMoodleArea = "";
+
+            if (String(this.tipoCursoCodigo) === "6") {
+                this.clientesDisponibles = [];
+                this.clienteSeleccionado = "";
+                this.lastSistemaId = null;
+                try {
+                    const [cliRes, areasRes] = await Promise.all([
+                        axios.get(`${VITE_URL_APP}/api/get-clientes-pac`).catch(() => null),
+                        axios.get(`${VITE_URL_APP}/api/obtener-areas`).catch(() => null),
+                    ]);
+
+                    const rawClientes = cliRes?.data || [];
+                    this.clientesDisponibles = rawClientes.map((c) => ({
+                        codigo: String(c.codigo ?? ""),
+                        cod_legacy: String(c.cod_legacy ?? c.codigo ?? ""),
+                        descripcion: c.descripcion ?? c.Abreviatura ?? c.nombre ?? "",
+                    }));
+
+                    this.areasResponsables = areasRes?.data?.success
+                        ? (areasRes.data.areas || [])
+                        : [];
+                } catch (e) {
+                    console.error("Error cargando catálogos del plan PCA:", e);
+                    this.areasResponsables = [];
+                }
+            } else {
+                this.clientesDisponibles = [];
+                this.clienteSeleccionado = "";
+                if (this.areaConocimiento) {
+                    await this.cargarAreasResponsables(this.areaConocimiento, true);
+                } else {
+                    this.areasResponsables = [];
+                }
+            }
         },
 
         async abrir(cod) {
@@ -1142,23 +1327,21 @@ window.formCursoEditNew = function () {
                 if (!cursoRes?.data?.success || !curso) {
                     throw new Error("No se pudo cargar el curso.");
                 }
-                // ── Regla de negocio: bloquear VIGENTE / PENDIENTE ──
+                // ── Regla de negocio: edición libre antes de subir al AV ──
+                // Se permite editar cualquier campo del curso (nombre, descripción,
+                // tipo, responsable, periodicidad, frecuencia, plan, sucursal,
+                // dirigido, cliente para PCA, etc.) antes de subirlo al Aula Virtual.
                 const progs = curso.CURS_PROGRAMACIONES || [];
                 const hasVigente = curso.CURS_TIENE_VIGENTE === true;
                 const hasPendiente = curso.CURS_TIENE_PENDIENTE === true;
-                if (hasVigente || hasPendiente) {
-                    this.showModal = false;
-                    document.body.style.overflow = "";
-                    Swal.fire(
-                        "No se puede editar",
-                        hasVigente
-                            ? "El curso tiene una programación VIGENTE (aperturado). Solo se editan cursos inactivos."
-                            : "El curso tiene una programación PENDIENTE. Solo se editan cursos inactivos (solo CERRADOS o sin programación).",
-                        "warning"
-                    );
-                    return;
-                }
                 this.estadoProg = progs.length === 0 ? "Sin programación" : "Solo programaciones cerradas";
+                if (hasVigente || hasPendiente) {
+                    // El curso ya tiene programaciones activas; se informa pero se
+                    // mantiene habilitado el flujo de edición de cualquier campo.
+                    this.informativoVigente = hasVigente
+                        ? "El curso tiene una programación VIGENTE (aperturada). Algunos cambios solo aplicarán a futuras matrículas."
+                        : "El curso tiene una programación PENDIENTE. Algunos cambios solo aplicarán a futuras matrículas.";
+                }
 
                 // ── Combos ──
                 if (sistRes?.data) {
@@ -1166,6 +1349,21 @@ window.formCursoEditNew = function () {
                     this.sistemas = arr.map((a) => ({ codigo: a.codigo, descripcion: a.abreviatura || a.descripcion }));
                 }
                 if (jefRes?.data) this.personalJefaturas = jefRes.data.personal || [];
+
+                // ── Plan de capacitación (catálogo) ──
+                try {
+                    const tiposRes = await axios.get(`${VITE_URL_APP}/api/get-capacitacion-tipo-cursos`);
+                    const planesRaw = Array.isArray(tiposRes?.data)
+                        ? tiposRes.data
+                        : (Array.isArray(tiposRes) ? tiposRes : []);
+                    this.planes = planesRaw.map((p) => ({
+                        codigo: String(p.codigo ?? p.Codigo ?? ""),
+                        nombre: p.nombre ?? p.Nombre ?? "",
+                        descripcion: p.descripcion ?? p.Abreviatura ?? p.nombre ?? "",
+                    }));
+                } catch (e) {
+                    console.error("Error cargando planes del modal de edición:", e);
+                }
 
                 // ── Datos del curso (claves CURS_ de la API nueva) ──
                 this.codigoPk = curso.CURS_PK ? String(curso.CURS_PK) : "";
@@ -1208,8 +1406,39 @@ window.formCursoEditNew = function () {
                     this.sucursalesDisponibles = [...this.sucursalesDisponibles, { codigo: this.sucursal, nombre: `Sucursal ${this.sucursal}` }];
                 }
                 this.dirigido = curso.CURS_DIRIGIDO_A != null ? String(curso.CURS_DIRIGIDO_A) : "";
+                this.clienteSeleccionado = curso.CURS_CLIENTE_COD ? String(curso.CURS_CLIENTE_COD) : "";
                 this.tieneProgramaciones = progs.length > 0;
                 this.subidoAV = !!curso.CURS_AV_COD;
+                if (this.subidoAV) {
+                    this.showModal = false;
+                    document.body.style.overflow = "";
+                    Swal.fire(
+                        "No se puede editar",
+                        "El curso ya está subido al Aula Virtual y no puede ser editado desde este módulo.",
+                        "warning"
+                    );
+                    return;
+                }
+
+                // Clientes disponibles para planes PCA
+                this.clientesDisponibles = [];
+                this.busquedaCliente = "";
+                if (String(this.tipoCursoCodigo) === "6") {
+                    try {
+                        const cliRes = await axios.get(`${VITE_URL_APP}/api/get-clientes-pac`);
+                        const rawClientes = cliRes?.data || [];
+                        this.clientesDisponibles = rawClientes.map((c) => ({
+                            codigo: String(c.codigo ?? ""),
+                            cod_legacy: String(c.cod_legacy ?? c.codigo ?? ""),
+                            descripcion: c.descripcion ?? c.Abreviatura ?? c.nombre ?? "",
+                        }));
+                        if (curso?.CURS_CLIENTE_COD) {
+                            this.clienteSeleccionado = String(curso.CURS_CLIENTE_COD);
+                        }
+                    } catch (e) {
+                        console.error("Error cargando clientes del plan PCA:", e);
+                    }
+                }
 
                 this._original = {
                     nombre: this.nombre,
@@ -1221,7 +1450,9 @@ window.formCursoEditNew = function () {
                     areaConocimiento: this.areaConocimiento,
                     areaResponsable: this.areaResponsable,
                     codMoodleArea: this.codMoodleArea,
+                    tipoCursoCodigo: this.tipoCursoCodigo,
                     dirigido: this.dirigido,
+                    cliente: this.clienteSeleccionado,
                     sucursal: this.sucursal
                 };
             } catch (e) {
@@ -1280,6 +1511,8 @@ window.formCursoEditNew = function () {
             if (changed("sucursal"))       fd.append("SW_CURS_SUCURSAL_COD", String(toInt(this.sucursal)));
             if (changed("esPeriodico")) fd.append("SW_CURS_PERIODICIDAD", this.esPeriodico ? 1 : 0);
             if (changed("frecuencia")) fd.append("SW_CURS_CANT_PERIOD", toInt(this.frecuencia));
+            if (changed("tipoCursoCodigo")) fd.append("SW_CURS_PLAN_CAPAC_COD", String(this.tipoCursoCodigo));
+            if (changed("cliente")) fd.append("SW_CURS_CLIENTE_COD", String(this.clienteSeleccionado || ""));
             
             this.guardando = true;
             try {

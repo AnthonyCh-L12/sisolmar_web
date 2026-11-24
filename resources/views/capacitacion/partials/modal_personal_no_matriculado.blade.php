@@ -102,11 +102,23 @@
             <!-- Filtros -->
             <div class="border border-default-200/60 rounded-xl bg-default-50/50 px-4 pt-2.5 pb-3 mb-4">
                 <p class="text-[11px] font-semibold text-default-400 uppercase tracking-widest mb-2">Filtros</p>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                     <div class="relative">
                         <input type="text" id="txtBuscarPersonalNoMatriculado"
                             placeholder="Buscar por nombre, DNI o código..."
                             class="w-full h-9 pl-8 pr-8 text-xs border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                    </div>
+                    <div>
+                        <select id="slcFiltroSucursalNoMatriculado"
+                            class="w-full h-9 px-2.5 text-xs border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                            <option value="">Todas las sucursales</option>
+                        </select>
+                    </div>
+                    <div x-show="esPCA">
+                        <select id="slcFiltroClienteNoMatriculado"
+                            class="w-full h-9 px-2.5 text-xs border border-default-200 rounded-lg bg-white text-default-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
+                            <option value="">Todos los clientes</option>
+                        </select>
                     </div>
                     <div>
                         <select id="slcFiltroCargoNoMatriculado"
@@ -207,6 +219,7 @@
             totalPendientes: 0,
             totalInscritos: 0,
             seleccionados: [],
+            esPCA: false,
             notificarCorreo: false,
             correoNotificacion: '',
 
@@ -229,6 +242,7 @@
                 this.totalPendientes = 0;
                 this.totalInscritos = 0;
                 this.seleccionados = [];
+                this.esPCA = String(data?.Tipo || '').toUpperCase().includes("PCA");
                 this.notificarCorreo = false;
                 this.correoNotificacion = '';
 
@@ -251,6 +265,10 @@
             limpiarFiltros() {
                 const buscarEl = document.getElementById('txtBuscarPersonalNoMatriculado');
                 if (buscarEl) buscarEl.value = '';
+                const sucEl = document.getElementById('slcFiltroSucursalNoMatriculado');
+                if (sucEl) sucEl.value = '';
+                const cliEl = document.getElementById('slcFiltroClienteNoMatriculado');
+                if (cliEl) cliEl.value = '';
                 const cargoEl = document.getElementById('slcFiltroCargoNoMatriculado');
                 if (cargoEl) cargoEl.value = '';
                 const tipoEl = document.getElementById('slcFiltroTipoNoMatriculado');

@@ -577,6 +577,95 @@
         </div>
     </div>
 </div>
+
+    {{-- Modal: eliminar curso (inhabilitar en módulo + ocultar en AV) --}}
+    <div id="modalEliminarCursoNew" class="contents">
+        <div x-data="formEliminarCursoNew()" id="formEliminarCursoNewRoot" x-init="init()"
+            @open-modal-eliminar-new.window="abrir($event.detail.codigo)" @close-modal-eliminar-new.window="showModal = false">
+
+            <div x-show="showModal" x-cloak class="fixed inset-0 z-[120] flex items-center justify-center p-4"
+                x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                style="background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(4px);">
+
+                <div class="relative flex flex-col shadow-2xl rounded-2xl overflow-hidden w-full max-w-lg border border-default-200 bg-white max-h-[90vh]">
+                    <div class="px-6 py-5 border-b border-default-100 bg-gradient-to-r from-red-50/60 via-white to-white">
+                        <div class="flex justify-between items-start gap-4">
+                            <div class="flex items-start gap-3">
+                                <div class="w-11 h-11 rounded-xl bg-red-500/10 text-red-600 inline-flex items-center justify-center shrink-0">
+                                    <i class="ti ti-trash text-2xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-xl font-bold text-default-900">Eliminar curso</h3>
+                                    <p class="text-sm text-default-500 mt-1">El curso se desactivará en el módulo y se ocultará en el Aula Virtual.</p>
+                                </div>
+                            </div>
+                            <button type="button" @click="cerrar()"
+                                class="flex-shrink-0 w-8 h-8 inline-flex items-center justify-center rounded-lg text-default-400 hover:text-default-700 hover:bg-default-100 transition-colors">
+                                <i class="ti ti-x text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white">
+                        <div x-show="error" x-cloak
+                            class="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            <i class="ti ti-alert-circle text-lg shrink-0"></i>
+                            <span x-text="error"></span>
+                        </div>
+
+                        <div x-show="cargando" x-cloak
+                            class="mb-4 flex items-center gap-2 text-sm text-default-500">
+                            <i class="ti ti-loader-2 animate-spin text-lg"></i>
+                            <span>Cargando información del curso…</span>
+                        </div>
+
+                        <div x-show="!cargando && curso" x-cloak
+                            class="mb-4 rounded-xl border border-default-200 bg-default-50/60 px-4 py-3">
+                            <p class="text-[11px] font-semibold text-default-400 uppercase tracking-widest mb-1">Curso</p>
+                            <p class="text-sm font-semibold text-default-900" x-text="curso?.CURS_NOMBRE || '—'"></p>
+                            <p class="text-xs text-default-500 mt-0.5">
+                                <span x-text="'Código: ' + (curso?.CURS_COD || '—')"></span>
+                                <span class="mx-1">·</span>
+                                <span x-text="'Plan: ' + (curso?.CURS_PLAN_CAPAC_NOMBRE || '—')"></span>
+                            </p>
+                        </div>
+
+                        <div class="rounded-xl border border-red-200 bg-red-50/50 px-4 py-3">
+                            <div class="flex items-start gap-2">
+                                <i class="ti ti-alert-triangle text-red-500 text-lg shrink-0 mt-0.5"></i>
+                                <p class="text-sm text-red-800 font-medium">
+                                    Esta acción <span class="font-bold">no se puede deshacer</span>. El curso quedará
+                                    inhabilitado en el módulo y oculto del Aula Virtual.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="px-6 py-4 border-t border-default-100 bg-default-50/50 shrink-0">
+                        <div class="flex justify-end items-center gap-2">
+                            <button type="button" @click="cerrar()"
+                                class="h-9 px-4 inline-flex items-center bg-white border border-default-200 text-default-700 text-sm font-medium rounded-lg shadow-sm hover:bg-default-50 transition">
+                                Cancelar
+                            </button>
+                            <button type="button" @click="confirmarEliminar()" :disabled="guardando || cargando"
+                                class="h-9 px-4 inline-flex items-center gap-1.5 bg-red-500 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span x-show="!guardando" class="inline-flex items-center gap-1.5">
+                                    <i class="ti ti-trash"></i>
+                                    <span>Eliminar</span>
+                                </span>
+                                <span x-show="guardando" class="inline-flex items-center gap-1.5">
+                                    <i class="ti ti-loader-2 animate-spin"></i>
+                                    <span>Eliminando…</span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('script')

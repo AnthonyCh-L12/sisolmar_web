@@ -1069,9 +1069,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 const selTipo = document.getElementById(
                     "slcFiltroTipoTrabajadorMoodle",
                 );
+                const selSucursal = document.getElementById(
+                    "slcFiltroSucursalMoodle",
+                );
+                const selCliente = document.getElementById(
+                    "slcFiltroClienteMoodle",
+                );
 
                 let cargoKey = claveFiltro(selCargo?.value || "");
                 let tipoKey = claveFiltro(selTipo?.value || "");
+                let sucKey = claveFiltro(selSucursal?.value || "");
+                let cliKey = claveFiltro(selCliente?.value || "");
 
                 if (
                     cargoKey &&
@@ -1132,9 +1140,21 @@ document.addEventListener("DOMContentLoaded", () => {
                     construirOpcionesFiltro(dataTipos, "tipo_trabajador"),
                     "Todos los tipos de trabajador",
                 );
+                fillSelectConOpciones(
+                    "slcFiltroSucursalMoodle",
+                    construirOpcionesFiltro(participantes, "sucursal"),
+                    "Todas las sucursales",
+                );
+                fillSelectConOpciones(
+                    "slcFiltroClienteMoodle",
+                    construirOpcionesFiltro(participantes, "cliente"),
+                    "Todos los clientes",
+                );
 
                 if (selCargo) selCargo.value = cargoKey;
                 if (selTipo) selTipo.value = tipoKey;
+                if (selSucursal) selSucursal.value = sucKey;
+                if (selCliente) selCliente.value = cliKey;
             };
 
             const aplicarFiltrosParticipantes = () => {
@@ -1153,6 +1173,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     document.getElementById("slcFiltroTipoTrabajadorMoodle")
                         ?.value || "",
                 );
+                const sucKey = claveFiltro(
+                    document.getElementById("slcFiltroSucursalMoodle")?.value || "",
+                );
+                // El filtro por cliente solo aplica a cursos PCA; si el select está
+                // oculto (x-show="esPCA" en falso) se ignora para no filtrar de más.
+                const selClienteEl = document.getElementById(
+                    "slcFiltroClienteMoodle",
+                );
+                const clienteVisible =
+                    !!selClienteEl && selClienteEl.offsetParent !== null;
+                const cliKey = clienteVisible
+                    ? claveFiltro(selClienteEl.value || "")
+                    : "";
 
                 table.clearFilter();
                 table.addFilter((data) => {
@@ -1163,6 +1196,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         tipoKey &&
                         claveFiltro(data.tipo_trabajador) !== tipoKey
                     ) {
+                        return false;
+                    }
+                    if (sucKey && claveFiltro(data.sucursal) !== sucKey) {
+                        return false;
+                    }
+                    if (cliKey && claveFiltro(data.cliente) !== cliKey) {
                         return false;
                     }
                     if (term) {
@@ -1212,6 +1251,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 },
             );
+
+            [
+                "slcFiltroSucursalMoodle",
+                "slcFiltroClienteMoodle",
+            ].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.onchange = function () {
+                        aplicarFiltrosParticipantes();
+                    };
+                }
+            });
         } catch (error) {
             console.error("Error cargando participantes de Moodle", error);
             await Swal.fire({
@@ -2084,9 +2135,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 const selTipo = document.getElementById(
                     "slcFiltroTipoNoMatriculado",
                 );
+                const selSucursal = document.getElementById(
+                    "slcFiltroSucursalNoMatriculado",
+                );
+                const selCliente = document.getElementById(
+                    "slcFiltroClienteNoMatriculado",
+                );
 
                 let cargoKey = claveFiltro(selCargo?.value || "");
                 let tipoKey = claveFiltro(selTipo?.value || "");
+                let sucKey = claveFiltro(selSucursal?.value || "");
+                let cliKey = claveFiltro(selCliente?.value || "");
 
                 if (
                     cargoKey &&
@@ -2145,9 +2204,21 @@ document.addEventListener("DOMContentLoaded", () => {
                     construirOpcionesFiltro(dataTipos, "tipo_trabajador"),
                     "Todos los tipos de trabajador",
                 );
+                fillSelectConOpciones(
+                    "slcFiltroSucursalNoMatriculado",
+                    construirOpcionesFiltro(personal, "sucursal"),
+                    "Todas las sucursales",
+                );
+                fillSelectConOpciones(
+                    "slcFiltroClienteNoMatriculado",
+                    construirOpcionesFiltro(personal, "cliente"),
+                    "Todos los clientes",
+                );
 
                 if (selCargo) selCargo.value = cargoKey;
                 if (selTipo) selTipo.value = tipoKey;
+                if (selSucursal) selSucursal.value = sucKey;
+                if (selCliente) selCliente.value = cliKey;
             };
 
             const tableData = personal.map((p) => ({
@@ -2204,6 +2275,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     document.getElementById("slcFiltroTipoNoMatriculado")
                         ?.value || "",
                 );
+                const sucKey = claveFiltro(
+                    document.getElementById("slcFiltroSucursalNoMatriculado")
+                        ?.value || "",
+                );
+                // El filtro por cliente solo aplica a cursos PCA; si el select está
+                // oculto (x-show="esPCA" en falso) se ignora para no filtrar de más.
+                const selClienteEl = document.getElementById(
+                    "slcFiltroClienteNoMatriculado",
+                );
+                const clienteVisible =
+                    !!selClienteEl && selClienteEl.offsetParent !== null;
+                const cliKey = clienteVisible
+                    ? claveFiltro(selClienteEl.value || "")
+                    : "";
 
                 table.clearFilter();
                 table.addFilter((data) => {
@@ -2214,6 +2299,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         tipoKey &&
                         claveFiltro(data.tipo_trabajador) !== tipoKey
                     ) {
+                        return false;
+                    }
+                    if (sucKey && claveFiltro(data.sucursal) !== sucKey) {
+                        return false;
+                    }
+                    if (cliKey && claveFiltro(data.cliente) !== cliKey) {
                         return false;
                     }
                     if (term) {
@@ -2362,6 +2453,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (el) {
                         el.onchange = function () {
                             refrescarOpcionesFiltros();
+                            aplicarFiltros();
+                        };
+                    }
+                });
+
+                [
+                    "slcFiltroSucursalNoMatriculado",
+                    "slcFiltroClienteNoMatriculado",
+                ].forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.onchange = function () {
                             aplicarFiltros();
                         };
                     }
