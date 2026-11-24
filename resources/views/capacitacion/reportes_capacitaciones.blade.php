@@ -477,6 +477,20 @@
                     </select>
                 </div>
 
+                {{-- Selector de plan --}}
+                <div>
+                    <label class="text-xs font-medium text-default-700 mb-1.5 block">
+                        Plan de capacitación <span class="text-default-400 font-normal">(PCA / PCE)</span>
+                    </label>
+                    <select x-model="selectedPlan" @change="filtrarCursosPorFecha()"
+                        class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                        <option value="">Todos los planes</option>
+                        <template x-for="plan in planesDisponibles" :key="plan">
+                            <option :value="plan" x-text="plan"></option>
+                        </template>
+                    </select>
+                </div>
+
                 {{-- Rango de fechas --}}
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -1651,6 +1665,19 @@
                             </div>
                         </div>
 
+                        <div>
+                            <label class="text-xs font-medium text-default-700 mb-1 block">
+                                Plan de capacitación <span class="text-default-400 font-normal">(PCA / PCE)</span>
+                            </label>
+                            <select x-model="selectedPlan" @change="filtrarCursos()"
+                                class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                <option value="">Todos los planes</option>
+                                <template x-for="plan in planesDisponibles" :key="plan">
+                                    <option :value="plan" x-text="plan"></option>
+                                </template>
+                            </select>
+                        </div>
+
                         <div class="grid grid-cols-3 gap-3">
                             <div>
                                 <label class="text-xs font-medium text-default-700 mb-1 block">
@@ -2429,6 +2456,19 @@
                                 <input type="date" x-model="selectedFechaHasta" @change="filtrarCursos()"
                                     class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all">
                             </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-medium text-default-700 mb-1 block">
+                                Plan de capacitación <span class="text-default-400 font-normal">(PCA / PCE)</span>
+                            </label>
+                            <select x-model="selectedPlan" @change="filtrarCursos()"
+                                class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                <option value="">Todos los planes</option>
+                                <template x-for="plan in planesDisponibles" :key="plan">
+                                    <option :value="plan" x-text="plan"></option>
+                                </template>
+                            </select>
                         </div>
 
                         <div>
@@ -3241,6 +3281,19 @@
                                     </template>
                                 </select>
                             </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-medium text-default-700 mb-1 block">
+                                Plan de capacitación <span class="text-default-400 font-normal">(PCA / PCE)</span>
+                            </label>
+                            <select x-model="selectedPlan" @change="filtrarCursos()"
+                                class="w-full h-9 px-3 text-sm bg-white border border-default-200 rounded-lg text-default-900 placeholder-default-400 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+                                <option value="">Todos los planes</option>
+                                <template x-for="plan in planesDisponibles" :key="plan">
+                                    <option :value="plan" x-text="plan"></option>
+                                </template>
+                            </select>
                         </div>
 
                         <div>
