@@ -126,7 +126,8 @@ class ReporteCapacitacionesController extends Controller
         try {
             $courseIds = $request->courseIds ?? null;
             $sucursalId = $request->sucursalId ?? null;
-            $estadoId = $request->estadoId ?? 0;
+            $estadoId = (int) ($request->estadoId ?? 0);
+            $esNoMatriculado = $estadoId === self::ESTADO_NO_MATRICULADO;
 
             $courseIdsCsv = null;
             if (!empty($courseIds)) {
@@ -140,28 +141,38 @@ class ReporteCapacitacionesController extends Controller
                 ->keyBy(fn($p) => trim($p->NRO_DOC));
 
             if ($courseIdsCsv) {
-                $matriculados = collect(
-                    DB::connection('mysql_grupoihb')->select(
-                        'CALL grupoihb_see.SP_OBTENER_MATRICULADOS_CON_ESTADO(?, ?)',
-                        [$courseIdsCsv, (int) $estadoId]
-                    )
-                );
+                if ($esNoMatriculado) {
+                    $cursos = $this->cursosNoMatriculados(
+                        $courseIdsCsv,
+                        (array) $courseIds,
+                        $personalPorDni
+                    );
+                } else {
+                    $matriculados = collect(
+                        DB::connection('mysql_grupoihb')->select(
+                            'CALL grupoihb_see.SP_OBTENER_MATRICULADOS_CON_ESTADO(?, ?)',
+                            [$courseIdsCsv, $estadoId]
+                        )
+                    );
 
-                $cursos = $matriculados
-                    ->groupBy('course_id')
-                    ->map(function ($grupo) use ($personalPorDni) {
-                        $primero = $grupo->first();
+                    $cursos = $matriculados
+                        ->groupBy('course_id')
+                        ->map(function ($grupo) use ($personalPorDni) {
+                            $primero = $grupo->first();
 
-                        return [
-                            'Curso' => $this->nombreCursoLocal(
-                                $primero->course_id ?? null,
-                                $primero->course_name ?? null
-                            ),
-                            'Personales' => $this->mapearPersonales($grupo, $personalPorDni),
-                        ];
-                    })
-                    ->filter(fn($c) => count($c['Personales']) > 0)
-                    ->values();
+                            return [
+                                'Curso' => $this->nombreCursoLocal(
+                                    $primero->course_id ?? null,
+                                    $primero->course_name ?? null
+                                ),
+                                'Personales' => $this->mapearPersonales($grupo, $personalPorDni),
+                            ];
+                        })
+                        ->filter(fn($c) => count($c['Personales']) > 0)
+                        ->values();
+
+                    $cursos = $this->filtrarCursosPorEstado($cursos, $estadoId);
+                }
 
                 return response()->json([
                     'success' => true,
@@ -169,10 +180,18 @@ class ReporteCapacitacionesController extends Controller
                 ]);
             }
 
+            // Sin cursos seleccionados no se puede determinar el personal no matriculado.
+            if ($esNoMatriculado) {
+                return response()->json([
+                    'success' => true,
+                    'Cursos' => [],
+                ]);
+            }
+
             $todosCursos = collect(
                 DB::connection('mysql_grupoihb')->select(
                     'CALL grupoihb_see.SP_OBTENER_ESTADO_CURSOS_POR_USUARIOS(NULL, NULL, ?)',
-                    [(int) $estadoId]
+                    [$estadoId]
                 )
             );
 
@@ -188,6 +207,8 @@ class ReporteCapacitacionesController extends Controller
                     'Personales' => $this->mapearPersonales($matriculados, $personalPorDni, true),
                 ];
             })->filter(fn($c) => count($c['Personales']) > 0)->values();
+
+            $cursos = $this->filtrarCursosPorEstado($cursos, $estadoId);
 
             return response()->json([
                 'success' => true,
@@ -205,6 +226,120 @@ class ReporteCapacitacionesController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Devuelve las etiquetas de estado que corresponden al filtro numérico
+     * usado por el modal de reporte por capacitación.
+     */
+    private function estadosFiltro(int $estadoId): array
+    {
+        return match ($estadoId) {
+            1 => ['APROBADO'],
+            2 => ['DESAPROBADO'],
+            3 => ['SIN ACCEDER', 'SIN NOTA', 'PENDIENTE'],
+            4 => ['EN CURSO'],
+            default => [],
+        };
+    }
+
+    /**
+     * Deja únicamente el personal cuyo estado coincide con el estado
+     * seleccionado, para garantizar que el reporte traiga solo ese estado.
+     */
+    private function filtrarCursosPorEstado(Collection $cursos, int $estadoId): Collection
+    {
+        $estados = $this->estadosFiltro($estadoId);
+
+        if (empty($estados)) {
+            return $cursos;
+        }
+
+        return $cursos
+            ->map(function ($curso) use ($estados) {
+                $curso['Personales'] = collect($curso['Personales'] ?? [])
+                    ->filter(fn($p) => in_array(
+                        mb_strtoupper(trim((string) ($p['Estado'] ?? ''))),
+                        $estados,
+                        true
+                    ))
+                    ->values()
+                    ->all();
+
+                return $curso;
+            })
+            ->filter(fn($c) => count($c['Personales']) > 0)
+            ->values();
+    }
+
+    /**
+     * Calcula el personal NO matriculado de cada curso solicitado.
+     */
+    private function cursosNoMatriculados(
+        string $courseIdsCsv,
+        array $courseIds,
+        Collection $personalPorDni
+    ): Collection {
+        $rows = collect(
+            DB::connection('mysql_grupoihb')->select(
+                'CALL grupoihb_see.SP_OBTENER_ESTADO_CURSOS_POR_USUARIOS(?, ?, ?)',
+                [null, $courseIdsCsv, 0]
+            )
+        );
+
+        $inscritosPorCurso = [];
+        $nombresCursos = [];
+
+        foreach ($rows as $row) {
+            $courseId = (string) ($row->course_id ?? '');
+
+            if ($courseId === '') {
+                continue;
+            }
+
+            $nombresCursos[$courseId] = $this->nombreCursoLocal(
+                $row->course_id ?? null,
+                $row->course_name ?? null
+            );
+
+            foreach ((json_decode($row->usuarios, true) ?: []) as $u) {
+                $username = trim((string) ($u['username'] ?? ''));
+
+                if ($username !== '') {
+                    $inscritosPorCurso[$courseId][$username] = true;
+                }
+            }
+        }
+
+        return collect($courseIds)
+            ->map(function ($courseId) use ($inscritosPorCurso, $nombresCursos, $personalPorDni) {
+                $courseId = (string) $courseId;
+
+                $personales = $personalPorDni
+                    ->reject(fn($p) => !empty(
+                        $inscritosPorCurso[$courseId][trim((string) ($p->NRO_DOC ?? ''))]
+                    ))
+                    ->map(fn($p) => [
+                        'CodigoPers' => $p->CODI_PERS,
+                        'SucursalCodigo' => $p->SUCU_CODIGO,
+                        'NombreCompleto' => $p->NOMBRE_COMPLETO,
+                        'DNI' => $p->NRO_DOC,
+                        'Cargo' => $p->CARGO ?? 'Sin asignar',
+                        'TipoTrabajador' => TipoTrabajadorHelper::normalizar($p->TIPO_TRABAJADOR ?? ''),
+                        'Nota_Final' => null,
+                        'Estado' => 'NO MATRICULADO',
+                    ])
+                    ->values()
+                    ->all();
+
+                return [
+                    'Curso' => $nombresCursos[$courseId]
+                        ?? $this->nombreCursoLocal($courseId),
+                    'Personales' => $personales,
+                ];
+            })
+            ->filter(fn($c) => count($c['Personales']) > 0)
+            ->values();
     }
 
     public function recordPersonal(Request $request): JsonResponse

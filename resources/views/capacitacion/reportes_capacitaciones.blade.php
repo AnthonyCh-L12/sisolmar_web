@@ -197,7 +197,7 @@
                     </li>
                     <li class="flex items-start gap-2">
                         <i class="ti ti-check mt-0.5 shrink-0 text-xs text-primary"></i>
-                        <span class="text-xs leading-relaxed text-default-600">Estado: Pendiente, Aprobado o Desaprobado</span>
+                        <span class="text-xs leading-relaxed text-default-600">Estado: Aprobado, Desaprobado, Sin acceder, En curso o No matriculado</span>
                     </li>
                     <li class="flex items-start gap-2">
                         <i class="ti ti-check mt-0.5 shrink-0 text-xs text-primary"></i>
@@ -507,6 +507,7 @@
                         <option value="2">Desaprobados</option>
                         <option value="3">Sin acceder</option>
                         <option value="4">En curso</option>
+                        <option value="5">No matriculado</option>
                     </select>
                 </div>
 
@@ -820,21 +821,24 @@
                                                                         'bg-green-50 text-green-700 border-green-200': persona.Estado === 'APROBADO',
                                                                         'bg-red-50 text-red-700 border-red-200': persona.Estado === 'DESAPROBADO',
                                                                         'bg-gray-50 text-gray-600 border-gray-200': persona.Estado === 'SIN ACCEDER',
-                                                                        'bg-blue-50 text-blue-700 border-blue-200': persona.Estado === 'EN CURSO'
+                                                                        'bg-blue-50 text-blue-700 border-blue-200': persona.Estado === 'EN CURSO',
+                                                                        'bg-slate-100 text-slate-600 border-slate-300': persona.Estado === 'NO MATRICULADO'
                                                                     }">
                                                                 <span class="badge-dot" :class="{
                                                                             'bg-amber-500': persona.Estado === 'PENDIENTE',
                                                                             'bg-green-500': persona.Estado === 'APROBADO',
                                                                             'bg-red-500': persona.Estado === 'DESAPROBADO',
                                                                             'bg-gray-400': persona.Estado === 'SIN ACCEDER',
-                                                                            'bg-blue-500': persona.Estado === 'EN CURSO'
+                                                                            'bg-blue-500': persona.Estado === 'EN CURSO',
+                                                                            'bg-slate-400': persona.Estado === 'NO MATRICULADO'
                                                                         }"></span>
                                                                 <i class="ti text-[11px]" :class="{
                                                                             'ti-clock': persona.Estado === 'PENDIENTE',
                                                                             'ti-circle-check': persona.Estado === 'APROBADO',
                                                                             'ti-circle-x': persona.Estado === 'DESAPROBADO',
                                                                             'ti-player-off': persona.Estado === 'SIN ACCEDER',
-                                                                            'ti-player-play': persona.Estado === 'EN CURSO'
+                                                                            'ti-player-play': persona.Estado === 'EN CURSO',
+                                                                            'ti-user-off': persona.Estado === 'NO MATRICULADO'
                                                                         }"></i>
                                                                 <span x-text="persona.Estado"></span>
                                                             </span>
