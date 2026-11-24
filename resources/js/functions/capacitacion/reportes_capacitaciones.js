@@ -6518,9 +6518,10 @@ export default document.addEventListener("alpine:init", () => {
                             ? `${label} (X)`
                             : `${label} (  )`;
 
+                    const dibujarBloque = (startY) => {
                     // Datos del empleador
                     doc.autoTable({
-                        startY: 49,
+                        startY: startY,
                         margin: margenContenido,
                         theme: "grid",
                         styles: {
@@ -6715,11 +6716,21 @@ export default document.addEventListener("alpine:init", () => {
                         },
                     });
 
+                    return doc.lastAutoTable.finalY;
+                    };
+
+                    const blockEndY = dibujarBloque(49);
+
                     // Listado de personal capacitado
                     doc.autoTable({
-                        startY: doc.lastAutoTable.finalY,
-                        margin: margenContenido,
+                        startY: blockEndY,
+                        margin: { ...margenContenido, top: blockEndY },
                         theme: "grid",
+                        willDrawPage: (pageData) => {
+                            if (pageData.pageNumber > 1) {
+                                dibujarBloque(49);
+                            }
+                        },
                         didDrawCell: (cellData) => {
                             if (
                                 cellData.section === "body" &&
