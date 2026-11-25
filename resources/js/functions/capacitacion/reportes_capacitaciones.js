@@ -169,12 +169,96 @@ function _canvasAJpegBytes(canvas, quality) {
     });
 }
 
+function _recortarMargenesFirma(canvas) {
+    const ancho = canvas.width;
+    const alto = canvas.height;
+    if (!ancho || !alto) return canvas;
+
+    let ctx;
+    try {
+        ctx = canvas.getContext("2d");
+    } catch (e) {
+        return canvas;
+    }
+    if (!ctx) return canvas;
+
+    let imageData;
+    try {
+        imageData = ctx.getImageData(0, 0, ancho, alto);
+    } catch (e) {
+        return canvas;
+    }
+
+    const data = imageData.data;
+    const umbral = 245;
+    let minX = ancho;
+    let minY = alto;
+    let maxX = -1;
+    let maxY = -1;
+
+    for (let y = 0; y < alto; y++) {
+        const fila = y * ancho * 4;
+        for (let x = 0; x < ancho; x++) {
+            const i = fila + x * 4;
+            if (data[i + 3] < 10) continue;
+            if (
+                data[i] < umbral ||
+                data[i + 1] < umbral ||
+                data[i + 2] < umbral
+            ) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+
+    // Imagen vacía: no hay trazo que recortar.
+    if (maxX < minX || maxY < minY) return canvas;
+
+    const margen = Math.max(
+        1,
+        Math.round(Math.max(maxX - minX + 1, maxY - minY + 1) * 0.03),
+    );
+    minX = Math.max(0, minX - margen);
+    minY = Math.max(0, minY - margen);
+    maxX = Math.min(ancho - 1, maxX + margen);
+    maxY = Math.min(alto - 1, maxY + margen);
+
+    const anchoRecorte = maxX - minX + 1;
+    const altoRecorte = maxY - minY + 1;
+
+    if (anchoRecorte >= ancho && altoRecorte >= alto) return canvas;
+
+    const recortado = document.createElement("canvas");
+    recortado.width = anchoRecorte;
+    recortado.height = altoRecorte;
+    const ctxRecorte = recortado.getContext("2d");
+    if (!ctxRecorte) return canvas;
+
+    ctxRecorte.fillStyle = "#ffffff";
+    ctxRecorte.fillRect(0, 0, anchoRecorte, altoRecorte);
+    ctxRecorte.drawImage(
+        canvas,
+        minX,
+        minY,
+        anchoRecorte,
+        altoRecorte,
+        0,
+        0,
+        anchoRecorte,
+        altoRecorte,
+    );
+
+    return recortado;
+}
+
 async function _cargarFirma(url, opts = {}) {
     if (!url) return null;
 
     const maxSide = opts.maxSide || 500;
     const quality = opts.quality ?? 0.68;
-    const maxBytes = opts.maxBytes ?? 25 * 1024;
     let controller = null;
     let timeout = null;
 
@@ -198,7 +282,7 @@ async function _cargarFirma(url, opts = {}) {
         if (!respuesta.ok) return null;
 
         const original = new Uint8Array(await respuesta.arrayBuffer());
-        const { bytes, esJpeg } = _limpiarBytesJpeg(original);
+        const { bytes } = _limpiarBytesJpeg(original);
         if (bytes.length === 0) return null;
 
         const blob = new Blob([bytes], { type: "image/jpeg" });
@@ -217,26 +301,15 @@ async function _cargarFirma(url, opts = {}) {
             maxSide / Math.max(anchoOriginal, altoOriginal),
         );
 
-        // Si la firma ya es pequeña, reutilizar el JPEG original evita
-        // decodificarla y volverla a comprimir.
-        if (esJpeg && escala === 1 && bytes.length <= maxBytes) {
-            if (typeof img.close === "function") img.close();
-            return {
-                src: bytes,
-                format: "JPEG",
-                width: anchoOriginal,
-                height: altoOriginal,
-                alias,
-            };
-        }
-
         const ancho = Math.max(1, Math.round(anchoOriginal * escala));
         const alto = Math.max(1, Math.round(altoOriginal * escala));
 
-        const canvas = document.createElement("canvas");
-        canvas.width = ancho;
-        canvas.height = alto;
-        const ctx = canvas.getContext("2d");
+        // Se redibuja la firma y se recortan los márgenes blancos para
+        // aprovechar al máximo el espacio de la celda en el PDF.
+        const canvasOriginal = document.createElement("canvas");
+        canvasOriginal.width = ancho;
+        canvasOriginal.height = alto;
+        const ctx = canvasOriginal.getContext("2d");
         if (!ctx) {
             if (typeof img.close === "function") img.close();
             return null;
@@ -248,6 +321,8 @@ async function _cargarFirma(url, opts = {}) {
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, 0, 0, ancho, alto);
         if (typeof img.close === "function") img.close();
+
+        const canvas = _recortarMargenesFirma(canvasOriginal);
 
         let jpegBytes = await _canvasAJpegBytes(canvas, quality);
         if (!jpegBytes || jpegBytes.length === 0) return null;
@@ -268,8 +343,8 @@ async function _cargarFirma(url, opts = {}) {
         return {
             src: jpegBytes,
             format: "JPEG",
-            width: ancho,
-            height: alto,
+            width: canvas.width,
+            height: canvas.height,
             alias,
         };
     } catch (e) {
@@ -6716,7 +6791,7 @@ export default document.addEventListener("alpine:init", () => {
                                 { content: "FIRMA", styles: headerStyle },
                                 {
                                     content: "",
-                                    styles: { minCellHeight: 16 },
+                                    styles: { minCellHeight: 20 },
                                 },
                             ],
                             [
@@ -6792,7 +6867,7 @@ export default document.addEventListener("alpine:init", () => {
                             persona.Nombre_Personal || "",
                             persona.DNI_Personal || "",
                             persona.Cargo_Personal || "",
-                            { content: "", styles: { minCellHeight: 10 } },
+                            { content: "", styles: { minCellHeight: 14 } },
                         ]),
                         columnStyles: {
                             0: { cellWidth: 10, halign: "center" },
