@@ -6820,6 +6820,10 @@ export default document.addEventListener("alpine:init", () => {
                         startY: blockEndY,
                         margin: { ...margenContenido, top: blockEndY },
                         theme: "grid",
+                        // Evita que una fila se parta al final de la página:
+                        // autotable genera una fila "resto" (índice -1) que
+                        // se imprimía como fila vacía en la página siguiente.
+                        rowPageBreak: "avoid",
                         willDrawPage: (pageData) => {
                             if (pageData.pageNumber > 1) {
                                 dibujarBloque(49);
@@ -6833,11 +6837,12 @@ export default document.addEventListener("alpine:init", () => {
                                 const persona = (data.Personal || [])[
                                     cellData.row.index
                                 ];
+                                // Las filas "resto" (-1) no corresponden a
+                                // ninguna persona: no dibujar "SIN FIRMA".
+                                if (!persona) return;
                                 dibujarFirmaEnCelda(
                                     doc,
-                                    persona
-                                        ? personalFirmas[persona.DNI_Personal]
-                                        : null,
+                                    personalFirmas[persona.DNI_Personal],
                                     cellData.cell,
                                 );
                             }
