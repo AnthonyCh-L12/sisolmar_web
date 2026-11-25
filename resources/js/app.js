@@ -32,39 +32,86 @@ class App {
 
     initSidenav() {
         var self = this;
-        var pageUrl = window.location.href.split(/[?#]/)[0];
-        document
-            .querySelectorAll("ul.admin-menu .menu-item a")
-            .forEach((element) => {
-                if (element.href === pageUrl) {
-                    element.classList.add("active");
 
-                    let parentMenuItem = element.closest(".menu-item");
-                    parentMenuItem.classList.add("active");
+        // Normaliza una URL a solo su ruta, sin query, hash ni barra final.
+        function normalizePath(value) {
+            try {
+                const url = new URL(value, window.location.origin);
+                const path = decodeURIComponent(url.pathname).replace(
+                    /\/+$/,
+                    "",
+                );
+                return path === "" ? "/" : path;
+            } catch (_) {
+                return "";
+            }
+        }
 
-                    let parentMenu =
-                        element.parentElement.parentElement.parentElement
-                            .parentElement;
-                    if (
-                        parentMenu &&
-                        parentMenu.classList.contains("menu-item")
-                    ) {
-                        const collapseElement = parentMenu.querySelector(
-                            ".hs-accordion-toggle",
-                        );
+        const currentPath = normalizePath(
+            window.location.href.split(/[?#]/)[0],
+        );
 
-                        if (collapseElement) {
-                            // collapseElement.classList.add("active");
-                            collapseElement.classList.add("open");
-                            parentMenu.classList.add("active");
-                            const nextE = collapseElement.nextElementSibling;
-                            if (nextE) {
-                                nextE.classList.remove("hidden");
-                            }
-                        }
-                    }
+        const menuLinks = Array.from(
+            document.querySelectorAll("ul.admin-menu .menu-item a[href]"),
+        ).filter((link) => {
+            const href = link.getAttribute("href") || "";
+            return href !== "" && !href.startsWith("javascript:");
+        });
+
+        // Coincidencia exacta; si la vista actual es de tercer nivel
+        // (modulo/vista/subvista) se usa la ruta más específica que la contenga.
+        const exactMatch = menuLinks.find(
+            (link) => normalizePath(link.href) === currentPath,
+        );
+        const prefixMatches = menuLinks
+            .filter((link) => {
+                const linkPath = normalizePath(link.href);
+                return linkPath !== "/" && currentPath.startsWith(linkPath + "/");
+            })
+            .sort(
+                (a, b) =>
+                    normalizePath(b.href).length - normalizePath(a.href).length,
+            );
+
+        const activeLinks = exactMatch ? [exactMatch] : prefixMatches.slice(0, 1);
+
+        activeLinks.forEach((element) => {
+            element.classList.add("active");
+
+            const parentMenuItem = element.closest(".menu-item");
+            if (parentMenuItem) {
+                parentMenuItem.classList.add("active");
+            }
+
+            // Abre TODOS los acordeones padre (grupo > módulo). Antes solo se
+            // abría el nivel inmediato, por lo que al navegar el grupo quedaba
+            // cerrado. Se usa la clase `active` que espera Preline y no `open`.
+            let accordion = element.closest(".hs-accordion");
+            while (accordion) {
+                accordion.classList.add("active");
+
+                const toggle = accordion.querySelector(
+                    ":scope > .hs-accordion-toggle",
+                );
+                const content = accordion.querySelector(
+                    ":scope > .hs-accordion-content",
+                );
+
+                if (toggle) {
+                    toggle.setAttribute("aria-expanded", "true");
                 }
-            });
+
+                if (content) {
+                    content.classList.remove("hidden");
+                    content.style.display = "block";
+                    content.style.height = "";
+                }
+
+                accordion = accordion.parentElement
+                    ? accordion.parentElement.closest(".hs-accordion")
+                    : null;
+            }
+        });
 
         setTimeout(function () {
             var activatedItem = document.querySelector(

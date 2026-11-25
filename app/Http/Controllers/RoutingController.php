@@ -10,6 +10,7 @@ use App\Http\Controllers\CapacitacionController;
 use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\ActualizacionesDjController;
+use App\Http\Controllers\SolicitudVacacionesController;
 
 class RoutingController extends Controller
 {
@@ -83,6 +84,9 @@ class RoutingController extends Controller
             ],
             'maestros' => [
                 'usuarios' => [UsuarioController::class, 'index'],
+            ],
+            'rrhh' => [
+            'Solicitud' => [SolicitudVacacionesController::class, 'index'],
             ],
         ];
 

@@ -34,7 +34,7 @@ class FileControl extends Model
 
     public static function getDocsXPersona($codPersonal = '1', $usuario = '0')
     {
-        return DB::select('EXEC SW_LISTAR_FOLIOS_X_PERSONAL ?, ?', [$codPersonal, $usuario]);
+        return DB::select('EXEC dbo.folios_por_personal_jhordan ?, ?', [$codPersonal, $usuario]);
     }
 
     public static function getClientes()
@@ -473,6 +473,19 @@ class FileControl extends Model
   }
 
     public static function getRutaFolio($codFolio){
+        if ((int) $codFolio === 65) {
+            return ['CERTIFICADOS/CURRICULUM_VITAE'];
+        }
+
+        if ((int) $codFolio === 81) {
+            $rutaVacuna = DB::table('si_solm.dbo.SISO_PARAMETRO')
+                ->where('PARA_LEGAJO', 'LEG90')
+                ->where('PARA_VIGENCIA', 'S')
+                ->value('PARA_VALOR');
+
+            return $rutaVacuna ? [trim($rutaVacuna)] : [];
+        }
+
         $resultados = DB::select('EXEC SW_RUTA_ARCHIVO_FOLIO ?', [$codFolio]);
 
         if (!$resultados || count($resultados) === 0) {

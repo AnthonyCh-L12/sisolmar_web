@@ -291,6 +291,33 @@ class PlanesCapacitacionNewController extends Controller
     }
 
     /**
+     * Entrega los PDFs oficiales de los planes (PCE/PCA) desde storage/public.
+     *
+     * Se sirven a través de Laravel para evitar bloqueos (403) del servidor web
+     * al acceder directamente a /pdfs/*. Solo se permite una lista blanca.
+     */
+    public function obtenerPdfPlan(string $tipo)
+    {
+        $archivos = [
+            'pce-oficial-2026' => 'PCE OFICIAL 2026.pdf',
+            'pca-cosco' => 'PCA_COSCO.pdf',
+            'pca-mll2' => 'PCA_MLL2.pdf',
+        ];
+
+        abort_unless(isset($archivos[$tipo]), 404);
+
+        $nombre = $archivos[$tipo];
+        $ruta = public_path('pdfs/' . $nombre);
+
+        abort_unless(is_file($ruta), 404, 'El archivo PDF no se encuentra en el servidor.');
+
+        return response()->file($ruta, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $nombre . '"',
+        ]);
+    }
+
+    /**
      * Programaciones habilitadas (opcionalmente de un año) agrupadas por curso.
      *
      * @param  array<int, int|string>  $codigosCurso

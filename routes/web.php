@@ -24,6 +24,9 @@ use App\Http\Controllers\UsuarioController;
 use App\Mail\AlertaCaducidadMail;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
+use App\Http\Controllers\SolicitudVacacionesController;
+
 
 Route::get('/login', [LoginController::class, 'index'])->name('login');
 
@@ -99,6 +102,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/get-cargos-erp', [FileController::class, 'getCargosErp']);
         Route::get('/get-coincidencias', [FileController::class, 'getCoincidencias']);
         Route::get('/get-documentos/{personalId}', [FileController::class, 'getDocumentosXPersonal']);
+        Route::get('/cv-personal/{codPersonal}', [FileController::class, 'getDatosCVPersonal']);
+        Route::get('/cv-certificados/{codPersonal}', [FileController::class, 'getCertificadosCvPreview']);
+        Route::get('/cv-media/{tipo}/{codPersonal}/{archivo?}', [FileController::class, 'getCvMedia'])->where('archivo', '.*');
+        Route::get('/get-folio-registrado/{codPersonal}/{codFolio}/{codRequisito}', [FileController::class, 'getFolioRegistradoPersona']);
+        Route::get('/evaluacion-postulante/personal/{codPersonal}', [FileController::class, 'getDatosEvaluacionPostulante']);
+        Route::get('/get-verificadores-domiciliarios', [FileController::class, 'getVerificadoresDomiciliarios']);
         Route::get('/get-legajos', [FileController::class, 'getLegajos']);
         Route::get('/get-clientes', [FileController::class, 'getClientes']);
         Route::get('/get-clientes-legajos', [FileController::class, 'getClientesLegajos']);
@@ -111,6 +120,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/get-folios-cliente-cargo', [FileController::class, 'getFoliosClienteCargo']);
         Route::get('/get-folios', [FileController::class, 'getFolios']);
         Route::get('/get-folios-categoria/{codCategoria}', [FileController::class, 'getFoliosPorCategoria']);
+        Route::get('/get-folios-tipo/{codTipo}', [FileController::class, 'getFoliosPorTipo']);
         Route::get('/get-folios-vigentes', [ConsultaController::class, 'getFoliosVigentes']);
         Route::get('/get-folios-pendientes', [ConsultaController::class, 'getFoliosPendientes']);
         Route::get('/folios/proximos-vencer', [ConsultaController::class, 'getFoliosProximosVencer']);
@@ -226,6 +236,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/obtener-plan-pce-new', [PlanesCapacitacionNewController::class, 'obtenerPlanPCENew']);
         Route::get('/obtener-plan-pca-new/{codCliente}', [PlanesCapacitacionNewController::class, 'obtenerPlanPCANew']);
         Route::get('/obtener-cursos-por-plan-new/{tipo_curso}', [PlanesCapacitacionNewController::class, 'obtenerCursosPorPlanNew']);
+        // Sirve los PDFs oficiales de los planes evitando el acceso directo a /public/pdfs
+        Route::get('/planes-capacitacion/pdf/{tipo}', [PlanesCapacitacionNewController::class, 'obtenerPdfPlan']);
         Route::get('/obtener-cursos-new', [NewCapacController::class, 'obtenerCursos']);
         Route::get('/obtener-cursos-matriculas-new', [NewCapacController::class, 'obtenerCursosMatriculas']);
         Route::get('/obtener-curso-new/{codigoCurso}', [NewCapacController::class, 'obtenerCurso']);
@@ -396,6 +408,17 @@ Route::middleware(['auth'])->group(function () {
     }); // fin prefix('api')
 
     Route::get('/reportes', [FileController::class, 'ViewReportes'])->name('reportes');
+
+    Route::get('/rrhh/Solicitud/personal', [SolicitudVacacionesController::class, 'getPersonalVacaciones'])
+    ->name('rrhh.solicitud.personal');
+
+    Route::get('/rrhh/Solicitud/pdf/{cab}/{det}',[SolicitudVacacionesController::class, 'generarPdf'])->name('rrhh.solicitud.pdf');
+    Route::get('/rrhh/Solicitud/detalle/{codigo}',[SolicitudVacacionesController::class, 'detalle'])->name('rrhh.solicitud.detalle');
+    Route::get('/rrhh/Solicitud/tipos-cargo', [SolicitudVacacionesController::class, 'getTiposCargoVacaciones'])->name('rrhh.solicitud.tiposCargo');
+    Route::post('rrhh/Solicitud/detalle/{codigo}/iniciar',[SolicitudVacacionesController::class, 'iniciarVacaciones'])->name('rrhh.solicitud.vacaciones.iniciar');
+    Route::post('rrhh/Solicitud/detalle/{codigo}/revertir/{cronograma}',[SolicitudVacacionesController::class, 'revertirVacaciones'])->name('rrhh.solicitud.vacaciones.revertir');
+
+
     // ─── RUTAS DE VISTAS (catchall al final) ─────────────────────────────────
     Route::group(['prefix' => '/', 'where' => ['first' => '^(?!api|\.well-known).*']], function () {
         Route::get('', [RoutingController::class, 'index'])->name('root');
