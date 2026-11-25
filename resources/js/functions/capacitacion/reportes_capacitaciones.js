@@ -6281,19 +6281,20 @@ export default document.addEventListener("alpine:init", () => {
                     paginaActual,
                     totalPaginas,
                 ) {
-                    const x0 = margenIzq;
                     const y0 = 10;
-                    // El encabezado usa el mismo ancho que la tabla de
-                    // contenido (A4 - márgenes laterales), sin invadir el
-                    // margen derecho.
-                    const anchoEncabezado =
+                    // El encabezado queda más angosto por ambos lados: se
+                    // conserva el borde derecho alineado con la tabla y se
+                    // retrasa el izquierdo la misma medida.
+                    const anchoContenido =
                         doc.internal.pageSize.getWidth() - margenIzq * 2;
-                    const widths = [
-                        29,
-                        84,
-                        44,
-                        anchoEncabezado - 29 - 84 - 44,
-                    ];
+                    const reduccionIzquierda = 10;
+                    const x0 = margenIzq + reduccionIzquierda;
+                    const anchoEncabezado =
+                        anchoContenido - reduccionIzquierda;
+                    const factor = anchoEncabezado / anchoContenido;
+                    const widths = [30, 83, 44, 24.8].map(
+                        (w) => w * factor,
+                    );
                     const heights = [13, 12, 10];
                     const alturaTotal = heights[0] + heights[1] + heights[2];
                     const colX = [
