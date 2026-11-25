@@ -6283,7 +6283,17 @@ export default document.addEventListener("alpine:init", () => {
                 ) {
                     const x0 = margenIzq;
                     const y0 = 10;
-                    const widths = [30, 85, 45, 25];
+                    // El encabezado usa el mismo ancho que la tabla de
+                    // contenido (A4 - márgenes laterales), sin invadir el
+                    // margen derecho.
+                    const anchoEncabezado =
+                        doc.internal.pageSize.getWidth() - margenIzq * 2;
+                    const widths = [
+                        29,
+                        84,
+                        44,
+                        anchoEncabezado - 29 - 84 - 44,
+                    ];
                     const heights = [13, 12, 10];
                     const alturaTotal = heights[0] + heights[1] + heights[2];
                     const colX = [
@@ -6316,7 +6326,7 @@ export default document.addEventListener("alpine:init", () => {
                         widths[1],
                         heights[0],
                         [[{ text: "SOL SECURITY S.A.C.", bold: true }]],
-                        { align: "center" },
+                        { align: "center", fontSize: 12 },
                     );
                     dibujarCelda(
                         doc,
