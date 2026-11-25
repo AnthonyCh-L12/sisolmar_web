@@ -6292,13 +6292,15 @@ export default document.addEventListener("alpine:init", () => {
                     doc.setLineWidth(0.2);
 
                     if (logoSol) {
+                        const logoW = widths[0] - 4; // 2 mm de margen a cada lado
+                        const logoH = logoW * (15 / 26); // mantiene la proporción
                         doc.addImage(
                             logoSol,
                             "PNG",
                             x0 + 2,
-                            y0 + (alturaTotal - 15) / 2,
-                            26,
-                            15,
+                            y0 + (alturaTotal - logoH) / 2,
+                            logoW,
+                            logoH,
                             "logo_sol",
                         );
                     }
@@ -6331,7 +6333,10 @@ export default document.addEventListener("alpine:init", () => {
                         y0,
                         widths[3],
                         heights[0],
-                        [[{ text: "SEXTA EDICIÓN", bold: true }]],
+                        [
+                            [{ text: "SEXTA", bold: true }],
+                            [{ text: "EDICIÓN", bold: true }],
+                        ],
                         { align: "center" },
                     );
 
