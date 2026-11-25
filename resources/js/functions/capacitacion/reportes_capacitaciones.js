@@ -6208,7 +6208,7 @@ export default document.addEventListener("alpine:init", () => {
                 ) {
                     const x0 = margenIzq;
                     const y0 = 10;
-                    const widths = [34, 66, 36, 49];
+                    const widths = [30, 85, 45, 25];
                     const heights = [13, 12, 10];
                     const alturaTotal = heights[0] + heights[1] + heights[2];
                     const colX = [
@@ -6222,15 +6222,13 @@ export default document.addEventListener("alpine:init", () => {
                     doc.setLineWidth(0.2);
 
                     if (logoSol) {
-                        const logoAncho = 26;
-                        const logoAlto = 15;
                         doc.addImage(
                             logoSol,
                             "PNG",
-                            x0 + (widths[0] - logoAncho) / 2,
-                            y0 + (alturaTotal - logoAlto) / 2,
-                            logoAncho,
-                            logoAlto,
+                            x0 + 2,
+                            y0 + (alturaTotal - 15) / 2,
+                            26,
+                            15,
                             "logo_sol",
                         );
                     }
@@ -6263,10 +6261,7 @@ export default document.addEventListener("alpine:init", () => {
                         y0,
                         widths[3],
                         heights[0],
-                        [
-                            [{ text: "SEXTA", bold: true }],
-                            [{ text: "EDICIÓN", bold: true }],
-                        ],
+                        [[{ text: "SEXTA EDICIÓN", bold: true }]],
                         { align: "center" },
                     );
 
@@ -6291,7 +6286,7 @@ export default document.addEventListener("alpine:init", () => {
                                 },
                             ],
                         ],
-                        { align: "left", fontSize: 6.8 },
+                        { align: "left" },
                     );
                     dibujarCelda(
                         doc,
@@ -6615,11 +6610,11 @@ export default document.addEventListener("alpine:init", () => {
                             ],
                         ],
                         columnStyles: {
-                            0: { cellWidth: 35 },
-                            1: { cellWidth: 26 },
-                            2: { cellWidth: 44 },
-                            3: { cellWidth: 38 },
-                            4: { cellWidth: 42 },
+                            0: { cellWidth: 33 },
+                            1: { cellWidth: 27 },
+                            2: { cellWidth: 55 },
+                            3: { cellWidth: 35 },
+                            4: { cellWidth: 35 },
                         },
                     });
 
@@ -6653,11 +6648,11 @@ export default document.addEventListener("alpine:init", () => {
                             ],
                         ],
                         columnStyles: {
-                            0: { cellWidth: 28 },
-                            1: { cellWidth: 28 },
-                            2: { cellWidth: 28 },
-                            3: { cellWidth: 28 },
-                            4: { cellWidth: 73 },
+                            0: { cellWidth: 33 },
+                            1: { cellWidth: 27 },
+                            2: { cellWidth: 30 },
+                            3: { cellWidth: 35 },
+                            4: { cellWidth: 60 },
                         },
                     });
 
@@ -6733,10 +6728,10 @@ export default document.addEventListener("alpine:init", () => {
                             ],
                         ],
                         columnStyles: {
-                            0: { cellWidth: 35 },
-                            1: { cellWidth: 86 },
-                            2: { cellWidth: 20 },
-                            3: { cellWidth: 44 },
+                            0: { cellWidth: 33 },
+                            1: { cellWidth: 92 },
+                            2: { cellWidth: 25 },
+                            3: { cellWidth: 35 },
                         },
                     });
 
@@ -6774,7 +6769,7 @@ export default document.addEventListener("alpine:init", () => {
                         },
                         styles: {
                             fontSize: 8,
-                            cellPadding: 1,
+                            cellPadding: 1.5,
                             valign: "middle",
                             textColor: [0, 0, 0],
                             lineColor: [0, 0, 0],
@@ -6797,14 +6792,14 @@ export default document.addEventListener("alpine:init", () => {
                             persona.Nombre_Personal || "",
                             persona.DNI_Personal || "",
                             persona.Cargo_Personal || "",
-                            { content: "", styles: { minCellHeight: 8 } },
+                            { content: "", styles: { minCellHeight: 10 } },
                         ]),
                         columnStyles: {
-                            0: { cellWidth: 15, halign: "center" },
-                            1: { cellWidth: 68 },
-                            2: { cellWidth: 29, halign: "center" },
-                            3: { cellWidth: 40 },
-                            4: { cellWidth: 33 },
+                            0: { cellWidth: 10, halign: "center" },
+                            1: { cellWidth: 75 },
+                            2: { cellWidth: 25, halign: "center" },
+                            3: { cellWidth: 45 },
+                            4: { cellWidth: 30 },
                         },
                     });
                 };
