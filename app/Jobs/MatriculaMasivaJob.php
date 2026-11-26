@@ -167,8 +167,8 @@ class MatriculaMasivaJob implements ShouldQueue
                     'curso_nombre'   => $curso->nombre,
                     'estado'         => 'procesando',
                     'notificar_email' => $this->notificarEmail,
-                    'updated_at'     => now(),
-                    'created_at'     => now(),
+                    'updated_at'     => $this->marcaTiempoSqlServer(),
+                    'created_at'     => $this->marcaTiempoSqlServer(),
                 ]
             );
         } catch (\Exception $e) {
@@ -234,11 +234,22 @@ class MatriculaMasivaJob implements ShouldQueue
     private function marcarSeguimiento(string $jobId, array $datos): void
     {
         try {
-            $datos['updated_at'] = now();
+            $datos['updated_at'] = $this->marcaTiempoSqlServer();
             DB::table('matricula_masiva_jobs')->where('job_id', $jobId)->update($datos);
         } catch (\Exception $e) {
             Log::warning("MatriculaMasivaJob: no se pudo actualizar el seguimiento.", ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * SQL Server interpreta las fechas 'Y-m-d H:i:s' según el DATEFORMAT de la
+     * sesión (en español, dmy) y puede lanzar "conversión de nvarchar en
+     * datetime fuera de intervalo". Se usa CONVERT con estilo 120 (ODBC
+     * canónico) para que el valor sea siempre inequívoco.
+     */
+    private function marcaTiempoSqlServer()
+    {
+        return DB::raw("CONVERT(datetime, '" . now()->format('Y-m-d H:i:s') . "', 120)");
     }
 
     private function notificarCoordinador(string $nombreCurso, array $resumen): void
@@ -578,28 +589,84 @@ class MatriculaMasivaJob implements ShouldQueue
         return $res[0]->user_id;
     }
 
+    /**
+     * Resuelve el curso de Moodle al que pertenece un curso de capacitación.
+     *
+     * `codigo_moodle` es el id real del curso en `mdl_course` y debe buscarse
+     * por `id`. Buscarlo además por `idnumber` con una comparación numérica
+     * provocaba colisiones: por ejemplo, el id 148 también coincidía con el
+     * idnumber '0148' de otro curso y la matrícula terminaba en el curso
+     * equivocado. Para cursos antiguos sin `codigo_moodle` se usa el
+     * `codigo_curso` comparando `idnumber` como texto exacto.
+     */
+    private function resolverCursoMoodle(Cursos $curso): ?object
+    {
+        $conn = DB::connection('mysql_grupoihb');
+
+        if (!empty($curso->codigo_moodle)) {
+            return $conn->table('mdl_course')
+                ->where('id', (int) $curso->codigo_moodle)
+                ->first(['id', 'idnumber', 'category']);
+        }
+
+        $ref = trim((string) $curso->codigo_curso);
+
+        if ($ref === '') {
+            return null;
+        }
+
+        return $conn->table('mdl_course')
+            ->whereRaw('CAST(idnumber AS CHAR) = ?', [$ref])
+            ->first(['id', 'idnumber', 'category']);
+    }
+
     private function matricularEnMoodle(int $moodleUserId, Cursos $curso, CursoProgramacion $prog): void
     {
-        $moodleCourseRef = $curso->codigo_moodle ?: $curso->codigo_curso;
+        $courseMoodle = $this->resolverCursoMoodle($curso);
 
-        $courseMoodle = DB::connection('mysql_grupoihb')->table('mdl_course')
-            ->where('id', $moodleCourseRef)
-            ->orWhere('idnumber', $moodleCourseRef)
-            ->first(['id', 'idnumber', 'category']);
+        if (!$courseMoodle) {
+            Log::error('MatriculaMasivaJob: no se encontró el curso en Moodle, no se matriculó.', [
+                'curso_id'       => $curso->codigo,
+                'codigo_moodle'  => $curso->codigo_moodle,
+                'codigo_curso'   => $curso->codigo_curso,
+                'moodle_user_id' => $moodleUserId,
+            ]);
 
-        $moodleCourseIdNumber = (string) ($courseMoodle ? $courseMoodle->idnumber : $moodleCourseRef);
-
-        if ($courseMoodle) {
-            $this->garantizarContextoMoodle($courseMoodle);
+            return;
         }
+
+        $moodleCourseIdNumber = trim((string) $courseMoodle->idnumber);
+
+        if ($moodleCourseIdNumber === '') {
+            Log::error('MatriculaMasivaJob: el curso de Moodle no tiene idnumber, no se matriculó.', [
+                'moodle_course_id' => $courseMoodle->id,
+                'curso_id'         => $curso->codigo,
+                'moodle_user_id'   => $moodleUserId,
+            ]);
+
+            return;
+        }
+
+        $this->garantizarContextoMoodle($courseMoodle);
 
         $fInic = Carbon::parse($prog->fecha_inicio)->format('Y-m-d H:i:s');
         $fFin  = Carbon::parse($prog->fecha_final)->format('Y-m-d H:i:s');
 
-        DB::connection('mysql_grupoihb')->select(
+        $res = DB::connection('mysql_grupoihb')->select(
             "SELECT F_Matricular_R(?, ?, ?, ?, ?) AS result",
             [$moodleUserId, $moodleCourseIdNumber, $fInic, $fFin, 5]
         );
+
+        $resultado = (int) ($res[0]->result ?? 0);
+
+        if ($resultado <= 0) {
+            Log::error('MatriculaMasivaJob: Moodle no confirmó la matrícula.', [
+                'moodle_user_id'   => $moodleUserId,
+                'moodle_course_id' => $courseMoodle->id,
+                'idnumber'         => $moodleCourseIdNumber,
+                'resultado'        => $resultado,
+            ]);
+        }
     }
 
     private function garantizarContextoMoodle(object $courseMoodle): void
@@ -663,15 +730,15 @@ class MatriculaMasivaJob implements ShouldQueue
             return;
         }
 
-        $moodleCourseRef = $curso->codigo_moodle ?: $curso->codigo_curso;
-
-        $courseMoodle = DB::connection('mysql_grupoihb')->table('mdl_course')
-            ->where('id', $moodleCourseRef)
-            ->orWhere('idnumber', $moodleCourseRef)
-            ->first(['id', 'idnumber', 'category']);
+        $courseMoodle = $this->resolverCursoMoodle($curso);
 
         if (!$courseMoodle) {
-            Log::warning("MatriculaMasivaJob: no se encontró curso Moodle ({$moodleCourseRef}) para asignar responsable.");
+            Log::warning('MatriculaMasivaJob: no se encontró curso Moodle para asignar responsable.', [
+                'curso_id'       => $curso->codigo,
+                'codigo_moodle'  => $curso->codigo_moodle,
+                'codigo_curso'   => $curso->codigo_curso,
+                'cod_responsable' => $codResponsable,
+            ]);
             return;
         }
 

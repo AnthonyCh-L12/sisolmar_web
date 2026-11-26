@@ -138,47 +138,61 @@ class DispatchMatriculaBatchJob implements ShouldQueue
                                 $fInic = Carbon::parse($prog->fecha_inicio)->format('Y-m-d H:i:s');
                                 $fFin  = Carbon::parse($prog->fecha_final)->format('Y-m-d H:i:s');
 
-                                $moodleCourseRef = $curso->codigo_moodle ?: $curso->codigo_curso;
-                                
-                                $courseMoodle = DB::connection('mysql_grupoihb')->table('mdl_course')
-                                    ->where('id', $moodleCourseRef)
-                                    ->orWhere('idnumber', $moodleCourseRef)
-                                    ->first(['id', 'idnumber', 'category']);
-                                
-                                $moodleCourseIdNumber = (string)($courseMoodle ? $courseMoodle->idnumber : $moodleCourseRef);
+                                $courseMoodle = $this->resolverCursoMoodle($curso);
 
-                                if ($courseMoodle) {
-                                    $context = DB::connection('mysql_grupoihb')->table('mdl_context')
-                                        ->where('contextlevel', 50) // 50 = Curso
-                                        ->where('instanceid', $courseMoodle->id)
-                                        ->first();
-
-                                    if (!$context) {
-                                        $categoryContext = DB::connection('mysql_grupoihb')->table('mdl_context')
-                                            ->where('contextlevel', 40)
-                                            ->where('instanceid', $courseMoodle->category)
-                                            ->first();
-
-                                        $contextId = DB::connection('mysql_grupoihb')->table('mdl_context')->insertGetId([
-                                            'contextlevel' => 50,
-                                            'instanceid'   => $courseMoodle->id,
-                                            'path'         => '',
-                                            'depth'        => 0,
-                                            'locked'       => 0
-                                        ]);
-
-                                        $path = ($categoryContext ? $categoryContext->path : '/1') . '/' . $contextId;
-                                        $depth = ($categoryContext ? $categoryContext->depth : 1) + 1;
-
-                                        DB::connection('mysql_grupoihb')->table('mdl_context')
-                                            ->where('id', $contextId)
-                                            ->update(['path' => $path, 'depth' => $depth]);
-                                            
-                                        Log::info("Contexto Moodle generado para curso ID: {$courseMoodle->id}");
-                                    }
+                                if (!$courseMoodle) {
+                                    Log::error('DispatchMatriculaBatchJob: no se encontró el curso en Moodle, no se matriculó.', [
+                                        'curso_id'       => $curso->codigo,
+                                        'codigo_moodle'  => $curso->codigo_moodle,
+                                        'codigo_curso'   => $curso->codigo_curso,
+                                        'moodle_user_id' => $moodleUserId,
+                                    ]);
+                                    $fallidos++;
+                                    continue;
                                 }
 
-                                DB::connection('mysql_grupoihb')->select(
+                                $moodleCourseIdNumber = trim((string) $courseMoodle->idnumber);
+
+                                if ($moodleCourseIdNumber === '') {
+                                    Log::error('DispatchMatriculaBatchJob: el curso de Moodle no tiene idnumber, no se matriculó.', [
+                                        'moodle_course_id' => $courseMoodle->id,
+                                        'curso_id'         => $curso->codigo,
+                                        'moodle_user_id'   => $moodleUserId,
+                                    ]);
+                                    $fallidos++;
+                                    continue;
+                                }
+
+                                $context = DB::connection('mysql_grupoihb')->table('mdl_context')
+                                    ->where('contextlevel', 50) // 50 = Curso
+                                    ->where('instanceid', $courseMoodle->id)
+                                    ->first();
+
+                                if (!$context) {
+                                    $categoryContext = DB::connection('mysql_grupoihb')->table('mdl_context')
+                                        ->where('contextlevel', 40)
+                                        ->where('instanceid', $courseMoodle->category)
+                                        ->first();
+
+                                    $contextId = DB::connection('mysql_grupoihb')->table('mdl_context')->insertGetId([
+                                        'contextlevel' => 50,
+                                        'instanceid'   => $courseMoodle->id,
+                                        'path'         => '',
+                                        'depth'        => 0,
+                                        'locked'       => 0
+                                    ]);
+
+                                    $path = ($categoryContext ? $categoryContext->path : '/1') . '/' . $contextId;
+                                    $depth = ($categoryContext ? $categoryContext->depth : 1) + 1;
+
+                                    DB::connection('mysql_grupoihb')->table('mdl_context')
+                                        ->where('id', $contextId)
+                                        ->update(['path' => $path, 'depth' => $depth]);
+
+                                    Log::info("Contexto Moodle generado para curso ID: {$courseMoodle->id}");
+                                }
+
+                                $res = DB::connection('mysql_grupoihb')->select(
                                     "SELECT F_USER_matricula2(?, ?, ?, ?, ?, ?, ?, ?, ?) AS result",
                                     [
                                         $moodleUserId, 
@@ -192,6 +206,20 @@ class DispatchMatriculaBatchJob implements ShouldQueue
                                         5
                                     ]
                                 );
+
+                                $resultado = (int) ($res[0]->result ?? 0);
+
+                                if ($resultado <= 0) {
+                                    Log::error('DispatchMatriculaBatchJob: Moodle no confirmó la matrícula.', [
+                                        'moodle_user_id'   => $moodleUserId,
+                                        'moodle_course_id' => $courseMoodle->id,
+                                        'idnumber'         => $moodleCourseIdNumber,
+                                        'resultado'        => $resultado,
+                                    ]);
+                                    $fallidos++;
+                                    continue;
+                                }
+
                                 $enviados++;
                             } else {
                                 Log::warning("Personal {$codPersonal} no tiene DNI registrado.");
@@ -225,5 +253,35 @@ class DispatchMatriculaBatchJob implements ShouldQueue
                 'trace' => $e->getTraceAsString()
             ]);
         }
+    }
+
+    /**
+     * Resuelve el curso de Moodle sin ambigüedad.
+     *
+     * `codigo_moodle` es el id real del curso en `mdl_course` y debe buscarse
+     * por `id`. Buscarlo además por `idnumber` con comparación numérica hacía
+     * que ids como 148 coincidieran con el idnumber '0148' de otro curso y la
+     * matrícula terminara en el curso equivocado. Para cursos antiguos sin
+     * `codigo_moodle` se usa el `codigo_curso` contra `idnumber` como texto.
+     */
+    private function resolverCursoMoodle(Cursos $curso): ?object
+    {
+        $conn = DB::connection('mysql_grupoihb');
+
+        if (!empty($curso->codigo_moodle)) {
+            return $conn->table('mdl_course')
+                ->where('id', (int) $curso->codigo_moodle)
+                ->first(['id', 'idnumber', 'category']);
+        }
+
+        $ref = trim((string) $curso->codigo_curso);
+
+        if ($ref === '') {
+            return null;
+        }
+
+        return $conn->table('mdl_course')
+            ->whereRaw('CAST(idnumber AS CHAR) = ?', [$ref])
+            ->first(['id', 'idnumber', 'category']);
     }
 }
