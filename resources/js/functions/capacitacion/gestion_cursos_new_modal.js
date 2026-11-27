@@ -279,26 +279,10 @@ window.formAperturaNew = function () {
         esPeriodico: true,
         fechaInicio: "",
         fechaFin: "",
-        incluirAutomatico: true,
-        matricularAutomaticamente: true,
-        notificarCorreo: false,
-        correoNotificacion: "",
 
         get fechaMinima() {
             const t = new Date();
             return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
-        },
-        get esDirigidoOtros() {
-            return String(this.dirigidoA) === "OTROS" || String(this.dirigidoA) === "0";
-        },
-        get dirigidoLabel() {
-            if (this.dirigidoNombre) return this.dirigidoNombre.toLowerCase();
-            const labels = { 1: "todo el personal", 2: "personal administrativo", 3: "personal operativo" };
-            return labels[String(this.dirigidoA)] || "";
-        },
-        get sucursalLabel() {
-            if (String(this.sucursalCodigo).toUpperCase() === "TODAS" || !this.sucursalCodigo) return "todas las sucursales";
-            return `la sucursal ${this.sucursalNombre || this.sucursalCodigo}`;
         },
         get requiereFechaFin() {
             return !this.esPeriodico || String(this.frecuencia).toUpperCase() === "PERSONALIZADO";
@@ -378,11 +362,6 @@ window.formAperturaNew = function () {
                 this.esPeriodico = curso.CURS_ES_PERIODICO !== false;
                 this.fechaInicio = this.fechaMinima;
                 this.fechaFin = "";
-                // Por defecto matricular; si es OTROS siempre será manual
-                this.matricularAutomaticamente = true;
-                this.incluirAutomatico = true;
-                this.notificarCorreo = false;
-                this.correoNotificacion = "";
             } catch (e) {
                 console.error("Error abriendo apertura:", e);
                 this.error = "No se pudo cargar la información del curso.";
@@ -415,13 +394,7 @@ window.formAperturaNew = function () {
                 Swal.fire("Atención", "Con frecuencia personalizada debe indicar la fecha de fin.", "warning");
                 return;
             }
-            const matricular = this.esDirigidoOtros ? false : !!this.matricularAutomaticamente;
-            const correoNotificacion = String(this.correoNotificacion || "").trim();
-            if (matricular && this.notificarCorreo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoNotificacion)) {
-                Swal.fire("Atención", "Ingresa un correo válido para enviar el aviso.", "warning");
-                return;
-            }
-            // Apertura con opción de matrícula automática (switch del modal)
+            // Apertura: solo crea la programación; la matrícula se gestiona en Matrículas
             this.guardando = true;
             try {
                 const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
@@ -430,10 +403,10 @@ window.formAperturaNew = function () {
                 const payload = {
                     cod_curso: this.codigoPk,
                     fecha_inicio: this.fechaInicio,
-                    incluir_automatico: matricular,
-                    matricular_automatico: matricular,
-                    notificar_email: this.notificarCorreo,
-                    correo_notificacion: matricular && this.notificarCorreo ? correoNotificacion : null,
+                    incluir_automatico: false,
+                    matricular_automatico: false,
+                    notificar_email: false,
+                    correo_notificacion: null,
                 };
                 if (this.requiereFechaFin) payload.fecha_final = this.fechaFin;
                 const res = await axios.post(`${VITE_URL_APP}/api/cursos/aperturar-curso`, payload, { headers });
@@ -446,7 +419,7 @@ window.formAperturaNew = function () {
                         timer: 3500,
                         timerProgressBar: true,
                         icon: "success",
-                        title: (res.data.message || "Curso aperturado correctamente") + (matricular && this.notificarCorreo ? ` Se enviará el resumen a ${correoNotificacion} al finalizar.` : ""),
+                        title: res.data.message || "Curso aperturado correctamente. La matrícula se gestiona en Matrículas.",
                     });
                     if (window.tablaCursosNew) {
                         try {

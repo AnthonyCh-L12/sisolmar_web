@@ -533,10 +533,24 @@
                                 <h4 class="text-sm font-bold text-default-900">Aperturar el curso</h4>
                             </div>
                             <p class="text-xs text-default-500 mt-1 leading-6">
-                                Al aperturar el curso se generará la <span
-                                    class="font-semibold text-default-700">matriculación automática</span> de los
-                                participantes según la configuración que se registró en el primer paso: sucursal y para
-                                quienes va dirigido.
+                                Al aperturar el curso se crea únicamente la <span class="font-semibold text-default-700">programación</span> con sus fechas de vigencia. No se matricula personal en este paso.
+                            </p>
+                        </div>
+                    </li>
+
+                    {{-- Paso 5 --}}
+                    <li class="relative flex gap-4">
+                        <div class="flex flex-col items-center">
+                            <span
+                                class="w-9 h-9 rounded-full bg-primary/10 text-primary inline-flex items-center justify-center shrink-0 font-bold text-sm">5</span>
+                            <span class="w-px flex-1 bg-default-200 mt-1"></span>
+                        </div>
+                        <div class="pb-1">
+                            <div class="flex items-center gap-2">
+                                <h4 class="text-sm font-bold text-default-900">Matricular al personal</h4>
+                            </div>
+                            <p class="text-xs text-default-500 mt-1 leading-6">
+                                La matrícula se realiza en el submódulo <span class="font-semibold text-default-700">Gestión de Matrículas</span>, donde podrás seleccionar y matricular de forma masiva o individual.
                             </p>
                         </div>
                     </li>
@@ -555,7 +569,7 @@
                         </div>
                         <div class="flex items-center">
                             <p class="text-sm font-bold text-success leading-6">
-                                ¡Listo! - ¡Curso subido y personal matriculado!
+                                ¡Listo! - ¡Curso aperturado y listo para matricular personal!
                             </p>
                         </div>
                     </li>

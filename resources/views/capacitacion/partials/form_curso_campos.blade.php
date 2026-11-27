@@ -244,9 +244,8 @@
                                                     <i class="bx bx-buildings mr-1"></i> Seleccionar Clientes <span
                                                         class="text-red-500">*</span>
                                                 </label>
-                                                <p class="text-xs text-blue-500 mb-3 font-medium">Se matriculará al
-                                                    personal asignado a
-                                                    estos clientes.</p>
+                                                <p class="text-xs text-blue-500 mb-3 font-medium">El curso estará dirigido
+                                                    al personal asignado a estos clientes.</p>
                                                 <div class="mb-3">
                                                     <input type="text" x-model="busquedaCliente"
                                                         placeholder="Buscar cliente..."
@@ -285,9 +284,8 @@
                                                     <i class="bx bx-category mr-1"></i> Seleccionar Áreas Operativas
                                                     <span class="text-red-500">*</span>
                                                 </label>
-                                                <p class="text-xs text-teal-500 mb-3 font-medium">Se matriculará al
-                                                    personal perteneciente
-                                                    a estas áreas.</p>
+                                                <p class="text-xs text-teal-500 mb-3 font-medium">El curso estará dirigido
+                                                    al personal perteneciente a estas áreas.</p>
                                                 <div class="mb-3">
                                                     <input type="text" x-model="busquedaAreaPCI"
                                                         placeholder="Buscar área..."

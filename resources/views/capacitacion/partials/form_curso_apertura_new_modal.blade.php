@@ -87,55 +87,21 @@
                     </div>
                     <p x-show="!fechasValidas" class="mt-3 text-xs text-default-400 font-medium">Selecciona las fechas para ver la vigencia estimada del curso.</p>
 
-                    {{-- Matrícula --}}
-                    <div class="mt-4 rounded-xl border p-4"
-                        :class="(!matricularAutomaticamente || esDirigidoOtros) ? 'bg-amber-50/50 border-amber-100' : 'bg-blue-50/50 border-blue-100'">
-                        <div class="flex items-center justify-between gap-3">
-                            <p class="text-sm font-bold" :class="(!matricularAutomaticamente || esDirigidoOtros) ? 'text-amber-800' : 'text-blue-800'"
-                                x-text="esDirigidoOtros ? 'Matrícula manual' : (matricularAutomaticamente ? 'Matrícula automática' : 'Solo programación')"></p>
-                            {{-- Switch: matricular o no automáticamente (solo si aplica) --}}
-                            <label x-show="!esDirigidoOtros" class="inline-flex items-center gap-2 cursor-pointer select-none shrink-0">
-                                <span class="text-[11px] font-bold uppercase tracking-wider"
-                                    :class="matricularAutomaticamente ? 'text-blue-700' : 'text-default-400'"
-                                    x-text="matricularAutomaticamente ? 'Matricular: Sí' : 'Matricular: No'"></span>
-                                <button type="button" role="switch" :aria-checked="matricularAutomaticamente.toString()"
-                                    @click="matricularAutomaticamente = !matricularAutomaticamente"
-                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                    :class="matricularAutomaticamente ? 'bg-primary' : 'bg-gray-300'">
-                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
-                                        :class="matricularAutomaticamente ? 'translate-x-6' : 'translate-x-1'"></span>
-                                </button>
-                                <input id="napMatricularAuto" type="checkbox" x-model="matricularAutomaticamente" class="sr-only">
-                            </label>
+                    {{-- Matrícula: se gestiona desde el submódulo de Matrículas --}}
+                    <div class="mt-4 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                                <i class="ti ti-users text-lg text-blue-600"></i>
+                            </div>
+                            <div class="text-sm">
+                                <p class="font-bold text-blue-800">Matrícula en Gestión de Matrículas</p>
+                                <p class="text-blue-700 mt-1">
+                                    Al aperturar el curso solo se crea la <strong>programación</strong>. La matrícula
+                                    del personal se realiza después en el submódulo <strong>Matrículas</strong>,
+                                    donde podrás seleccionar y matricular de forma masiva o individual.
+                                </p>
+                            </div>
                         </div>
-                        <p class="text-sm mt-1" :class="(!matricularAutomaticamente || esDirigidoOtros) ? 'text-amber-700' : 'text-blue-700'">
-                            <template x-if="!esDirigidoOtros && matricularAutomaticamente">
-                                <span>Se matriculará automáticamente a <strong x-text="dirigidoLabel"></strong> en <strong x-text="sucursalLabel"></strong>.</span>
-                            </template>
-                            <template x-if="!esDirigidoOtros && !matricularAutomaticamente">
-                                <span>Solo se creará la programación <strong>sin matrícula automática</strong>. Podrás matricular luego manualmente en <strong>Matrículas</strong> (<span x-text="sucursalLabel"></span>).</span>
-                            </template>
-                            <template x-if="esDirigidoOtros">
-                                <span>Deberás matricular manualmente al personal en <strong>Matrículas</strong> (<span x-text="sucursalLabel"></span>).</span>
-                            </template>
-                        </p>
-                    </div>
-
-                    {{-- Aviso por correo (solo tiene efecto con matrícula automática) --}}
-                    <label class="mt-4 flex items-start gap-2.5 p-3 rounded-xl border border-default-100 bg-default-50/60 select-none"
-                        :class="(!matricularAutomaticamente || esDirigidoOtros) ? 'opacity-50 pointer-events-none' : 'cursor-pointer'">
-                        <input id="napNotificar" type="checkbox" x-model="notificarCorreo" :disabled="!matricularAutomaticamente || esDirigidoOtros" class="mt-0.5 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary">
-                        <span>
-                            <span class="block text-sm font-semibold text-default-800">Avisar por correo al finalizar</span>
-                            <span class="block text-xs text-default-500 mt-0.5">Se enviará el resumen al correo que indiques cuando termine la matrícula masiva (solo si son más de 10 personas).</span>
-                        </span>
-                    </label>
-
-                    <div x-show="notificarCorreo && !esDirigidoOtros && matricularAutomaticamente" x-transition class="mt-2">
-                        <label for="napCorreoNotificacion" class="text-sm font-medium text-gray-800 inline-block mb-1">Correo para el aviso <span class="text-red-500">*</span></label>
-                        <input id="napCorreoNotificacion" type="email" x-model.trim="correoNotificacion" placeholder="tu.correo@solsecurity.pe"
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50">
-                        <p class="text-xs text-default-500 mt-1">Ingresa tu propio correo para recibir el resumen de la matrícula.</p>
                     </div>
 
                 </div>

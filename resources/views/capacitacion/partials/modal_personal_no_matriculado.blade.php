@@ -220,6 +220,7 @@
             totalInscritos: 0,
             seleccionados: [],
             esPCA: false,
+            sucursalPreferida: '',
             notificarCorreo: false,
             correoNotificacion: '',
 
@@ -243,6 +244,7 @@
                 this.totalInscritos = 0;
                 this.seleccionados = [];
                 this.esPCA = String(data?.Tipo || '').toUpperCase().includes("PCA");
+                this.sucursalPreferida = data?.Sucursal || '';
                 this.notificarCorreo = false;
                 this.correoNotificacion = '';
 

@@ -143,7 +143,7 @@
                         {{-- Clientes PCA --}}
                         <div x-show="tipoCurso == '6'" x-transition class="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
                             <p class="text-sm font-bold text-blue-800 mb-1">Clientes <span class="text-red-500">*</span></p>
-                            <p class="text-xs text-blue-500 mb-3">Se matriculará al personal asignado a este cliente.</p>
+                            <p class="text-xs text-blue-500 mb-3">El curso estará dirigido al personal asignado a este cliente.</p>
                             <input type="text" x-model="busquedaCliente" placeholder="Buscar cliente…" class="w-full border border-blue-200 rounded-md px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-200">
                             <div class="border border-blue-100 rounded-md p-2 overflow-y-auto bg-white custom-scrollbar" style="max-height: 150px;">
                                 <template x-for="c in clientesFiltrados" :key="c.codigo">

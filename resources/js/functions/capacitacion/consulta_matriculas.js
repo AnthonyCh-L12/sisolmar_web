@@ -2445,6 +2445,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 refrescarOpcionesFiltros();
 
+                // Preselecciona la sucursal configurada del curso (si existe en la lista)
+                const sucursalPref = claveFiltro(
+                    alpineComponent?.sucursalPreferida || "",
+                );
+                const selSucursalPref = document.getElementById(
+                    "slcFiltroSucursalNoMatriculado",
+                );
+                if (
+                    sucursalPref &&
+                    selSucursalPref &&
+                    [...selSucursalPref.options].some(
+                        (o) => o.value === sucursalPref,
+                    )
+                ) {
+                    selSucursalPref.value = sucursalPref;
+                    aplicarFiltros();
+                }
                 [
                     "slcFiltroCargoNoMatriculado",
                     "slcFiltroTipoNoMatriculado",

@@ -106,6 +106,7 @@ class NewCapacController extends Controller
                 ->leftJoin('sw_cursos_sistema as s', 's.codigo', '=', 'c.SW_CURS_SIST_GESTION_COD')
                 ->leftJoin('sw_cursos_area as ar', 'ar.codigo', '=', 'c.SW_CURS_AREA_COD')
                 ->leftJoin('sw_clientes as cli', 'cli.cod_legacy', '=', 'c.SW_CURS_CLIENTE_COD')
+                ->leftJoin('si_solm.dbo.SISO_SUCURSAL as suc', 'suc.SUCU_CODIGO', '=', 'c.SW_CURS_SUCURSAL_COD')
                 ->leftJoin('si_solm.dbo.PERSONAL as pr', function ($join) {
                     $join->on(
                         'pr.CODI_PERS',
@@ -122,6 +123,8 @@ class NewCapacController extends Controller
                     'c.SW_CURS_DESCRIPCION',
                     'c.SW_CURS_AV_COD',
                     'c.SW_CURS_RESP_COD',
+                    'c.SW_CURS_DIRIGIDO_COD',
+                    'suc.SUCU_ABREVIATURA as sucursal_nombre',
                     'c.fecha_creacion',
                     DB::raw("CONVERT(varchar(19), c.fecha_creacion, 120) as fecha_creacion_iso"),
                     'p.nombre as plan_nombre',
@@ -170,6 +173,10 @@ class NewCapacController extends Controller
                             ? mb_strtoupper($responsable)
                             : 'Sin responsable',
                         'Descripcion' => $row->SW_CURS_DESCRIPCION ?: 'Sin descripcion',
+                        'Sucursal' => trim((string) ($row->sucursal_nombre ?? '')) ?: null,
+                        'Dirigido' => $row->SW_CURS_DIRIGIDO_COD !== null
+                            ? (int) $row->SW_CURS_DIRIGIDO_COD
+                            : null,
                         'Total_Matriculados' => (int) $row->total_matriculados,
                         'Fecha_Creacion' => $row->fecha_creacion_iso
                             ? strtotime((string) $row->fecha_creacion_iso)

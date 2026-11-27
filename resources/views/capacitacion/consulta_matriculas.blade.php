@@ -481,6 +481,13 @@
 
     <!-- Cursos registrados -->
     <div class="rounded-2xl border border-default-200/60 bg-white shadow-sm p-6">
+        <div class="mb-4 flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
+            <i class="ti ti-info-circle text-lg text-primary shrink-0"></i>
+            <p class="text-xs leading-5 text-default-600">
+                La matrícula se gestiona <strong>solo desde este módulo</strong>. Aperturar un curso ya no matricula
+                personal: usa <strong>Matricular</strong> para seleccionar y matricular de forma masiva o individual.
+            </p>
+        </div>
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-base font-bold text-default-900">Listado de cursos disponibles</h2>
         </div>
