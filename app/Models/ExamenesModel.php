@@ -23,6 +23,8 @@ class ExamenesModel extends Model
             JOIN mdl_modules m         ON m.id = cm.module AND m.name = 'quiz'
             JOIN mdl_quiz q            ON q.id = cm.instance
             WHERE c.visible = 1
+              AND cm.visible = 1
+              AND cm.deletioninprogress = 0
             ORDER BY c.fullname, q.name
         ");
     }
