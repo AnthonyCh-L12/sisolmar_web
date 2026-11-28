@@ -544,6 +544,9 @@ import Swal from 'sweetalert2';
                 await ndj_consultarDniHijos((data.CODI_PERS || $('ndj_cod_postulante')?.value || '').trim());
             }
 
+            // Consultar si el DNI del titular ya existe (para mostrar las miniaturas)
+            await ndj_consultarDniPersonal((data.CODI_PERS || $('ndj_cod_postulante')?.value || '').trim());
+
             if (data.FOTO_PATH) {
                 const prv = $('ndj_previewFoto'), ph = $('ndj_placeholderFoto');
                 if (prv) {
@@ -684,12 +687,11 @@ import Swal from 'sweetalert2';
         if (ndj_abriendo) return;
         ndj_abriendo = true;
 
-        if (alertTipoPersonal) alertTipoPersonal.style.display = 'block';
-
         const modal = $('modalNuevaDJ');
         if (!modal) { ndj_abriendo = false; return; }
 
         ndj_reset();
+        ndj_aplicarEstadoSucursal();
 
         const necesitaCarga = !ndj_catalogoListo;
         if (necesitaCarga && typeof Swal !== 'undefined') {
@@ -796,6 +798,32 @@ import Swal from 'sweetalert2';
         const _presto = $('ndj_presto_smo');
         if (!bloquear && _lugar && _presto) {
             _lugar.disabled = _presto.value !== 'SI';
+        }
+    }
+
+    // Evalúa la sucursal actual (sin depender de que el usuario la cambie).
+    // Antes, el formulario solo se habilitaba con el evento 'change' del select;
+    // si la sucursal ya venía seleccionada por defecto (p. ej. usuarios con una
+    // sola sucursal asignada), el aviso quedaba visible y Cargo/Fecha seguían
+    // deshabilitados. Esto aplica el estado también al cargar/abrir el modal.
+    function ndj_aplicarEstadoSucursal() {
+        const sel = $('ndj_filtroSucursal');
+        const haySucursal = !!(sel && sel.value);
+
+        if (alertTipoPersonal) {
+            alertTipoPersonal.style.display = haySucursal ? 'none' : 'block';
+        }
+        ndj_bloquearCampos(!haySucursal);
+
+        // Respetar reglas propias que no dependen de la sucursal.
+        if (haySucursal) {
+            const nroDoc = $('ndj_nro_documento');
+            const tipoDoc = $('ndj_tipo_documento');
+            if (nroDoc && tipoDoc && !tipoDoc.value) nroDoc.disabled = true;
+
+            const lugar = $('ndj_lugar_smo');
+            const presto = $('ndj_presto_smo');
+            if (lugar) lugar.disabled = !presto || presto.value !== 'SI';
         }
     }
 
@@ -1288,13 +1316,64 @@ import Swal from 'sweetalert2';
     // ── DNI Anverso / Reverso: vista previa + adjunto al GUARDAR ───────────
     // Los archivos NO se suben aparte: viajan en la misma petición de guardado
     // (igual que la foto) para que el servidor pueda exigirlos antes de guardar.
-    const ndjDniFiles = { anverso: null, reverso: null };
+    const ndjDniFiles = { anverso: null, reverso: null, tieneAnverso: false, tieneReverso: false };
+    let ndjDniConsultado = '';
+
+    function ndj_codigoDni() {
+        return ($('ndj_cod_postulante')?.value || '').trim();
+    }
+
+    function ndj_renderDni(lado, prev, img) {
+        const archivo = ndjDniFiles[lado];
+        const tiene   = lado === 'anverso' ? ndjDniFiles.tieneAnverso : ndjDniFiles.tieneReverso;
+        const codi    = ndj_codigoDni();
+        const carpeta = lado === 'anverso' ? 'DNI1_1' : 'DNI2_1';
+        if (img) img.onerror = () => { if (prev) prev.style.display = 'none'; };
+        if (archivo) {
+            if (img) img.src = URL.createObjectURL(archivo);
+            if (prev) prev.style.display = 'block';
+        } else if (tiene && codi) {
+            // Igual que el DNI de los hijos: si ya está en el servidor, se muestra en pequeño
+            if (img) img.src = `http://190.116.178.163/Biblioteca_Grafica/${carpeta}/${codi}.jpg?v=${Date.now()}`;
+            if (prev) prev.style.display = 'block';
+        } else {
+            if (prev) prev.style.display = 'none';
+            if (img)  img.removeAttribute('src');
+        }
+    }
+
+    async function ndj_consultarDniPersonal(codiPers) {
+        const codi = (codiPers || ndj_codigoDni()).trim();
+        if (!codi || ndjDniConsultado === codi) return;
+        ndjDniFiles.tieneAnverso = false;
+        ndjDniFiles.tieneReverso = false;
+        try {
+            const resp = await fetch(`${VITE_URL_APP}/api/dj/get-dni-personal?codi_pers=${encodeURIComponent(codi)}`, {
+                headers: { 'Accept': 'application/json' }, credentials: 'same-origin',
+            });
+            const json = await resp.json();
+            ndjDniFiles.tieneAnverso = !!json.data?.anverso;
+            ndjDniFiles.tieneReverso = !!json.data?.reverso;
+            ndjDniConsultado = codi;
+            ndj_renderDni('anverso', $('ndj_prev_dni_anverso'), $('ndj_img_dni_anverso'));
+            ndj_renderDni('reverso', $('ndj_prev_dni_reverso'), $('ndj_img_dni_reverso'));
+        } catch (e) {
+            console.warn('[NuevaDJ] Error consultando DNI del personal:', e);
+        }
+    }
+
+    function ndj_abrirModalDni() {
+        const modalDni = $('ndj_modalDni');
+        ndj_consultarDniPersonal(ndj_codigoDni());
+        ndj_renderDni('anverso', $('ndj_prev_dni_anverso'), $('ndj_img_dni_anverso'));
+        ndj_renderDni('reverso', $('ndj_prev_dni_reverso'), $('ndj_img_dni_reverso'));
+        if (modalDni) modalDni.style.display = 'flex';
+    }
 
     function ndj_configDniInputs() {
         // Modal "Subir DNI" (abrir/cerrar)
-        const modalDni = $('ndj_modalDni');
-        $('ndj_btnSubirDni')?.addEventListener('click', () => { if (modalDni) modalDni.style.display = 'flex'; });
-        $('ndj_cerrarModalDni')?.addEventListener('click', () => { if (modalDni) modalDni.style.display = 'none'; });
+        $('ndj_btnSubirDni')?.addEventListener('click', ndj_abrirModalDni);
+        $('ndj_cerrarModalDni')?.addEventListener('click', () => { const m = $('ndj_modalDni'); if (m) m.style.display = 'none'; });
         const pares = [
             ['ndj_btnDniAnverso', 'ndj_dni_anverso', 'ndj_prev_dni_anverso', 'ndj_img_dni_anverso', 'ndj_clear_dni_anverso', 'anverso'],
             ['ndj_btnDniReverso', 'ndj_dni_reverso', 'ndj_prev_dni_reverso', 'ndj_img_dni_reverso', 'ndj_clear_dni_reverso', 'reverso'],
@@ -1307,11 +1386,11 @@ import Swal from 'sweetalert2';
                 const f = inp.files?.[0];
                 if (!f) return;
                 ndjDniFiles[lado] = f;
-                if (img)  img.src = URL.createObjectURL(f);
-                if (prev) prev.style.display = 'block';
+                ndj_renderDni(lado, prev, img);
             });
             if (clear) clear.addEventListener('click', () => {
                 ndjDniFiles[lado] = null;
+                if (lado === 'anverso') ndjDniFiles.tieneAnverso = false; else ndjDniFiles.tieneReverso = false;
                 inp.value = '';
                 if (prev) prev.style.display = 'none';
                 if (img)  img.removeAttribute('src');
@@ -1322,6 +1401,9 @@ import Swal from 'sweetalert2';
     function ndj_limpiarDni() {
         ndjDniFiles.anverso = null;
         ndjDniFiles.reverso = null;
+        ndjDniFiles.tieneAnverso = false;
+        ndjDniFiles.tieneReverso = false;
+        ndjDniConsultado = '';
         ['ndj_dni_anverso', 'ndj_dni_reverso'].forEach(id => { const i = $(id); if (i) i.value = ''; });
         ['ndj_prev_dni_anverso', 'ndj_prev_dni_reverso'].forEach(id => { const p = $(id); if (p) p.style.display = 'none'; });
         const m = $('ndj_modalDni');
@@ -2032,14 +2114,9 @@ import Swal from 'sweetalert2';
         ndj_cargarReglasEdad();
         ndj_configDniInputs();
         ndj_configDniHijos();
-        ndj_bloquearCampos(true);
-        if (alertTipoPersonal) alertTipoPersonal.style.display = 'block';
+        ndj_aplicarEstadoSucursal();
 
-        $('ndj_filtroSucursal')?.addEventListener('change', function () {
-            if (this.value && alertTipoPersonal) alertTipoPersonal.style.display = 'none';
-            else if (alertTipoPersonal)          alertTipoPersonal.style.display = 'block';
-            ndj_bloquearCampos(!this.value);
-        });
+        $('ndj_filtroSucursal')?.addEventListener('change', ndj_aplicarEstadoSucursal);
 
         // ── Validaciones de campos ────────────────────────────
 
