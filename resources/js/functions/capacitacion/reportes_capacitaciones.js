@@ -3,7 +3,12 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
 function _assetUrl(path) {
-    const env = typeof APP_ENV !== "undefined" ? APP_ENV : (typeof window !== "undefined" ? window.APP_ENV : undefined);
+    const env =
+        typeof APP_ENV !== "undefined"
+            ? APP_ENV
+            : typeof window !== "undefined"
+              ? window.APP_ENV
+              : undefined;
     // local => raíz del sitio; cualquier otro/fallback => prefijo /sisolmar (producción)
     const base = env === "local" ? "" : "/sisolmar";
     return `${base}${path}`;
@@ -60,9 +65,7 @@ function _cargarImagen(url) {
         }
         const img = new Image();
         img.onload = () =>
-            resolve(
-                img.naturalWidth > 0 && img.naturalHeight > 0 ? img : null,
-            );
+            resolve(img.naturalWidth > 0 && img.naturalHeight > 0 ? img : null);
         img.onerror = () => resolve(null);
         img.src = url;
     });
@@ -86,8 +89,7 @@ function _imagenAPngDataUrl(img) {
 function _limpiarBytesJpeg(bytes) {
     // Buscar el marcador JPEG real (FF D8 FF) y descartar basura previa.
     const jpegStart = bytes.findIndex(
-        (b, i) =>
-            b === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff,
+        (b, i) => b === 0xff && bytes[i + 1] === 0xd8 && bytes[i + 2] === 0xff,
     );
     if (jpegStart < 0) {
         return { bytes, esJpeg: false };
@@ -169,12 +171,96 @@ function _canvasAJpegBytes(canvas, quality) {
     });
 }
 
+function _recortarMargenesFirma(canvas) {
+    const ancho = canvas.width;
+    const alto = canvas.height;
+    if (!ancho || !alto) return canvas;
+
+    let ctx;
+    try {
+        ctx = canvas.getContext("2d");
+    } catch (e) {
+        return canvas;
+    }
+    if (!ctx) return canvas;
+
+    let imageData;
+    try {
+        imageData = ctx.getImageData(0, 0, ancho, alto);
+    } catch (e) {
+        return canvas;
+    }
+
+    const data = imageData.data;
+    const umbral = 245;
+    let minX = ancho;
+    let minY = alto;
+    let maxX = -1;
+    let maxY = -1;
+
+    for (let y = 0; y < alto; y++) {
+        const fila = y * ancho * 4;
+        for (let x = 0; x < ancho; x++) {
+            const i = fila + x * 4;
+            if (data[i + 3] < 10) continue;
+            if (
+                data[i] < umbral ||
+                data[i + 1] < umbral ||
+                data[i + 2] < umbral
+            ) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+
+    // Imagen vacía: no hay trazo que recortar.
+    if (maxX < minX || maxY < minY) return canvas;
+
+    const margen = Math.max(
+        1,
+        Math.round(Math.max(maxX - minX + 1, maxY - minY + 1) * 0.03),
+    );
+    minX = Math.max(0, minX - margen);
+    minY = Math.max(0, minY - margen);
+    maxX = Math.min(ancho - 1, maxX + margen);
+    maxY = Math.min(alto - 1, maxY + margen);
+
+    const anchoRecorte = maxX - minX + 1;
+    const altoRecorte = maxY - minY + 1;
+
+    if (anchoRecorte >= ancho && altoRecorte >= alto) return canvas;
+
+    const recortado = document.createElement("canvas");
+    recortado.width = anchoRecorte;
+    recortado.height = altoRecorte;
+    const ctxRecorte = recortado.getContext("2d");
+    if (!ctxRecorte) return canvas;
+
+    ctxRecorte.fillStyle = "#ffffff";
+    ctxRecorte.fillRect(0, 0, anchoRecorte, altoRecorte);
+    ctxRecorte.drawImage(
+        canvas,
+        minX,
+        minY,
+        anchoRecorte,
+        altoRecorte,
+        0,
+        0,
+        anchoRecorte,
+        altoRecorte,
+    );
+
+    return recortado;
+}
+
 async function _cargarFirma(url, opts = {}) {
     if (!url) return null;
 
     const maxSide = opts.maxSide || 500;
     const quality = opts.quality ?? 0.68;
-    const maxBytes = opts.maxBytes ?? 25 * 1024;
     let controller = null;
     let timeout = null;
 
@@ -198,7 +284,7 @@ async function _cargarFirma(url, opts = {}) {
         if (!respuesta.ok) return null;
 
         const original = new Uint8Array(await respuesta.arrayBuffer());
-        const { bytes, esJpeg } = _limpiarBytesJpeg(original);
+        const { bytes } = _limpiarBytesJpeg(original);
         if (bytes.length === 0) return null;
 
         const blob = new Blob([bytes], { type: "image/jpeg" });
@@ -217,26 +303,15 @@ async function _cargarFirma(url, opts = {}) {
             maxSide / Math.max(anchoOriginal, altoOriginal),
         );
 
-        // Si la firma ya es pequeña, reutilizar el JPEG original evita
-        // decodificarla y volverla a comprimir.
-        if (esJpeg && escala === 1 && bytes.length <= maxBytes) {
-            if (typeof img.close === "function") img.close();
-            return {
-                src: bytes,
-                format: "JPEG",
-                width: anchoOriginal,
-                height: altoOriginal,
-                alias,
-            };
-        }
-
         const ancho = Math.max(1, Math.round(anchoOriginal * escala));
         const alto = Math.max(1, Math.round(altoOriginal * escala));
 
-        const canvas = document.createElement("canvas");
-        canvas.width = ancho;
-        canvas.height = alto;
-        const ctx = canvas.getContext("2d");
+        // Se redibuja la firma y se recortan los márgenes blancos para
+        // aprovechar al máximo el espacio de la celda en el PDF.
+        const canvasOriginal = document.createElement("canvas");
+        canvasOriginal.width = ancho;
+        canvasOriginal.height = alto;
+        const ctx = canvasOriginal.getContext("2d");
         if (!ctx) {
             if (typeof img.close === "function") img.close();
             return null;
@@ -249,6 +324,8 @@ async function _cargarFirma(url, opts = {}) {
         ctx.drawImage(img, 0, 0, ancho, alto);
         if (typeof img.close === "function") img.close();
 
+        const canvas = _recortarMargenesFirma(canvasOriginal);
+
         let jpegBytes = await _canvasAJpegBytes(canvas, quality);
         if (!jpegBytes || jpegBytes.length === 0) return null;
 
@@ -256,10 +333,7 @@ async function _cargarFirma(url, opts = {}) {
         // podrían inflar el PDF; baja la calidad solo si supera el límite.
         const maxOutputBytes = opts.maxOutputBytes ?? 60 * 1024;
         let calidadAjustada = quality;
-        while (
-            jpegBytes.length > maxOutputBytes &&
-            calidadAjustada > 0.4
-        ) {
+        while (jpegBytes.length > maxOutputBytes && calidadAjustada > 0.4) {
             calidadAjustada = Math.max(0.4, calidadAjustada - 0.08);
             jpegBytes = await _canvasAJpegBytes(canvas, calidadAjustada);
             if (!jpegBytes || jpegBytes.length === 0) return null;
@@ -268,8 +342,8 @@ async function _cargarFirma(url, opts = {}) {
         return {
             src: jpegBytes,
             format: "JPEG",
-            width: ancho,
-            height: alto,
+            width: canvas.width,
+            height: canvas.height,
             alias,
         };
     } catch (e) {
@@ -661,8 +735,7 @@ export default document.addEventListener("alpine:init", () => {
         const orden = { PCA: 0, PCE: 1 };
         return planes.sort(
             (a, b) =>
-                (orden[a] ?? 2) - (orden[b] ?? 2) ||
-                a.localeCompare(b, "es"),
+                (orden[a] ?? 2) - (orden[b] ?? 2) || a.localeCompare(b, "es"),
         );
     };
 
@@ -1367,7 +1440,9 @@ export default document.addEventListener("alpine:init", () => {
 
                 const pageHeight = doc.internal.pageSize.getHeight();
 
-                const logoSol = await _cargarImagen(_assetUrl("/images/logo_sol.png"));
+                const logoSol = await _cargarImagen(
+                    _assetUrl("/images/logo_sol.png"),
+                );
 
                 const dibujarEncabezado = () => {
                     let logoBottomY = 26;
@@ -1576,8 +1651,7 @@ export default document.addEventListener("alpine:init", () => {
 
                     sucursalesCurso.forEach((sucursalGrupo, si) => {
                         if (si > 0) {
-                            nextY =
-                                (doc.lastAutoTable?.finalY || nextY) + 20;
+                            nextY = (doc.lastAutoTable?.finalY || nextY) + 20;
                         }
 
                         if (nextY > pageHeight - 22) {
@@ -2915,8 +2989,10 @@ export default document.addEventListener("alpine:init", () => {
                     const s = String(r.fecha_creacion || "");
                     const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
                     if (match) {
-                        return `${match[1]}-${match[2]}-${match[3]}` ===
-                            this.filtroFecha;
+                        return (
+                            `${match[1]}-${match[2]}-${match[3]}` ===
+                            this.filtroFecha
+                        );
                     }
                     const d = new Date(s);
                     if (isNaN(d.getTime())) return false;
@@ -2965,10 +3041,7 @@ export default document.addEventListener("alpine:init", () => {
 
         get reportesPaginados() {
             const inicio = (this.currentPage - 1) * this.perPage;
-            return this.reportesFiltrados.slice(
-                inicio,
-                inicio + this.perPage,
-            );
+            return this.reportesFiltrados.slice(inicio, inicio + this.perPage);
         },
 
         get paginasVisibles() {
@@ -3356,7 +3429,7 @@ export default document.addEventListener("alpine:init", () => {
                 start + this.personalPerPage,
             );
         },
-        
+
         cursosPaginados() {
             const start = (this.cursosPage - 1) * this.cursosPerPage;
             return this.cursos.slice(start, start + this.cursosPerPage);
@@ -3709,9 +3782,7 @@ export default document.addEventListener("alpine:init", () => {
                 this.selectedUsernames.push(dni);
             } else {
                 this.selectedUsernames.splice(idx, 1);
-                this.importados = this.importados.filter(
-                    (i) => i.dni !== dni,
-                );
+                this.importados = this.importados.filter((i) => i.dni !== dni);
             }
             this.recalcularSeleccionPersonal();
         },
@@ -4904,9 +4975,7 @@ export default document.addEventListener("alpine:init", () => {
                 this.selectedUsernames.push(dni);
             } else {
                 this.selectedUsernames.splice(idx, 1);
-                this.importados = this.importados.filter(
-                    (i) => i.dni !== dni,
-                );
+                this.importados = this.importados.filter((i) => i.dni !== dni);
             }
             this.recalcularSeleccionPersonal();
         },
@@ -5699,9 +5768,7 @@ export default document.addEventListener("alpine:init", () => {
                         .filter(Boolean),
                 ),
             ].sort((a, b) => b - a);
-            this.planesDisponibles = _planesDisponibles(
-                this.todosLosCursos,
-            );
+            this.planesDisponibles = _planesDisponibles(this.todosLosCursos);
             this.selectedAnio = this.aniosDisponibles[0] || "";
             this.filtrarCursos();
 
@@ -5933,9 +6000,7 @@ export default document.addEventListener("alpine:init", () => {
                 this.selectedPersonalDnis.push(dni);
             } else {
                 this.selectedPersonalDnis.splice(idx, 1);
-                this.importados = this.importados.filter(
-                    (i) => i.dni !== dni,
-                );
+                this.importados = this.importados.filter((i) => i.dni !== dni);
             }
             this.recalcularSeleccionPersonal();
         },
@@ -6148,7 +6213,8 @@ export default document.addEventListener("alpine:init", () => {
                 // Altura del pie que se repite en cada hoja
                 // (OBSERVACIONES + RESPONSABLE DEL REGISTRO).
                 const alturaObservaciones = 14;
-                const alturaFooterReporte = alturaObservaciones + 6 + 8 + 8 + 8 + 18;
+                const alturaFooterReporte =
+                    alturaObservaciones + 6 + 8 + 8 + 8 + 18;
                 const espacioSobreFooter = 8;
 
                 const headerStyle = {
@@ -6206,9 +6272,13 @@ export default document.addEventListener("alpine:init", () => {
                     paginaActual,
                     totalPaginas,
                 ) {
-                    const x0 = margenIzq;
                     const y0 = 10;
-                    const widths = [30, 85, 45, 25];
+                    const anchoTabla = 185; // mismo ancho que las tablas y el footer
+                    const reduccion = 10; // margen a cada lado (0 = ancho completo)
+                    const x0 = margenIzq + reduccion;
+                    const anchoEncabezado = anchoTabla - reduccion * 2;
+                    const factor = anchoEncabezado / 181.8; // 181.8 = suma de [30, 83, 44, 24.8]
+                    const widths = [30, 83, 44, 24.8].map((w) => w * factor);
                     const heights = [13, 12, 10];
                     const alturaTotal = heights[0] + heights[1] + heights[2];
                     const colX = [
@@ -6222,13 +6292,15 @@ export default document.addEventListener("alpine:init", () => {
                     doc.setLineWidth(0.2);
 
                     if (logoSol) {
+                        const logoW = widths[0] - 4; // 2 mm de margen a cada lado
+                        const logoH = logoW * (15 / 26); // mantiene la proporción
                         doc.addImage(
                             logoSol,
                             "PNG",
                             x0 + 2,
-                            y0 + (alturaTotal - 15) / 2,
-                            26,
-                            15,
+                            y0 + (alturaTotal - logoH) / 2,
+                            logoW,
+                            logoH,
                             "logo_sol",
                         );
                     }
@@ -6241,7 +6313,7 @@ export default document.addEventListener("alpine:init", () => {
                         widths[1],
                         heights[0],
                         [[{ text: "SOL SECURITY S.A.C.", bold: true }]],
-                        { align: "center" },
+                        { align: "center", fontSize: 12 },
                     );
                     dibujarCelda(
                         doc,
@@ -6261,7 +6333,10 @@ export default document.addEventListener("alpine:init", () => {
                         y0,
                         widths[3],
                         heights[0],
-                        [[{ text: "SEXTA EDICIÓN", bold: true }]],
+                        [
+                            [{ text: "SEXTA", bold: true }],
+                            [{ text: "EDICIÓN", bold: true }],
+                        ],
                         { align: "center" },
                     );
 
@@ -6358,8 +6433,7 @@ export default document.addEventListener("alpine:init", () => {
                     const anchoTotal = 185;
                     const x0 = margenIzq;
                     const pageHeight = doc.internal.pageSize.getHeight();
-                    let y =
-                        pageHeight - margenIzq - alturaFooterReporte;
+                    let y = pageHeight - margenIzq - alturaFooterReporte;
 
                     doc.setDrawColor(0, 0, 0);
                     doc.setLineWidth(0.2);
@@ -6400,7 +6474,11 @@ export default document.addEventListener("alpine:init", () => {
                         doc.text(label, x0 + 2, y + alto / 2 + 1.2);
                         doc.setFont(undefined, "normal");
                         if (valor) {
-                            doc.text(String(valor), x0 + 35, y + alto / 2 + 1.2);
+                            doc.text(
+                                String(valor),
+                                x0 + 35,
+                                y + alto / 2 + 1.2,
+                            );
                         }
 
                         if (index === 3) {
@@ -6538,204 +6616,214 @@ export default document.addEventListener("alpine:init", () => {
                             : `${label} (  )`;
 
                     const dibujarBloque = (startY) => {
-                    // Datos del empleador
-                    doc.autoTable({
-                        startY: startY,
-                        margin: margenContenido,
-                        theme: "grid",
-                        styles: {
-                            fontSize: 8,
-                            cellPadding: 2,
-                            textColor: [0, 0, 0],
-                            valign: "middle",
-                            lineColor: [0, 0, 0],
-                            lineWidth: 0.2,
-                        },
-                        head: [
-                            [
-                                {
-                                    content: "DATOS DEL EMPLEADOR",
-                                    colSpan: 5,
-                                    styles: headerStyle,
-                                },
-                            ],
-                            [
-                                {
-                                    content: "RAZÓN SOCIAL",
-                                    styles: headerStyle,
-                                },
-                                {
-                                    content: "RUC",
-                                    styles: headerStyle,
-                                },
-                                {
-                                    content:
-                                        "DOMICILIO (Dirección, distrito,\ndepartamento, provincia)",
-                                    styles: headerStyle,
-                                },
-                                {
-                                    content: "ACTIVIDAD ECONÓMICA",
-                                    styles: headerStyle,
-                                },
-                                {
-                                    content:
-                                        "Nº DE TRABAJADORES EN EL\nCENTRO LABORAL",
-                                    styles: headerStyle,
-                                },
-                            ],
-                        ],
-                        body: [
-                            [
-                                {
-                                    content: "SOL SECURITY S.A.C.",
-                                    styles: { halign: "center" },
-                                },
-                                {
-                                    content: "20445414833",
-                                    styles: { halign: "center" },
-                                },
-                                {
-                                    content:
-                                        "Calle José Gálvez 334, Callao -\nProv. Const. Del Callao",
-                                    styles: { halign: "center" },
-                                },
-                                {
-                                    content: "SEGURIDAD PRIVADA\nY ELECTRÓNICA",
-                                    styles: { halign: "center" },
-                                },
-                                {
-                                    content: data.Total_Aprobados || "0",
-                                    styles: { halign: "center" },
-                                },
-                            ],
-                        ],
-                        columnStyles: {
-                            0: { cellWidth: 33 },
-                            1: { cellWidth: 27 },
-                            2: { cellWidth: 55 },
-                            3: { cellWidth: 35 },
-                            4: { cellWidth: 35 },
-                        },
-                    });
-
-                    // Marcar (X)
-                    doc.autoTable({
-                        startY: doc.lastAutoTable.finalY,
-                        margin: margenContenido,
-                        theme: "grid",
-                        styles: {
-                            fontSize: 8,
-                            cellPadding: 2,
-                            valign: "middle",
-                            textColor: [0, 0, 0],
-                            lineColor: [0, 0, 0],
-                            lineWidth: 0.2,
-                        },
-                        body: [
-                            [
-                                {
-                                    content: "MARCAR (X)",
-                                    colSpan: 5,
-                                    styles: headerStyle,
-                                },
-                            ],
-                            [
-                                marcarTipo("INDUCCIÓN"),
-                                marcarTipo("CHARLA"),
-                                marcarTipo("CAPACITACIÓN"),
-                                marcarTipo("ENTRENAMIENTO"),
-                                marcarTipo("SIMULACROS DE EMERGENCIA"),
-                            ],
-                        ],
-                        columnStyles: {
-                            0: { cellWidth: 33 },
-                            1: { cellWidth: 27 },
-                            2: { cellWidth: 30 },
-                            3: { cellWidth: 35 },
-                            4: { cellWidth: 60 },
-                        },
-                    });
-
-                    // Datos de capacitación y capacitador
-                    doc.autoTable({
-                        startY: doc.lastAutoTable.finalY,
-                        margin: margenContenido,
-                        theme: "grid",
-                        didDrawCell: (cellData) => {
-                            if (
-                                cellData.section === "body" &&
-                                cellData.row.index === 2 &&
-                                cellData.column.index === 3
-                            ) {
-                                dibujarFirmaEnCelda(
-                                    doc,
-                                    firmaResponsable,
-                                    cellData.cell,
-                                );
-                            }
-                        },
-                        styles: {
-                            fontSize: 8,
-                            cellPadding: 2,
-                            valign: "middle",
-                            textColor: [0, 0, 0],
-                            lineColor: [0, 0, 0],
-                            lineWidth: 0.2,
-                        },
-                        body: [
-                            [
-                                {
-                                    content: "TEMA:",
-                                    styles: {
-                                        ...headerStyle,
-                                        halign: "left",
-                                        cellWidth: 33,
+                        // Datos del empleador
+                        doc.autoTable({
+                            startY: startY,
+                            margin: margenContenido,
+                            theme: "grid",
+                            styles: {
+                                fontSize: 8,
+                                cellPadding: 2,
+                                textColor: [0, 0, 0],
+                                valign: "middle",
+                                lineColor: [0, 0, 0],
+                                lineWidth: 0.2,
+                            },
+                            head: [
+                                [
+                                    {
+                                        content: "DATOS DEL EMPLEADOR",
+                                        colSpan: 5,
+                                        styles: headerStyle,
                                     },
-                                },
-                                {
-                                    content: data.Nombre_Curso || "",
-                                    colSpan: 3,
-                                },
+                                ],
+                                [
+                                    {
+                                        content: "RAZÓN SOCIAL",
+                                        styles: headerStyle,
+                                    },
+                                    {
+                                        content: "RUC",
+                                        styles: headerStyle,
+                                    },
+                                    {
+                                        content:
+                                            "DOMICILIO (Dirección, distrito,\ndepartamento, provincia)",
+                                        styles: headerStyle,
+                                    },
+                                    {
+                                        content: "ACTIVIDAD ECONÓMICA",
+                                        styles: headerStyle,
+                                    },
+                                    {
+                                        content:
+                                            "Nº DE TRABAJADORES EN EL\nCENTRO LABORAL",
+                                        styles: headerStyle,
+                                    },
+                                ],
                             ],
-                            [
-                                {
-                                    content: "FECHA:",
-                                    styles: { ...headerStyle, halign: "left" },
-                                },
-                                {
-                                    content: data.Fecha_Reporte || "",
-                                    colSpan: 3,
-                                },
+                            body: [
+                                [
+                                    {
+                                        content: "SOL SECURITY S.A.C.",
+                                        styles: { halign: "center" },
+                                    },
+                                    {
+                                        content: "20445414833",
+                                        styles: { halign: "center" },
+                                    },
+                                    {
+                                        content:
+                                            "Calle José Gálvez 334, Callao -\nProv. Const. Del Callao",
+                                        styles: { halign: "center" },
+                                    },
+                                    {
+                                        content:
+                                            "SEGURIDAD PRIVADA\nY ELECTRÓNICA",
+                                        styles: { halign: "center" },
+                                    },
+                                    {
+                                        content: data.Total_Aprobados || "0",
+                                        styles: { halign: "center" },
+                                    },
+                                ],
                             ],
-                            [
-                                {
-                                    content: "CAPACITADOR:",
-                                    styles: { ...headerStyle, halign: "left" },
-                                },
-                                data.Nombre_Responsable || "",
-                                { content: "FIRMA", styles: headerStyle },
-                                {
-                                    content: "",
-                                    styles: { minCellHeight: 16 },
-                                },
-                            ],
-                            [
-                                {
-                                    content: "Nº DE HORAS:",
-                                    styles: { ...headerStyle, halign: "left" },
-                                },
-                                { content: "01", colSpan: 3 },
-                            ],
-                        ],
-                        columnStyles: {
-                            0: { cellWidth: 33 },
-                            1: { cellWidth: 92 },
-                            2: { cellWidth: 25 },
-                            3: { cellWidth: 35 },
-                        },
-                    });
+                            columnStyles: {
+                                0: { cellWidth: 33 },
+                                1: { cellWidth: 27 },
+                                2: { cellWidth: 55 },
+                                3: { cellWidth: 35 },
+                                4: { cellWidth: 35 },
+                            },
+                        });
 
-                    return doc.lastAutoTable.finalY;
+                        // Marcar (X)
+                        doc.autoTable({
+                            startY: doc.lastAutoTable.finalY,
+                            margin: margenContenido,
+                            theme: "grid",
+                            styles: {
+                                fontSize: 8,
+                                cellPadding: 2,
+                                valign: "middle",
+                                textColor: [0, 0, 0],
+                                lineColor: [0, 0, 0],
+                                lineWidth: 0.2,
+                            },
+                            body: [
+                                [
+                                    {
+                                        content: "MARCAR (X)",
+                                        colSpan: 5,
+                                        styles: headerStyle,
+                                    },
+                                ],
+                                [
+                                    marcarTipo("INDUCCIÓN"),
+                                    marcarTipo("CHARLA"),
+                                    marcarTipo("CAPACITACIÓN"),
+                                    marcarTipo("ENTRENAMIENTO"),
+                                    marcarTipo("SIMULACROS DE EMERGENCIA"),
+                                ],
+                            ],
+                            columnStyles: {
+                                0: { cellWidth: 33 },
+                                1: { cellWidth: 27 },
+                                2: { cellWidth: 30 },
+                                3: { cellWidth: 35 },
+                                4: { cellWidth: 60 },
+                            },
+                        });
+
+                        // Datos de capacitación y capacitador
+                        doc.autoTable({
+                            startY: doc.lastAutoTable.finalY,
+                            margin: margenContenido,
+                            theme: "grid",
+                            didDrawCell: (cellData) => {
+                                if (
+                                    cellData.section === "body" &&
+                                    cellData.row.index === 2 &&
+                                    cellData.column.index === 3
+                                ) {
+                                    dibujarFirmaEnCelda(
+                                        doc,
+                                        firmaResponsable,
+                                        cellData.cell,
+                                    );
+                                }
+                            },
+                            styles: {
+                                fontSize: 8,
+                                cellPadding: 2,
+                                valign: "middle",
+                                textColor: [0, 0, 0],
+                                lineColor: [0, 0, 0],
+                                lineWidth: 0.2,
+                            },
+                            body: [
+                                [
+                                    {
+                                        content: "TEMA:",
+                                        styles: {
+                                            ...headerStyle,
+                                            halign: "left",
+                                            cellWidth: 33,
+                                        },
+                                    },
+                                    {
+                                        content: data.Nombre_Curso || "",
+                                        colSpan: 3,
+                                    },
+                                ],
+                                [
+                                    {
+                                        content: "FECHA:",
+                                        styles: {
+                                            ...headerStyle,
+                                            halign: "left",
+                                        },
+                                    },
+                                    {
+                                        content: data.Fecha_Reporte || "",
+                                        colSpan: 3,
+                                    },
+                                ],
+                                [
+                                    {
+                                        content: "CAPACITADOR:",
+                                        styles: {
+                                            ...headerStyle,
+                                            halign: "left",
+                                        },
+                                    },
+                                    data.Nombre_Responsable || "",
+                                    { content: "FIRMA", styles: headerStyle },
+                                    {
+                                        content: "",
+                                        styles: { minCellHeight: 20 },
+                                    },
+                                ],
+                                [
+                                    {
+                                        content: "Nº DE HORAS:",
+                                        styles: {
+                                            ...headerStyle,
+                                            halign: "left",
+                                        },
+                                    },
+                                    { content: "01", colSpan: 3 },
+                                ],
+                            ],
+                            columnStyles: {
+                                0: { cellWidth: 33 },
+                                1: { cellWidth: 92 },
+                                2: { cellWidth: 25 },
+                                3: { cellWidth: 35 },
+                            },
+                        });
+
+                        return doc.lastAutoTable.finalY;
                     };
 
                     const blockEndY = dibujarBloque(49);
@@ -6745,6 +6833,10 @@ export default document.addEventListener("alpine:init", () => {
                         startY: blockEndY,
                         margin: { ...margenContenido, top: blockEndY },
                         theme: "grid",
+                        // Evita que una fila se parta al final de la página:
+                        // autotable genera una fila "resto" (índice -1) que
+                        // se imprimía como fila vacía en la página siguiente.
+                        rowPageBreak: "avoid",
                         willDrawPage: (pageData) => {
                             if (pageData.pageNumber > 1) {
                                 dibujarBloque(49);
@@ -6758,11 +6850,12 @@ export default document.addEventListener("alpine:init", () => {
                                 const persona = (data.Personal || [])[
                                     cellData.row.index
                                 ];
+                                // Las filas "resto" (-1) no corresponden a
+                                // ninguna persona: no dibujar "SIN FIRMA".
+                                if (!persona) return;
                                 dibujarFirmaEnCelda(
                                     doc,
-                                    persona
-                                        ? personalFirmas[persona.DNI_Personal]
-                                        : null,
+                                    personalFirmas[persona.DNI_Personal],
                                     cellData.cell,
                                 );
                             }
@@ -6792,7 +6885,7 @@ export default document.addEventListener("alpine:init", () => {
                             persona.Nombre_Personal || "",
                             persona.DNI_Personal || "",
                             persona.Cargo_Personal || "",
-                            { content: "", styles: { minCellHeight: 10 } },
+                            { content: "", styles: { minCellHeight: 14 } },
                         ]),
                         columnStyles: {
                             0: { cellWidth: 10, halign: "center" },
@@ -7111,17 +7204,10 @@ export default document.addEventListener("alpine:init", () => {
                 sheet.views = [{ state: "frozen", ySplit: 1 }];
 
                 const buffer = await workbook.xlsx.writeBuffer();
-                saveAs(
-                    _blobExcel(buffer),
-                    "FORMATO_IMPORTACION_PERSONAL.xlsx",
-                );
+                saveAs(_blobExcel(buffer), "FORMATO_IMPORTACION_PERSONAL.xlsx");
             } catch (error) {
                 console.error(error);
-                Swal.fire(
-                    "Error",
-                    "No se pudo descargar el formato.",
-                    "error",
-                );
+                Swal.fire("Error", "No se pudo descargar el formato.", "error");
             }
         },
 
